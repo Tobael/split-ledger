@@ -10,6 +10,7 @@ import {
     RelayTransport,
     SyncManager,
     deriveGroupKey,
+    parseInviteLink,
     type GroupId,
     type GroupState,
     type LedgerEntry,
@@ -57,6 +58,7 @@ interface AppContextValue {
 
     // Sync
     syncStatus: SyncStatus;
+    syncGroupFromRelay: (inviteLink: string) => Promise<GroupId>;
 }
 
 const AppContext = createContext<AppContextValue | null>(null);
@@ -74,23 +76,76 @@ function getRelayWsUrl(): string {
     return `${proto}://${window.location.host}/ws`;
 }
 
+// ─── LocalStorage persistence helpers ───
+
+const IDENTITY_KEY = 'splitledger-identity';
+const GROUPS_KEY = 'splitledger-groups';
+
+function saveIdentityToStorage(identity: IdentityState): void {
+    localStorage.setItem(IDENTITY_KEY, JSON.stringify(identity));
+}
+
+function loadIdentityFromStorage(): IdentityState | null {
+    try {
+        const raw = localStorage.getItem(IDENTITY_KEY);
+        if (!raw) return null;
+        return JSON.parse(raw) as IdentityState;
+    } catch {
+        return null;
+    }
+}
+
+async function saveGroupEntriesToStorage(storage: InMemoryStorageAdapter): Promise<void> {
+    const groupIds = await storage.getGroupIds();
+    const data: Record<string, LedgerEntry[]> = {};
+    for (const gid of groupIds) {
+        data[gid] = await storage.getAllEntries(gid);
+    }
+    localStorage.setItem(GROUPS_KEY, JSON.stringify(data));
+}
+
+async function loadGroupEntriesFromStorage(storage: InMemoryStorageAdapter): Promise<void> {
+    try {
+        const raw = localStorage.getItem(GROUPS_KEY);
+        if (!raw) return;
+        const data = JSON.parse(raw) as Record<string, LedgerEntry[]>;
+        for (const [groupId, entries] of Object.entries(data)) {
+            for (const entry of entries) {
+                await storage.appendEntry(groupId as GroupId, entry);
+            }
+        }
+    } catch {
+        // Corrupted data, start fresh
+    }
+}
+
 // ─── Provider ───
 
 export function AppProvider({ children }: { children: ReactNode }) {
-    const [identity, setIdentity] = useState<IdentityState | null>(null);
+    const [identity, setIdentity] = useState<IdentityState | null>(() => loadIdentityFromStorage());
     const [groups, setGroups] = useState<GroupSummary[]>([]);
     const [syncStatus, setSyncStatus] = useState<SyncStatus>('disconnected');
+    const [storageReady, setStorageReady] = useState(false);
 
     const storage = useMemo(() => new InMemoryStorageAdapter(), []);
 
+    // Load persisted group entries on mount
+    useEffect(() => {
+        loadGroupEntriesFromStorage(storage).then(() => setStorageReady(true));
+    }, [storage]);
+
+    const persistEntries = useCallback(async () => {
+        await saveGroupEntriesToStorage(storage);
+    }, [storage]);
+
     const manager = useMemo(() => {
-        if (!identity) return null;
+        if (!identity || !storageReady) return null;
         return new GroupManager({
             storage,
             deviceIdentity: identity.device,
             rootKeyPair: identity.rootKeyPair,
         });
-    }, [identity, storage]);
+    }, [identity, storage, storageReady]);
 
     // Relay transport + sync manager (created once when identity is ready)
     const transportRef = useRef<RelayTransport | null>(null);
@@ -136,11 +191,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const createIdentity = useCallback((displayName: string) => {
         const root = createRootIdentity(displayName);
         const device = createDeviceIdentity(root.rootKeyPair, `${displayName}'s Browser`);
-        setIdentity({
+        const newIdentity = {
             displayName,
             rootKeyPair: root.rootKeyPair,
             device,
-        });
+        };
+        saveIdentityToStorage(newIdentity);
+        setIdentity(newIdentity);
     }, []);
 
     const getGroupState = useCallback(async (groupId: GroupId) => {
@@ -167,6 +224,25 @@ export function AppProvider({ children }: { children: ReactNode }) {
             // Relay offline — continue in offline mode
         }
     }, [identity]);
+
+    // Pre-sync a group's entries from relay before joining
+    const syncGroupFromRelay = useCallback(async (inviteLink: string): Promise<GroupId> => {
+        const { token } = parseInviteLink(inviteLink);
+        const groupId = token.groupId;
+        const syncMgr = syncManagerRef.current;
+
+        if (!syncMgr) {
+            throw new Error('Not connected to relay');
+        }
+
+        // Register group key and sync (fetches + decrypts + stores all entries)
+        const encoder = new TextEncoder();
+        const groupKey = deriveGroupKey(encoder.encode(groupId), groupId);
+        syncMgr.registerGroupKey(groupId, groupKey);
+        await syncMgr.startSync(groupId);
+
+        return groupId;
+    }, []);
 
     const refreshGroups = useCallback(async () => {
         if (!manager || !identity) return;
@@ -195,7 +271,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
         }
 
         setGroups(summaries);
-    }, [manager, identity, storage, syncGroupWithRelay]);
+
+        // Persist entries to localStorage after refresh
+        await persistEntries();
+    }, [manager, identity, storage, syncGroupWithRelay, persistEntries]);
 
     // Auto-refresh when manager changes
     useEffect(() => {
@@ -215,6 +294,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         getGroupState,
         getGroupEntries,
         syncStatus,
+        syncGroupFromRelay,
     };
 
     return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

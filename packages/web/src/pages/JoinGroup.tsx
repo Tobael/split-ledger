@@ -4,12 +4,13 @@ import { useApp } from '../context/AppContext';
 import { useI18n } from '../i18n';
 
 export function JoinGroup() {
-    const { manager, refreshGroups } = useApp();
+    const { manager, refreshGroups, syncGroupFromRelay } = useApp();
     const { t } = useI18n();
     const navigate = useNavigate();
     const [inviteLink, setInviteLink] = useState('');
     const [displayName, setDisplayName] = useState('');
     const [joining, setJoining] = useState(false);
+    const [status, setStatus] = useState('');
     const [error, setError] = useState('');
 
     const handleJoin = async () => {
@@ -17,12 +18,19 @@ export function JoinGroup() {
         setJoining(true);
         setError('');
         try {
+            // Step 1: Sync group entries from relay
+            setStatus(t.joinGroup.syncing);
+            await syncGroupFromRelay(inviteLink.trim());
+
+            // Step 2: Join the group
+            setStatus(t.joinGroup.joining);
             const { groupId } = await manager.joinGroup(inviteLink.trim(), displayName.trim());
             await refreshGroups();
             navigate(`/group/${groupId}`);
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed to join group');
             setJoining(false);
+            setStatus('');
         }
     };
 
@@ -77,7 +85,7 @@ export function JoinGroup() {
                         onClick={handleJoin}
                         disabled={!inviteLink.trim() || !displayName.trim() || joining}
                     >
-                        {joining ? t.joinGroup.joining : t.joinGroup.joinButton}
+                        {joining ? (status || t.joinGroup.joining) : t.joinGroup.joinButton}
                     </button>
                 </div>
             </div>

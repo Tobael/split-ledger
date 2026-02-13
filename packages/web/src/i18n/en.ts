@@ -57,6 +57,7 @@ export interface Translations {
         invitePlaceholder: string;
         nameLabel: string;
         namePlaceholder: string;
+        syncing: string;
         joining: string;
         joinButton: string;
     };
@@ -186,6 +187,7 @@ const en: Translations = {
         nameLabel: 'Your Display Name',
         namePlaceholder: 'How others will see you',
         joining: 'Joining…',
+        syncing: 'Syncing group data…',
         joinButton: 'Join Group',
     },
     groupDetail: {

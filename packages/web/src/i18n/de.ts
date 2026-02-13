@@ -60,6 +60,7 @@ const de: Translations = {
         nameLabel: 'Dein Anzeigename',
         namePlaceholder: 'Wie andere dich sehen werden',
         joining: 'Beitritt läuft…',
+        syncing: 'Gruppendaten werden synchronisiert…',
         joinButton: 'Gruppe beitreten',
     },
     groupDetail: {
