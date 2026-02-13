@@ -3,7 +3,6 @@
 // =============================================================================
 
 import Database from 'better-sqlite3';
-import type { RelayConfig } from './config.js';
 
 export interface StoredEntry {
     id: number;
