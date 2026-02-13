@@ -4,7 +4,7 @@ import { useApp } from '../context/AppContext';
 import { useI18n } from '../i18n';
 
 export function JoinGroup() {
-    const { manager, refreshGroups, syncGroupFromRelay } = useApp();
+    const { manager, refreshGroups, syncGroupFromRelay, broadcastEntry } = useApp();
     const { t } = useI18n();
     const navigate = useNavigate();
     const [inviteLink, setInviteLink] = useState('');
@@ -24,7 +24,10 @@ export function JoinGroup() {
 
             // Step 2: Join the group
             setStatus(t.joinGroup.joining);
-            const { groupId } = await manager.joinGroup(inviteLink.trim(), displayName.trim());
+            const { groupId, memberAddedEntry } = await manager.joinGroup(inviteLink.trim(), displayName.trim());
+
+            // Step 3: Broadcast MemberAdded entry to relay so others see us
+            await broadcastEntry(groupId, memberAddedEntry);
             await refreshGroups();
             navigate(`/group/${groupId}`);
         } catch (err) {
