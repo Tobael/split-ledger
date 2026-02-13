@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { useI18n } from '../i18n';
 import { ChainVisualization } from '../components/ChainVisualization';
@@ -22,7 +22,7 @@ interface ExpensePayload {
 
 export function GroupDetail() {
     const { id } = useParams<{ id: string }>();
-    const navigate = useNavigate();
+
     const { manager, getGroupState, getGroupEntries, identity } = useApp();
     const { t } = useI18n();
     const groupId = id as GroupId;
