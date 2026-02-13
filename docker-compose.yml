@@ -1,0 +1,41 @@
+version: "3.9"
+
+services:
+  # ─── Relay Server ───
+  relay:
+    build:
+      context: .
+      dockerfile: Dockerfile.relay
+    ports:
+      - "8443:8443"
+    volumes:
+      - relay-data:/app/data
+    environment:
+      PORT: "8443"
+      HOST: "0.0.0.0"
+      DB_PATH: "/app/data/relay.db"
+      ENTRY_RETENTION_DAYS: "90"
+      MAX_GROUPS: "100000"
+      MAX_ENTRIES_PER_GROUP: "1000000"
+      MAX_CONNECTIONS_PER_IP: "50"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8443/api/v1/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # ─── Web Frontend ───
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    ports:
+      - "8080:80"
+    depends_on:
+      relay:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  relay-data:
