@@ -48,6 +48,7 @@ services:
       - "traefik.http.routers.splitledger.rule=Host(`${SPLITLEDGER_DOMAIN}`)"
       - "traefik.http.routers.splitledger.entrypoints=websecure"
       - "traefik.http.routers.splitledger.tls=true"
+      - "traefik.http.services.splitledger.loadbalancer.server.port=80"
       - "traefik.docker.network=external_network"
 
 networks:

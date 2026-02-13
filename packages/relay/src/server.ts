@@ -35,12 +35,15 @@ export function startRelay(configOverrides?: Partial<RelayConfig>): RelayServer 
             const host = req.headers.host ?? `localhost:${config.port}`;
             const url = `${protocol}://${host}${req.url ?? '/'}`;
 
-            // Read the body
-            const chunks: Buffer[] = [];
-            for await (const chunk of req) {
-                chunks.push(chunk as Buffer);
+            // Read the body (only for methods that have one)
+            let body: Buffer | undefined;
+            if (req.method !== 'GET' && req.method !== 'HEAD') {
+                const chunks: Buffer[] = [];
+                for await (const chunk of req) {
+                    chunks.push(chunk as Buffer);
+                }
+                body = chunks.length > 0 ? Buffer.concat(chunks) : undefined;
             }
-            const body = chunks.length > 0 ? Buffer.concat(chunks) : undefined;
 
             const headers = new Headers();
             for (const [key, value] of Object.entries(req.headers)) {
