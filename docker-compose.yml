@@ -37,9 +37,6 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.web
-    depends_on:
-      relay:
-        condition: service_healthy
     restart: unless-stopped
     networks:
       - external_network
