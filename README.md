@@ -64,6 +64,8 @@ Required GitHub Secrets:
 | `DEPLOY_SECRET_KEY` | SSH private key |
 | `SSH_HOST` | Target server hostname |
 | `SSH_USER` | SSH username |
+| `SPLITLEDGER_DOMAIN` | Domain for web frontend (e.g. `expenses.example.com`) |
+| `SPLITLEDGER_RELAY_DOMAIN` | Domain for relay server (e.g. `relay.expenses.example.com`) |
 
 ## Tech Stack
 

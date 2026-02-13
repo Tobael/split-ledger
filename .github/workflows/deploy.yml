@@ -35,4 +35,6 @@ jobs:
           port: 22
           script: |
             cd splitledger
+            echo "SPLITLEDGER_DOMAIN=${{ secrets.SPLITLEDGER_DOMAIN }}" > .env
+            echo "SPLITLEDGER_RELAY_DOMAIN=${{ secrets.SPLITLEDGER_RELAY_DOMAIN }}" >> .env
             docker compose up -d --build --remove-orphans

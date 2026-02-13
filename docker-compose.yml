@@ -1,15 +1,12 @@
-version: "3.9"
-
 services:
   # ─── Relay Server ───
   relay:
+    container_name: splitledger-relay
     build:
       context: .
       dockerfile: Dockerfile.relay
-    ports:
-      - "8443:8443"
     volumes:
-      - relay-data:/app/data
+      - /docker-compose-services/splitledger-data:/app/data
     environment:
       PORT: "8443"
       HOST: "0.0.0.0"
@@ -20,22 +17,40 @@ services:
       MAX_CONNECTIONS_PER_IP: "50"
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8443/api/v1/health"]
+      test: [ "CMD", "wget", "-q", "--spider", "http://localhost:8443/api/v1/health" ]
       interval: 30s
       timeout: 5s
       retries: 3
+    networks:
+      - external_network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.splitledger-relay.rule=Host(`${SPLITLEDGER_RELAY_DOMAIN}`)"
+      - "traefik.http.routers.splitledger-relay.entrypoints=websecure"
+      - "traefik.http.routers.splitledger-relay.tls=true"
+      - "traefik.http.services.splitledger-relay.loadbalancer.server.port=8443"
+      - "traefik.docker.network=external_network"
 
   # ─── Web Frontend ───
   web:
+    container_name: splitledger-web
     build:
       context: .
       dockerfile: Dockerfile.web
-    ports:
-      - "8080:80"
     depends_on:
       relay:
         condition: service_healthy
     restart: unless-stopped
+    networks:
+      - external_network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.splitledger.rule=Host(`${SPLITLEDGER_DOMAIN}`)"
+      - "traefik.http.routers.splitledger.entrypoints=websecure"
+      - "traefik.http.routers.splitledger.tls=true"
+      - "traefik.docker.network=external_network"
 
-volumes:
-  relay-data:
+networks:
+  external_network:
+    external: true
+    name: external_network
