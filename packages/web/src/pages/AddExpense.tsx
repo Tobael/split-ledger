@@ -13,7 +13,7 @@ import {
 export function AddExpense() {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
-    const { manager, getGroupState, storage, identity, refreshGroups } = useApp();
+    const { manager, getGroupState, storage, identity, refreshGroups, broadcastEntry } = useApp();
     const { t } = useI18n();
     const groupId = id as GroupId;
 
@@ -105,6 +105,7 @@ export function AddExpense() {
             );
 
             await storage.appendEntry(groupId, entry);
+            await broadcastEntry(groupId, entry);
             await refreshGroups();
             navigate(`/group/${groupId}`);
         } catch (err) {

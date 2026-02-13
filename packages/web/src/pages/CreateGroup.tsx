@@ -2,9 +2,10 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { useI18n } from '../i18n';
+import { type GroupId } from '@splitledger/core';
 
 export function CreateGroup() {
-    const { manager, refreshGroups } = useApp();
+    const { manager, refreshGroups, broadcastEntry } = useApp();
     const { t } = useI18n();
     const navigate = useNavigate();
     const [name, setName] = useState('');
@@ -14,7 +15,8 @@ export function CreateGroup() {
         if (!manager || !name.trim()) return;
         setCreating(true);
         try {
-            const { groupId } = await manager.createGroup(name.trim());
+            const { groupId, genesisEntry } = await manager.createGroup(name.trim());
+            await broadcastEntry(groupId as GroupId, genesisEntry);
             await refreshGroups();
             navigate(`/group/${groupId}`);
         } catch (err) {

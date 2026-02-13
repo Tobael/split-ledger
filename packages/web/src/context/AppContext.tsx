@@ -59,6 +59,7 @@ interface AppContextValue {
     // Sync
     syncStatus: SyncStatus;
     syncGroupFromRelay: (inviteLink: string) => Promise<GroupId>;
+    broadcastEntry: (groupId: GroupId, entry: LedgerEntry) => Promise<void>;
 }
 
 const AppContext = createContext<AppContextValue | null>(null);
@@ -220,10 +221,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
             const groupKey = deriveGroupKey(encoder.encode(groupId), groupId);
             syncMgr.registerGroupKey(groupId, groupKey);
             await syncMgr.startSync(groupId);
+
+            // Push local entries to relay (relay deduplicates)
+            const localEntries = await storage.getAllEntries(groupId);
+            for (const entry of localEntries) {
+                try {
+                    await syncMgr.broadcastEntry(groupId, entry);
+                } catch {
+                    // Entry may already exist on relay — ignore
+                }
+            }
         } catch {
             // Relay offline — continue in offline mode
         }
-    }, [identity]);
+    }, [identity, storage]);
 
     // Pre-sync a group's entries from relay before joining
     const syncGroupFromRelay = useCallback(async (inviteLink: string): Promise<GroupId> => {
@@ -242,6 +253,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
         await syncMgr.startSync(groupId);
 
         return groupId;
+    }, []);
+
+    // Broadcast a newly created entry to the relay
+    const broadcastEntry = useCallback(async (groupId: GroupId, entry: LedgerEntry) => {
+        const syncMgr = syncManagerRef.current;
+        if (!syncMgr) return; // Relay offline — entry stays local
+        try {
+            await syncMgr.broadcastEntry(groupId, entry);
+        } catch {
+            // Relay offline — entry will be synced later
+        }
     }, []);
 
     const refreshGroups = useCallback(async () => {
@@ -295,6 +317,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         getGroupEntries,
         syncStatus,
         syncGroupFromRelay,
+        broadcastEntry,
     };
 
     return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
