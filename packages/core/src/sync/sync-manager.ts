@@ -246,8 +246,9 @@ export class SyncManager {
             const encrypted = base64ToBytes(transportEntry.encryptedEntry);
             const decrypted = decryptFromRelay(encrypted, groupKey);
             entry = deserializeEntry<LedgerEntry>(decrypted);
-        } catch {
-            this.emit({ type: 'entry:rejected', groupId, detail: { reason: 'Decryption failed' } });
+        } catch (err) {
+            console.error('[SyncManager] Decryption/Deserialization failed:', err);
+            this.emit({ type: 'entry:rejected', groupId, detail: { reason: 'Decryption failed', error: err } });
             return false;
         }
 
@@ -262,6 +263,7 @@ export class SyncManager {
         if (!state) {
             // No state yet — this might be the genesis entry
             if (entry.entryType !== 'Genesis') {
+                console.error('[SyncManager] Rejected: Expected genesis entry first, got', entry.entryType, entry.lamportClock);
                 this.emit({ type: 'entry:rejected', groupId, detail: { reason: 'Expected genesis first', entryId: entry.entryId } });
                 return false;
             }
@@ -271,6 +273,7 @@ export class SyncManager {
         const result = validateEntry(entry, allEntries, emptyState);
 
         if (!result.valid) {
+            console.error('[SyncManager] Validation failed:', result.errors);
             this.emit({ type: 'entry:rejected', groupId, detail: { errors: result.errors, entryId: entry.entryId } });
             return false;
         }

@@ -1,82 +1,76 @@
 # SplitLedger
 
-Cryptographically secure, peer-to-peer expense splitting. No accounts, no central servers storing your data — just end-to-end encrypted, hash-chained ledgers synced between devices.
+**Cryptographically secure, peer-to-peer expense splitting.**
+
+SplitLedger is a privacy-first application for managing shared expenses. It uses end-to-end encryption and a tamper-evident hash chain to ensure that your financial data remains yours. No accounts, no central servers reading your data, just math.
 
 ## Features
 
-- **End-to-end encrypted** — all entries are encrypted before leaving your device
-- **Hash-chained ledger** — tamper-evident log of all group activity
-- **No account required** — identity is a cryptographic key pair generated on your device
-- **Multi-device sync** — sync via relay server (WebSocket) with offline support
-- **Social recovery** — recover access via trusted group members
-- **Multi-language** — English and German (default)
+-   **🔒 End-to-End Encrypted**: Data is encrypted on your device before it ever touches the network.
+-   **🛡️ Tamper-Evident**: Uses a blockchain-like hash chain to prevent history rewriting.
+-   **👤 No Accounts**: Identity is a cryptographic key pair generated locally.
+-   **⚡ Real-Time Sync**: Syncs instantly across devices via a relay server (WebSocket).
+-   **📱 Offline First**: Works fully offline; syncs when you reconnect.
 
-## Architecture
+## Documentation
 
+We believe in transparency. Here is exactly how the security and synchronization work:
+
+-   [**Architecture & Design**](docs/design/01-architecture.md)
+-   [**User Flow: Group Creation**](docs/flows/01-group-creation.md) - How keys and groups are securely born.
+-   [**User Flow: Invitation & Join**](docs/flows/02-invitation-join.md) - How we securely invite others without exposing keys.
+-   [**User Flow: Adding Expenses**](docs/flows/03-adding-expense.md) - How the ledger ensures integrity and ordering.
+-   [**User Flow: Synchronization**](docs/flows/04-synchronization.md) - How devices stay in sync via an untrusted relay.
+
+## Architecture Overview
+
+```mermaid
+graph TD
+    subgraph Client [User Device (Browser)]
+        UI[React UI]
+        Logic[Business Logic]
+        Crypto[Crypto Engine (Ed25519/ChaCha20)]
+        Store[Local Storage (IndexedDB/LS)]
+        
+        UI --> Logic
+        Logic --> Crypto
+        Logic --> Store
+    end
+    
+    subgraph Network
+        Relay[Relay Server (Node.js/Hono)]
+        DB[(Relay DB)]
+        
+        Relay --> DB
+    end
+    
+    Client -- "Encrypted Blobs (WebSocket)" --> Relay
+    
+    style Client fill:#f9f,stroke:#333
+    style Relay fill:#bbf,stroke:#333
+    style Crypto fill:#bfb,stroke:#333
 ```
-packages/
-  core/     — cryptography, ledger engine, sync, balance computation
-  relay/    — Node.js relay server (Hono REST + WebSocket)
-  web/      — React SPA (Vite)
-```
 
-## Quick Start
+## Quick Start (Development)
 
-### Development
+To run the project locally for development:
 
 ```bash
-# Install dependencies
+# 1. Install dependencies
 npm install
 
-# Build core library
+# 2. Build core library
 npm run build --workspace=packages/core
 
-# Start relay server (port 8443)
+# 3. Start Relay Server (Port 8443)
 npm run dev --workspace=packages/relay
 
-# Start web app (port 5173, proxies to relay)
-npm run dev --workspace=packages/web
+# 4. Start Web Client (Port 5173)
+npm --workspace=packages/web run dev -- --host
 ```
 
-### Production (Docker Compose)
-
-```bash
-docker compose up -d --build
-```
-
-This starts:
-- **Relay server** on port `8443` (WebSocket + REST API)
-- **Web frontend** on port `8080` (nginx, proxies WS/API to relay)
-
-SQLite data is persisted in a Docker volume (`relay-data`).
-
-## Deployment
-
-The included GitHub Actions workflow (`.github/workflows/deploy.yml`) deploys via:
-1. WireGuard VPN connection
-2. rsync to the server
-3. `docker compose up -d --build --remove-orphans`
-
-Required GitHub Secrets:
-| Secret | Description |
-|--------|-------------|
-| `WIREGUARD_CONF` | WireGuard client config |
-| `DEPLOY_SECRET_KEY` | SSH private key |
-| `SSH_HOST` | Target server hostname |
-| `SSH_USER` | SSH username |
-| `SPLITLEDGER_DOMAIN` | Domain for web frontend (e.g. `expenses.example.com`) |
-| `SPLITLEDGER_RELAY_DOMAIN` | Domain for relay server (e.g. `relay.expenses.example.com`) |
-
-## Tech Stack
-
-| Component | Technology |
-|-----------|-----------|
-| Core crypto | Ed25519 (TweetNaCl), SHA-256, HKDF |
-| Ledger | Hash-chained entries with Lamport clocks |
-| Frontend | React, Vite, vanilla CSS |
-| Backend | Hono (REST), ws (WebSocket), better-sqlite3 |
-| Deployment | Docker Compose, nginx |
+Open `http://localhost:5173` in your browser.
 
 ## License
 
-Private — all rights reserved.
+Private — All rights reserved.
