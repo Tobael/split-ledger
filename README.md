@@ -22,35 +22,6 @@ We believe in transparency. Here is exactly how the security and synchronization
 -   [**User Flow: Adding Expenses**](docs/flows/03-adding-expense.md) - How the ledger ensures integrity and ordering.
 -   [**User Flow: Synchronization**](docs/flows/04-synchronization.md) - How devices stay in sync via an untrusted relay.
 
-## Architecture Overview
-
-```mermaid
-graph TD
-    subgraph Client [User Device (Browser)]
-        UI[React UI]
-        Logic[Business Logic]
-        Crypto[Crypto Engine (Ed25519/ChaCha20)]
-        Store[Local Storage (IndexedDB/LS)]
-        
-        UI --> Logic
-        Logic --> Crypto
-        Logic --> Store
-    end
-    
-    subgraph Network
-        Relay[Relay Server (Node.js/Hono)]
-        DB[(Relay DB)]
-        
-        Relay --> DB
-    end
-    
-    Client -- "Encrypted Blobs (WebSocket)" --> Relay
-    
-    style Client fill:#f9f,stroke:#333
-    style Relay fill:#bbf,stroke:#333
-    style Crypto fill:#bfb,stroke:#333
-```
-
 ## Quick Start (Development)
 
 To run the project locally for development:

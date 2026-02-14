@@ -80,6 +80,8 @@ export interface Translations {
         settleUp: string;
         markAsPaid: string;
         settlementDescription: string;
+        deleteGroup: string;
+        confirmDelete: string;
     };
     chain: {
         title: string;
@@ -232,6 +234,8 @@ const en: Translations = {
         settleUp: 'Settle Up',
         markAsPaid: 'Mark as Paid',
         settlementDescription: 'Settlement',
+        deleteGroup: 'Delete Group',
+        confirmDelete: 'Are you sure you want to delete this group? This cannot be undone.',
     },
     chain: {
         title: 'Hash Chain',

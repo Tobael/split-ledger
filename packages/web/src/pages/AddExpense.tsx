@@ -6,6 +6,7 @@ import {
     type GroupId,
     type GroupState,
     type PublicKey,
+    type Hash,
     EntryType,
     buildEntry,
 } from '@splitledger/core';
@@ -119,7 +120,17 @@ export function AddExpense() {
             // If editing, void the old entry first
             if (editId) {
                 await voidExpense(groupId, editId as any, 'Edited');
-                // We don't return here; we proceed to create the new entry (the "amendment")
+            }
+
+            // Determine previous hash
+            let previousHash: Hash;
+            if (editId) {
+                // If we just voided, we need the absolutely latest hash (which is the void entry)
+                const latest = await storage.getLatestEntry(groupId);
+                if (!latest) throw new Error('No entries found after voiding');
+                previousHash = latest.entryId;
+            } else {
+                previousHash = latestEntry.entryId;
             }
 
             const entry = buildEntry(
@@ -131,34 +142,8 @@ export function AddExpense() {
                     paidByRootPubkey: paidBy as PublicKey,
                     splits,
                 },
-                latestEntry.entryId, // this will be valid even if we just voided, because voiding (via voidExpense) appends to storage?
-                // Actually `voidExpense` calls `manager.createAndAppendEntry` but NOT `refreshGroups` synchronously enough?
-                // Wait. `voidExpense` in AppContext calls `manager.voidExpense` -> `storage.append`.
-                // BUT `latestEntry` here was fetched BEFORE voiding if I call `voidExpense` below.
-                // Race condition! 
-                // Fix: If editing, I should rely on `voidExpense` to append the void entry, AND THEN fetching the new latest hash?
-                // OR: Just accept that the new entry branches off the SAME parent as the void entry?
-                // NO, linear chain.
-                // I must re-fetch latest entry after voiding.
-                // OR simpler: `voidExpense` returns the new void entry. Use THAT as previous hash.
-                // But `voidExpense` in AppContext returns Promise<void>.
-                // I should update AppContext to return the Entry.
-                // For now, let's just re-fetch latest entry or guess.
-                // Safest: `voidExpense` then `storage.getLatestEntry`.
-
-                // Let's modify the flow:
-                // 1. If editId, call voidExpense.
-                // 2. Fetch latest entry (which is now the void entry or whatever was latest).
-                // 3. Build new entry.
-                // 4. Append.
-
-                // Actually, let's look at `latestEntry` usage.
-                // It uses `ordered[ordered.length-1]`.
-                // If I void, I add an entry.
-                // So I need to re-fetch `entries` or `latestEntry`.
-
-                editId ? (await storage.getLatestEntry(groupId))!.entryId : latestEntry.entryId,
-                result.finalState.currentLamportClock + 1 + (editId ? 1 : 0), // Hack: if we voided, clock incremented by 1.
+                previousHash,
+                result.finalState.currentLamportClock + 1 + (editId ? 1 : 0),
                 identity.device.deviceKeyPair.publicKey,
                 identity.device.deviceKeyPair.secretKey,
             );

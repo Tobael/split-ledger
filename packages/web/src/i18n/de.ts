@@ -82,6 +82,8 @@ const de: Translations = {
         settleUp: 'Ausgleichen',
         markAsPaid: 'Als bezahlt markieren',
         settlementDescription: 'Ausgleich',
+        deleteGroup: 'Gruppe löschen',
+        confirmDelete: 'Möchtest du diese Gruppe wirklich löschen? Dies kann nicht rückgängig gemacht werden.',
     },
     chain: {
         title: 'Hash-Kette',

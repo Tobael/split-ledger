@@ -18,6 +18,7 @@ import {
     type DeviceIdentity,
 
     EntryType,
+    type Hash,
 } from '@splitledger/core';
 
 // ─── Types ───
@@ -59,7 +60,7 @@ interface AppContextValue {
 
     // Sync
     syncStatus: SyncStatus;
-    syncGroupFromRelay: (inviteLink: string) => Promise<GroupId>;
+
     syncGroupFromRelay: (inviteLink: string) => Promise<GroupId>;
     broadcastEntry: (groupId: GroupId, entry: LedgerEntry) => Promise<void>;
     deleteGroup: (groupId: GroupId) => Promise<void>;
@@ -409,6 +410,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         syncStatus,
         syncGroupFromRelay,
         broadcastEntry,
+        deleteGroup,
+        voidExpense,
     };
 
     return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
