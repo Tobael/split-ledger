@@ -10,6 +10,10 @@ import {
     type PublicKey,
     EntryType,
     computeBalances,
+    computeSettlements,
+    buildEntry,
+    orderEntries,
+    validateFullChain,
 } from '@splitledger/core';
 
 interface ExpensePayload {
@@ -23,7 +27,7 @@ interface ExpensePayload {
 export function GroupDetail() {
     const { id } = useParams<{ id: string }>();
 
-    const { manager, getGroupState, getGroupEntries, identity } = useApp();
+    const { manager, getGroupState, getGroupEntries, identity, broadcastEntry, refreshGroups, storage } = useApp();
     const { t } = useI18n();
     const groupId = id as GroupId;
 
@@ -56,6 +60,57 @@ export function GroupDetail() {
         setTimeout(() => setCopied(false), 2000);
     };
 
+    const handleRemoveMember = async (memberPubkey: string) => {
+        if (!manager || !confirm(t.groupDetail.confirmRemove)) return;
+        try {
+            const entry = await manager.removeMember(groupId, memberPubkey as PublicKey, 'Removed by admin');
+            await broadcastEntry(groupId, entry);
+            await refresh();
+            await refreshGroups();
+        } catch (err) {
+            console.error('Failed to remove member:', err);
+            alert('Failed to remove member');
+        }
+    };
+
+    const handleSettleUp = async (from: string, to: string, amount: number) => {
+        if (!manager || !identity || !storage) return;
+        try {
+            // Get latest state for chaining
+            const entries = await storage.getAllEntries(groupId);
+            const ordered = orderEntries([...entries]);
+            const latestEntry = ordered[ordered.length - 1]!;
+            const result = validateFullChain(entries);
+
+            if (!result.valid || !result.finalState) {
+                alert(t.addExpense?.invalidLedger ?? 'Invalid ledger state');
+                return;
+            }
+
+            const entry = buildEntry(
+                EntryType.ExpenseCreated,
+                {
+                    description: t.groupDetail.settlementDescription,
+                    amountMinorUnits: amount,
+                    currency: 'EUR', // TODO: match group currency
+                    paidByRootPubkey: from as PublicKey, // Debtor pays
+                    splits: { [to]: amount }, // Creditor receives/consumes full amount
+                },
+                latestEntry.entryId,
+                result.finalState.currentLamportClock + 1,
+                identity.device.deviceKeyPair.publicKey,
+                identity.device.deviceKeyPair.secretKey,
+            );
+
+            await storage.appendEntry(groupId, entry);
+            await broadcastEntry(groupId, entry);
+            await refresh();
+        } catch (err) {
+            console.error('Failed to settle up:', err);
+            alert('Failed to settle up');
+        }
+    };
+
     if (!state) {
         return <div style={{ padding: 'var(--space-8)', color: 'var(--text-secondary)' }}>{t.common.loading}</div>;
     }
@@ -78,6 +133,7 @@ export function GroupDetail() {
                 </div>
                 <div style={{ display: 'flex', gap: 'var(--space-3)' }}>
                     <button className="btn btn--ghost" onClick={() => setShowChain(v => !v)}>{showChain ? t.groupDetail.hideChain : t.groupDetail.viewChain}</button>
+                    <Link to={`/group/${groupId}/recovery`} className="btn btn--secondary">🛡️</Link>
                     <button className="btn btn--secondary" onClick={handleCreateInvite}>{t.groupDetail.invite}</button>
                     <Link to={`/group/${groupId}/expense`} className="btn btn--primary">{t.groupDetail.addExpense}</Link>
                 </div>
@@ -138,6 +194,20 @@ export function GroupDetail() {
                                     {m.rootPubkey === state.creatorRootPubkey && (
                                         <span className="badge badge--accent" style={{ marginLeft: 'auto' }}>{t.common.creator}</span>
                                     )}
+
+                                    {/* Remove button: if I am creator (and target is not me) OR if target is me */}
+                                    {(activeMembers.length > 1 && (
+                                        (state.creatorRootPubkey === myPubkey && m.rootPubkey !== myPubkey) ||
+                                        (m.rootPubkey === myPubkey && m.rootPubkey !== state.creatorRootPubkey)
+                                    )) && (
+                                            <button
+                                                className="btn btn--ghost btn--sm"
+                                                style={{ marginLeft: m.rootPubkey === state.creatorRootPubkey ? 'var(--space-2)' : 'auto', color: 'var(--danger)', fontSize: 'var(--font-size-xs)' }}
+                                                onClick={() => handleRemoveMember(m.rootPubkey)}
+                                            >
+                                                {t.groupDetail.removeMember}
+                                            </button>
+                                        )}
                                 </div>
                             );
                         })}
@@ -163,7 +233,7 @@ export function GroupDetail() {
                     {activeMembers.length > 1 && (
                         <div style={{ marginTop: 'var(--space-4)', paddingTop: 'var(--space-4)', borderTop: '1px solid var(--glass-border)' }}>
                             <h4 style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-tertiary)', marginBottom: 'var(--space-2)', textTransform: 'uppercase' }}>{t.groupDetail.settlementsTitle}</h4>
-                            <Settlements members={activeMembers} balances={balances} />
+                            <Settlements members={activeMembers} balances={balances} onSettle={handleSettleUp} />
                         </div>
                     )}
                 </div>
@@ -209,21 +279,36 @@ export function GroupDetail() {
     );
 }
 
-function Settlements({ members, balances }: { members: { rootPubkey: string; displayName: string }[]; balances: Map<PublicKey, number> }) {
+function Settlements({ members, balances, onSettle }: { members: { rootPubkey: string; displayName: string }[]; balances: Map<PublicKey, number>; onSettle: (from: string, to: string, amount: number) => void }) {
     const { t } = useI18n();
-    const settlements = computeSettlements(members, balances);
-    if (settlements.length === 0) {
+    // Map names for display
+    const nameMap = new Map(members.map(m => [m.rootPubkey, m.displayName]));
+    // Use core computeSettlements
+    const rawSettlements = computeSettlements(balances);
+
+    if (rawSettlements.length === 0) {
         return <p style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-tertiary)' }}>{t.groupDetail.allSettled}</p>;
     }
+
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-            {settlements.map((s, i) => (
-                <div key={i} style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-secondary)' }}>
-                    <span style={{ color: 'var(--danger)' }}>{s.from}</span>
-                    {' → '}
-                    <span style={{ color: 'var(--success)' }}>{s.to}</span>
-                    {' · '}
-                    <span className="amount">{formatAmount(s.amount)}</span>
+            {rawSettlements.map((s, i) => (
+                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 'var(--font-size-xs)', color: 'var(--text-secondary)' }}>
+                    <div>
+                        <span style={{ color: 'var(--danger)' }}>{nameMap.get(s.from) ?? 'Unknown'}</span>
+                        {' → '}
+                        <span style={{ color: 'var(--success)' }}>{nameMap.get(s.to) ?? 'Unknown'}</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                        <span className="amount">{formatAmount(s.amount)}</span>
+                        <button
+                            className="btn btn--secondary btn--sm"
+                            style={{ padding: '2px 6px', fontSize: '10px' }}
+                            onClick={() => onSettle(s.from, s.to, s.amount)}
+                        >
+                            {t.groupDetail.markAsPaid}
+                        </button>
+                    </div>
                 </div>
             ))}
         </div>
@@ -240,41 +325,4 @@ function hashColor(pubkey: string): string {
     return `hsl(${hue}, 60%, 40%)`;
 }
 
-interface Settlement { from: string; to: string; amount: number; }
 
-function computeSettlements(
-    members: { rootPubkey: string; displayName: string }[],
-    balances: Map<PublicKey, number>,
-): Settlement[] {
-    const nameMap = new Map(members.map(m => [m.rootPubkey, m.displayName]));
-    const debtors: { key: string; amount: number }[] = [];
-    const creditors: { key: string; amount: number }[] = [];
-
-    for (const m of members) {
-        const bal = balances.get(m.rootPubkey as PublicKey) ?? 0;
-        if (bal < 0) debtors.push({ key: m.rootPubkey, amount: -bal });
-        else if (bal > 0) creditors.push({ key: m.rootPubkey, amount: bal });
-    }
-
-    debtors.sort((a, b) => b.amount - a.amount);
-    creditors.sort((a, b) => b.amount - a.amount);
-
-    const settlements: Settlement[] = [];
-    let di = 0, ci = 0;
-    while (di < debtors.length && ci < creditors.length) {
-        const transfer = Math.min(debtors[di].amount, creditors[ci].amount);
-        if (transfer > 0) {
-            settlements.push({
-                from: nameMap.get(debtors[di].key) ?? 'Unknown',
-                to: nameMap.get(creditors[ci].key) ?? 'Unknown',
-                amount: transfer,
-            });
-        }
-        debtors[di].amount -= transfer;
-        creditors[ci].amount -= transfer;
-        if (debtors[di].amount === 0) di++;
-        if (creditors[ci].amount === 0) ci++;
-    }
-
-    return settlements;
-}

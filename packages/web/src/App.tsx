@@ -9,6 +9,7 @@ import { JoinGroup } from './pages/JoinGroup';
 import { GroupDetail } from './pages/GroupDetail';
 import { AddExpense } from './pages/AddExpense';
 import { Settings } from './pages/Settings';
+import { GroupRecovery } from './pages/GroupRecovery';
 
 function AppRoutes() {
   const { isOnboarded } = useApp();
@@ -29,6 +30,7 @@ function AppRoutes() {
         <Route path="/join" element={<JoinGroup />} />
         <Route path="/group/:id" element={<GroupDetail />} />
         <Route path="/group/:id/expense" element={<AddExpense />} />
+        <Route path="/group/:id/recovery" element={<GroupRecovery />} />
         <Route path="/settings" element={<Settings />} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>

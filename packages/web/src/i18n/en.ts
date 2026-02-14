@@ -75,6 +75,11 @@ export interface Translations {
         paidBy: string;
         viewChain: string;
         hideChain: string;
+        removeMember: string;
+        confirmRemove: string;
+        settleUp: string;
+        markAsPaid: string;
+        settlementDescription: string;
     };
     chain: {
         title: string;
@@ -130,6 +135,11 @@ export interface Translations {
         importWarning: string;
         importError: string;
         wrongPassword: string;
+        authorizedDevices: string;
+        unknownDevice: string;
+        thisDevice: string;
+        revoke: string;
+        confirmRevoke: string;
         securityTitle: string;
         securityEd25519: string;
         securitySigned: string;
@@ -217,6 +227,11 @@ const en: Translations = {
         paidBy: 'Paid by',
         viewChain: '⛓ View Chain',
         hideChain: '⛓ Hide Chain',
+        removeMember: 'Remove',
+        confirmRemove: 'Are you sure you want to remove this member?',
+        settleUp: 'Settle Up',
+        markAsPaid: 'Mark as Paid',
+        settlementDescription: 'Settlement',
     },
     chain: {
         title: 'Hash Chain',
@@ -271,8 +286,13 @@ const en: Translations = {
         exportSuccess: 'Identity exported successfully!',
         importSuccess: 'Identity imported successfully! Reloading…',
         importWarning: 'This will replace your current identity. Make sure you have a backup.',
-        importError: 'Invalid or corrupted identity file.',
-        wrongPassword: 'Wrong password. Please try again.',
+        importError: 'Failed to import identity',
+        wrongPassword: 'Wrong password',
+        authorizedDevices: 'Authorized Devices',
+        unknownDevice: 'Unknown Device',
+        thisDevice: 'This Device',
+        revoke: 'Revoke',
+        confirmRevoke: 'Are you sure you want to revoke this device? It will be removed from all groups.',
         securityTitle: 'Security',
         securityEd25519: 'Ed25519 cryptographic identity',
         securitySigned: 'All entries are signed and hash-linked',
