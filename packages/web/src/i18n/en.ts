@@ -152,6 +152,10 @@ export interface Translations {
     nav: {
         groups: string;
     };
+    footer: {
+        impressum: string;
+        privacy: string;
+    };
 }
 
 const en: Translations = {
@@ -306,6 +310,10 @@ const en: Translations = {
     },
     nav: {
         groups: 'Groups',
+    },
+    footer: {
+        impressum: 'Legal Notice',
+        privacy: 'Privacy Policy',
     },
 };
 

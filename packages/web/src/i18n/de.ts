@@ -155,6 +155,10 @@ const de: Translations = {
     nav: {
         groups: 'Gruppen',
     },
+    footer: {
+        impressum: 'Impressum',
+        privacy: 'Datenschutzerklärung',
+    },
 };
 
 export default de;

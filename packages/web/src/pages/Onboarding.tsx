@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { useI18n } from '../i18n';
+import { Footer } from '../components/Footer';
 
 export function Onboarding() {
     const { createIdentity } = useApp();
@@ -98,6 +99,9 @@ export function Onboarding() {
                         <p style={styles.stepDesc}>{t.onboarding.generatingSub}</p>
                     </div>
                 )}
+            </div>
+            <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 10 }}>
+                <Footer />
             </div>
         </div>
     );

@@ -4,6 +4,7 @@ import { useApp } from '../context/AppContext';
 import { useI18n, supportedLocales, localeLabels } from '../i18n';
 
 import { BrandLogo } from './Logo';
+import { Footer } from './Footer';
 
 export function Layout({ children }: { children: ReactNode }) {
     const { isOnboarded, identity, syncStatus } = useApp();
@@ -75,6 +76,7 @@ export function Layout({ children }: { children: ReactNode }) {
                 </div>
             </nav>
             <main className="app-main">{children}</main>
+            <Footer />
         </div>
     );
 }
