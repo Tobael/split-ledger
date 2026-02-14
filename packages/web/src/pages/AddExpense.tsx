@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { useI18n } from '../i18n';
 import {
@@ -13,7 +13,10 @@ import {
 export function AddExpense() {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
-    const { manager, getGroupState, storage, identity, refreshGroups, broadcastEntry } = useApp();
+    const [searchParams] = useSearchParams();
+    const editId = searchParams.get('edit');
+
+    const { manager, getGroupState, storage, identity, refreshGroups, broadcastEntry, voidExpense } = useApp();
     const { t } = useI18n();
     const groupId = id as GroupId;
 
@@ -31,10 +34,34 @@ export function AddExpense() {
         getGroupState(groupId).then((s) => {
             if (s) {
                 setState(s);
-                if (identity) setPaidBy(identity.rootKeyPair.publicKey);
+                if (!editId && identity) setPaidBy(identity.rootKeyPair.publicKey);
             }
         });
-    }, [groupId, getGroupState, identity]);
+    }, [groupId, getGroupState, identity, editId]);
+
+    // Load entry if editing
+    useEffect(() => {
+        if (!editId || !storage) return;
+        storage.getEntry(editId as any).then(entry => {
+            if (entry && entry.entryType === EntryType.ExpenseCreated) {
+                const p = entry.payload;
+                setDescription(p.description);
+                setAmount((p.amountMinorUnits / 100).toFixed(2));
+                setCurrency(p.currency);
+                setPaidBy(p.paidByRootPubkey);
+
+                // Determine split mode
+                // (Simplification: if custom splits match equal logic, we could set equal, but keeping custom is safer for exact reproduction)
+                // Actually, let's try to detect if it's equal to default behaviors, but 'custom' is safe.
+                setSplitMode('custom');
+                const humanSplits: Record<string, string> = {};
+                for (const [k, v] of Object.entries(p.splits)) {
+                    humanSplits[k] = (v / 100).toFixed(2);
+                }
+                setCustomSplits(humanSplits);
+            }
+        });
+    }, [editId, storage]);
 
     if (!state || !identity) {
         return <div style={{ padding: 'var(--space-8)', color: 'var(--text-secondary)' }}>{t.common.loading}</div>;
@@ -89,6 +116,12 @@ export function AddExpense() {
                 return;
             }
 
+            // If editing, void the old entry first
+            if (editId) {
+                await voidExpense(groupId, editId as any, 'Edited');
+                // We don't return here; we proceed to create the new entry (the "amendment")
+            }
+
             const entry = buildEntry(
                 EntryType.ExpenseCreated,
                 {
@@ -98,8 +131,34 @@ export function AddExpense() {
                     paidByRootPubkey: paidBy as PublicKey,
                     splits,
                 },
-                latestEntry.entryId,
-                result.finalState.currentLamportClock + 1,
+                latestEntry.entryId, // this will be valid even if we just voided, because voiding (via voidExpense) appends to storage?
+                // Actually `voidExpense` calls `manager.createAndAppendEntry` but NOT `refreshGroups` synchronously enough?
+                // Wait. `voidExpense` in AppContext calls `manager.voidExpense` -> `storage.append`.
+                // BUT `latestEntry` here was fetched BEFORE voiding if I call `voidExpense` below.
+                // Race condition! 
+                // Fix: If editing, I should rely on `voidExpense` to append the void entry, AND THEN fetching the new latest hash?
+                // OR: Just accept that the new entry branches off the SAME parent as the void entry?
+                // NO, linear chain.
+                // I must re-fetch latest entry after voiding.
+                // OR simpler: `voidExpense` returns the new void entry. Use THAT as previous hash.
+                // But `voidExpense` in AppContext returns Promise<void>.
+                // I should update AppContext to return the Entry.
+                // For now, let's just re-fetch latest entry or guess.
+                // Safest: `voidExpense` then `storage.getLatestEntry`.
+
+                // Let's modify the flow:
+                // 1. If editId, call voidExpense.
+                // 2. Fetch latest entry (which is now the void entry or whatever was latest).
+                // 3. Build new entry.
+                // 4. Append.
+
+                // Actually, let's look at `latestEntry` usage.
+                // It uses `ordered[ordered.length-1]`.
+                // If I void, I add an entry.
+                // So I need to re-fetch `entries` or `latestEntry`.
+
+                editId ? (await storage.getLatestEntry(groupId))!.entryId : latestEntry.entryId,
+                result.finalState.currentLamportClock + 1 + (editId ? 1 : 0), // Hack: if we voided, clock incremented by 1.
                 identity.device.deviceKeyPair.publicKey,
                 identity.device.deviceKeyPair.secretKey,
             );
@@ -118,7 +177,7 @@ export function AddExpense() {
         <div style={{ maxWidth: '520px', margin: '0 auto' }}>
             <div className="page-header">
                 <Link to={`/group/${groupId}`} style={{ color: 'var(--text-tertiary)', fontSize: 'var(--font-size-sm)' }}>{t.addExpense.backTo} {state.groupName}</Link>
-                <h1 className="page-header__title" style={{ marginTop: 'var(--space-2)' }}>{t.addExpense.title}</h1>
+                <h1 className="page-header__title" style={{ marginTop: 'var(--space-2)' }}>{editId ? 'Edit Expense' : t.addExpense.title}</h1>
             </div>
 
             <div className="glass-card glass-card--static animate-fade-in" style={{ padding: 'var(--space-6)' }}>

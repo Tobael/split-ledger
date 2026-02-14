@@ -55,6 +55,7 @@ export interface DeviceIdentity {
 export enum EntryType {
     Genesis = 'Genesis',
     ExpenseCreated = 'ExpenseCreated',
+    ExpenseVoided = 'ExpenseVoided', // New: for editing/deleting
     ExpenseCorrection = 'ExpenseCorrection',
     MemberAdded = 'MemberAdded',
     MemberRemoved = 'MemberRemoved',
@@ -98,6 +99,13 @@ export interface ExpenseCreatedPayload {
     splits: Record<string, number>;
     category?: string;
     receiptHash?: Hash;
+}
+
+export interface ExpenseVoidedPayload {
+    /** The entryId of the expense being voided/edited */
+    voidedEntryId: Hash;
+    /** Optional reason for voiding (e.g., "Edited", "Deleted") */
+    reason?: string;
 }
 
 export interface ExpenseCorrectionPayload {
@@ -152,6 +160,7 @@ export interface CoSignature {
 export type PayloadMap = {
     [EntryType.Genesis]: GenesisPayload;
     [EntryType.ExpenseCreated]: ExpenseCreatedPayload;
+    [EntryType.ExpenseVoided]: ExpenseVoidedPayload;
     [EntryType.ExpenseCorrection]: ExpenseCorrectionPayload;
     [EntryType.MemberAdded]: MemberAddedPayload;
     [EntryType.MemberRemoved]: MemberRemovedPayload;
@@ -237,6 +246,7 @@ export interface StorageAdapter {
     getGroupIds(): Promise<GroupId[]>;
     getGroupState(groupId: GroupId): Promise<GroupState | null>;
     saveGroupState(state: GroupState): Promise<void>;
+    deleteGroup(groupId: GroupId): Promise<void>;
 }
 
 // --- Entry Building (pre-hash, pre-sign) ------------------------------------

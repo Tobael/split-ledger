@@ -1,8 +1,8 @@
-# SplitLedger
+# Fair Money
 
-**Cryptographically secure, peer-to-peer expense splitting.**
+**Cryptographically secure, peer-to-peer expense splitting (Split Ledger).**
 
-SplitLedger is a privacy-first application for managing shared expenses. It uses end-to-end encryption and a tamper-evident hash chain to ensure that your financial data remains yours. No accounts, no central servers reading your data, just math.
+Fair Money is a privacy-first application for managing shared expenses. It uses end-to-end encryption and a tamper-evident hash chain to ensure that your financial data remains yours. No accounts, no central servers reading your data, just math.
 
 ## Features
 

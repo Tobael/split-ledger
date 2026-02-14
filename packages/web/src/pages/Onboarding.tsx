@@ -29,7 +29,8 @@ export function Onboarding() {
                     <>
                         <div style={styles.logoContainer}>
                             <span style={styles.logo}>💸</span>
-                            <h1 style={styles.title}>SplitLedger</h1>
+                            <h1 style={styles.title}>Fair Money</h1>
+                            <h2 style={{ fontSize: '1.5rem', fontWeight: 500, color: 'var(--text-secondary)', marginTop: '-0.5rem' }}>Split Ledger</h2>
                         </div>
                         <p style={styles.tagline}>
                             {t.onboarding.tagline}<br />

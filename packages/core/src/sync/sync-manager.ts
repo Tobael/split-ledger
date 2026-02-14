@@ -118,6 +118,15 @@ export class SyncManager {
     }
 
     /**
+     * Delete a group locally and stop syncing it.
+     */
+    async deleteGroup(groupId: GroupId): Promise<void> {
+        this.stopBackgroundSync(groupId);
+        await this.transport.disconnect(groupId);
+        await this.storage.deleteGroup(groupId);
+    }
+
+    /**
      * Sync with relay: fetch entries we're missing.
      */
     async syncWithRelay(groupId: GroupId): Promise<number> {

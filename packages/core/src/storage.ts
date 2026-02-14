@@ -96,4 +96,13 @@ export class InMemoryStorageAdapter implements StorageAdapter {
         this.deviceIdentity = null;
         this.groupStates.clear();
     }
+
+    async deleteGroup(groupId: GroupId): Promise<void> {
+        const groupEntries = this.groupEntries.get(groupId) ?? [];
+        for (const entry of groupEntries) {
+            this.entries.delete(entry.entryId);
+        }
+        this.groupEntries.delete(groupId);
+        this.groupStates.delete(groupId);
+    }
 }

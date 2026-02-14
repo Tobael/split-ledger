@@ -12,6 +12,7 @@ import type {
     Ed25519KeyPair,
     GroupId,
     GroupState,
+    Hash,
     LedgerEntry,
     PublicKey,
     StorageAdapter,
@@ -432,5 +433,40 @@ export class GroupManager {
             deviceIdentity: this.device,
             rootKeyPair: this.rootKeyPair ?? undefined,
         });
+    }
+
+    /**
+     * Void (delete/edit) an expense.
+     * Appends an ExpenseVoided entry.
+     */
+    async voidExpense(groupId: GroupId, entryId: Hash, reason?: string): Promise<LedgerEntry> {
+        const entries = await this.storage.getAllEntries(groupId);
+        const ordered = orderEntries([...entries]);
+        const latestEntry = ordered[ordered.length - 1]!;
+        const state = await this.deriveGroupState(groupId);
+
+        const entry = buildEntry(
+            EntryType.ExpenseVoided,
+            {
+                voidedEntryId: entryId,
+                reason,
+            },
+            latestEntry.entryId,
+            state.currentLamportClock + 1,
+            this.device.deviceKeyPair.publicKey,
+            this.device.deviceKeyPair.secretKey,
+        );
+
+        await this.storage.appendEntry(groupId, entry);
+        return entry;
+    }
+
+
+    /**
+     * Delete a group from local storage.
+     * This does NOT revoke keys or notify other members (yet).
+     */
+    async deleteGroup(groupId: GroupId): Promise<void> {
+        await this.storage.deleteGroup(groupId);
     }
 }

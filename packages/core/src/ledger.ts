@@ -23,6 +23,7 @@ import type {
     DeviceRevokedPayload,
     ExpenseCorrectionPayload,
     ExpenseCreatedPayload,
+    ExpenseVoidedPayload,
     GenesisPayload,
     GroupMember,
     GroupState,
@@ -219,6 +220,9 @@ function validatePayload(
         case EntryType.ExpenseCorrection:
             validateExpenseCorrectionPayload(entry.payload, precedingEntries, groupState, errors);
             break;
+        case EntryType.ExpenseVoided:
+            validateExpenseVoidedPayload(entry.payload, precedingEntries, errors);
+            break;
         case EntryType.MemberAdded:
             validateMemberAddedPayload(entry.payload, entry.timestamp, groupState, errors);
             break;
@@ -234,6 +238,24 @@ function validatePayload(
         case EntryType.RootKeyRotation:
             validateRootKeyRotationPayload(entry.payload, groupState, errors);
             break;
+    }
+}
+
+function validateExpenseVoidedPayload(
+    payload: ExpenseVoidedPayload,
+    precedingEntries: LedgerEntry[],
+    errors: ValidationError[],
+): void {
+    const original = precedingEntries.find((e) => e.entryId === payload.voidedEntryId);
+    if (!original) {
+        errors.push({ field: 'payload.voidedEntryId', message: 'Voided entry not found' });
+        return;
+    }
+    if (
+        original.entryType !== EntryType.ExpenseCreated &&
+        original.entryType !== EntryType.ExpenseCorrection
+    ) {
+        errors.push({ field: 'payload.voidedEntryId', message: 'Can only void expense entries' });
     }
 }
 
@@ -456,7 +478,7 @@ export function applyEntry(entry: LedgerEntry, state: GroupState): void {
         case EntryType.RootKeyRotation:
             applyRootKeyRotation(entry.payload, state);
             break;
-        // ExpenseCreated and ExpenseCorrection don't change membership state
+        // ExpenseCreated, ExpenseCorrection, and ExpenseVoided don't change membership state
         // Balances are recomputed separately via computeBalances()
     }
 }

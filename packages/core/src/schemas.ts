@@ -31,6 +31,11 @@ export const expenseCreatedPayloadSchema = z.object({
     receiptHash: hashSchema.optional(),
 });
 
+export const expenseVoidedPayloadSchema = z.object({
+    voidedEntryId: hashSchema,
+    reason: z.string().optional(),
+});
+
 export const expenseCorrectionPayloadSchema = z.object({
     referencedEntryId: hashSchema,
     correctionReason: z.string().min(1).max(500),
@@ -96,6 +101,7 @@ export const ledgerEntryBaseSchema = z.object({
 export const payloadSchemas: Record<EntryType, z.ZodType> = {
     [EntryType.Genesis]: genesisPayloadSchema,
     [EntryType.ExpenseCreated]: expenseCreatedPayloadSchema,
+    [EntryType.ExpenseVoided]: expenseVoidedPayloadSchema,
     [EntryType.ExpenseCorrection]: expenseCorrectionPayloadSchema,
     [EntryType.MemberAdded]: memberAddedPayloadSchema,
     [EntryType.MemberRemoved]: memberRemovedPayloadSchema,

@@ -60,7 +60,10 @@ interface AppContextValue {
     // Sync
     syncStatus: SyncStatus;
     syncGroupFromRelay: (inviteLink: string) => Promise<GroupId>;
+    syncGroupFromRelay: (inviteLink: string) => Promise<GroupId>;
     broadcastEntry: (groupId: GroupId, entry: LedgerEntry) => Promise<void>;
+    deleteGroup: (groupId: GroupId) => Promise<void>;
+    voidExpense: (groupId: GroupId, entryId: Hash, reason?: string) => Promise<void>;
 }
 
 export type { IdentityState };
@@ -362,6 +365,25 @@ export function AppProvider({ children }: { children: ReactNode }) {
             // Relay offline — entry will be synced later
         }
     }, []);
+
+    const deleteGroup = useCallback(async (groupId: GroupId) => {
+        const syncMgr = syncManagerRef.current;
+        if (syncMgr) {
+            await syncMgr.stopSync(groupId);
+        }
+        if (manager) {
+            await manager.deleteGroup(groupId);
+        }
+        await refreshGroups();
+    }, [manager, refreshGroups]);
+
+    const voidExpense = useCallback(async (groupId: GroupId, entryId: Hash, reason?: string) => {
+        if (!manager) return;
+        const entry = await manager.voidExpense(groupId, entryId, reason);
+        await broadcastEntry(groupId, entry);
+        await refreshGroups();
+    }, [manager, broadcastEntry, refreshGroups]);
+
     useEffect(() => {
         if (manager) {
             refreshGroups();

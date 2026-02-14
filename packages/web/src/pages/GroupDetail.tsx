@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { useI18n } from '../i18n';
 import { ChainVisualization } from '../components/ChainVisualization';
@@ -26,8 +26,9 @@ interface ExpensePayload {
 
 export function GroupDetail() {
     const { id } = useParams<{ id: string }>();
+    const navigate = useNavigate();
 
-    const { manager, getGroupState, getGroupEntries, identity, broadcastEntry, refreshGroups, storage } = useApp();
+    const { manager, getGroupState, getGroupEntries, identity, broadcastEntry, refreshGroups, storage, deleteGroup } = useApp();
     const { t } = useI18n();
     const groupId = id as GroupId;
 
@@ -71,6 +72,17 @@ export function GroupDetail() {
         } catch (err) {
             console.error('Failed to remove member:', err);
             alert('Failed to remove member');
+        }
+    };
+
+    const handleDeleteGroup = async () => {
+        if (!confirm(t.groupDetail.confirmDelete ?? 'Are you sure you want to delete this group? This cannot be undone.')) return;
+        try {
+            await deleteGroup(groupId);
+            navigate('/dashboard');
+        } catch (err) {
+            console.error('Failed to delete group:', err);
+            alert('Failed to delete group');
         }
     };
 
@@ -277,6 +289,16 @@ export function GroupDetail() {
                         })}
                     </div>
                 )}
+            </div>
+
+            {/* Danger Zone */}
+            <div style={{ marginTop: 'var(--space-8)', paddingTop: 'var(--space-8)', borderTop: '1px solid var(--glass-border)' }}>
+                <button
+                    className="btn btn--danger btn--full"
+                    onClick={handleDeleteGroup}
+                >
+                    {t.groupDetail.deleteGroup ?? 'Delete Group'}
+                </button>
             </div>
         </div>
     );

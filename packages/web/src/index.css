@@ -5,41 +5,55 @@
 /* ═══════════════════════════════════════════════════════════════════════════ */
 
 :root {
-    /* Base colors */
-    --bg-primary: #0f1117;
-    --bg-secondary: #1a1d28;
-    --bg-tertiary: #232636;
-    --bg-card: rgba(26, 29, 40, 0.7);
-    --bg-card-hover: rgba(35, 38, 54, 0.8);
+    /* Base colors - Fair Money Theme */
+    /* Palette: #716969 (Gray), #FFFFFF (White), #004502 (Green), #D2D6EF (Lavender), #9B7E46 (Gold) */
+
+    --bg-primary: #FFFFFF;
+    --bg-secondary: #F8F9FC;
+    /* Very subtle cool gray */
+    --bg-tertiary: #D2D6EF;
+    /* Lavender tint */
+    --bg-card: rgba(255, 255, 255, 0.85);
+    --bg-card-hover: rgba(255, 255, 255, 0.95);
 
     /* Glass effect */
-    --glass-bg: rgba(26, 29, 40, 0.55);
-    --glass-border: rgba(255, 255, 255, 0.08);
-    --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    --glass-bg: rgba(255, 255, 255, 0.65);
+    --glass-border: rgba(0, 69, 2, 0.08);
+    /* Green tint border */
+    --glass-shadow: 0 8px 32px rgba(0, 69, 2, 0.05);
     --glass-blur: blur(16px);
 
     /* Accent colors */
-    --accent-primary: #22d3ee;
-    --accent-primary-dim: rgba(34, 211, 238, 0.15);
-    --accent-primary-glow: rgba(34, 211, 238, 0.3);
-    --accent-secondary: #818cf8;
-    --accent-secondary-dim: rgba(129, 140, 248, 0.15);
-    --accent-gradient: linear-gradient(135deg, #22d3ee, #818cf8);
-    --accent-gradient-subtle: linear-gradient(135deg, rgba(34, 211, 238, 0.1), rgba(129, 140, 248, 0.1));
+    --accent-primary: #004502;
+    /* Deep Green */
+    --accent-primary-dim: rgba(0, 69, 2, 0.1);
+    --accent-primary-glow: rgba(0, 69, 2, 0.2);
+    --accent-secondary: #9B7E46;
+    /* Gold/Bronze */
+    --accent-secondary-dim: rgba(155, 126, 70, 0.15);
+    --accent-gradient: linear-gradient(135deg, #004502, #9B7E46);
+    --accent-gradient-subtle: linear-gradient(135deg, rgba(0, 69, 2, 0.05), rgba(155, 126, 70, 0.05));
 
     /* Semantic colors */
-    --success: #34d399;
-    --success-dim: rgba(52, 211, 153, 0.15);
-    --warning: #fbbf24;
-    --warning-dim: rgba(251, 191, 36, 0.15);
-    --danger: #f87171;
-    --danger-dim: rgba(248, 113, 113, 0.15);
+    --success: #059669;
+    /* Green-600 */
+    --success-dim: rgba(5, 150, 105, 0.1);
+    --warning: #d97706;
+    /* Amber-600 */
+    --warning-dim: rgba(217, 119, 6, 0.1);
+    --danger: #dc2626;
+    /* Red-600 */
+    --danger-dim: rgba(220, 38, 38, 0.1);
 
     /* Text */
-    --text-primary: #f1f5f9;
-    --text-secondary: #94a3b8;
-    --text-tertiary: #64748b;
-    --text-accent: #22d3ee;
+    --text-primary: #004502;
+    /* Deep Green as primary text */
+    --text-secondary: #716969;
+    /* Gray */
+    --text-tertiary: #9ca3af;
+    --text-accent: #9B7E46;
+    /* Gold */
+    --text-inverse: #FFFFFF;
 
     /* Typography */
     --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -169,7 +183,7 @@ a:hover {
     content: '';
     position: absolute;
     inset: 0;
-    background: linear-gradient(rgba(255,255,255,0.1), transparent);
+    background: linear-gradient(rgba(255, 255, 255, 0.1), transparent);
     opacity: 0;
     transition: opacity var(--transition-fast);
 }
@@ -183,8 +197,8 @@ a:hover {
 }
 
 .btn--primary {
-    background: var(--accent-gradient);
-    color: var(--bg-primary);
+    background: var(--accent-primary);
+    color: var(--text-inverse);
 }
 
 .btn--primary:hover {
@@ -293,7 +307,7 @@ select.form-input {
     position: sticky;
     top: 0;
     z-index: 100;
-    background: rgba(15, 17, 23, 0.85);
+    background: rgba(255, 255, 255, 0.9);
     backdrop-filter: var(--glass-blur);
     border-bottom: 1px solid var(--glass-border);
     padding: var(--space-3) var(--space-6);
@@ -310,10 +324,7 @@ select.form-input {
 .app-nav__logo {
     font-size: var(--font-size-xl);
     font-weight: 700;
-    background: var(--accent-gradient);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
+    color: var(--accent-primary);
     letter-spacing: -0.02em;
 }
 
@@ -439,23 +450,49 @@ select.form-input {
 /* ═══════════════════════════════════════════════════════════════════════════ */
 
 @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(8px); }
-    to { opacity: 1; transform: translateY(0); }
+    from {
+        opacity: 0;
+        transform: translateY(8px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 @keyframes slideUp {
-    from { opacity: 0; transform: translateY(20px); }
-    to { opacity: 1; transform: translateY(0); }
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 @keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.5; }
+
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.5;
+    }
 }
 
 @keyframes shimmer {
-    0% { background-position: -200% 0; }
-    100% { background-position: 200% 0; }
+    0% {
+        background-position: -200% 0;
+    }
+
+    100% {
+        background-position: 200% 0;
+    }
 }
 
 .animate-fade-in {
@@ -467,11 +504,25 @@ select.form-input {
 }
 
 /* Staggered animation delays */
-.stagger-1 { animation-delay: 0.05s; }
-.stagger-2 { animation-delay: 0.1s; }
-.stagger-3 { animation-delay: 0.15s; }
-.stagger-4 { animation-delay: 0.2s; }
-.stagger-5 { animation-delay: 0.25s; }
+.stagger-1 {
+    animation-delay: 0.05s;
+}
+
+.stagger-2 {
+    animation-delay: 0.1s;
+}
+
+.stagger-3 {
+    animation-delay: 0.15s;
+}
+
+.stagger-4 {
+    animation-delay: 0.2s;
+}
+
+.stagger-5 {
+    animation-delay: 0.25s;
+}
 
 /* ═══════════════════════════════════════════════════════════════════════════ */
 /* Amount Display                                                             */

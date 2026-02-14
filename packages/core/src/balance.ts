@@ -49,6 +49,21 @@ export function getEffectiveExpenses(
 
             // Replace the effective expense data
             effectiveExpenses.set(originalId, correctedExpense);
+        } else if (entry.entryType === EntryType.ExpenseVoided) {
+            const { voidedEntryId } = entry.payload;
+
+            // Find original if this voids a correction (unlikely but possible if we allow voiding corrections)
+            // Actually, we usually void the original ID.
+            let targetId = voidedEntryId;
+            while (correctionToOriginal.has(targetId)) {
+                targetId = correctionToOriginal.get(targetId)!;
+            }
+
+            // Remove from effective set
+            effectiveExpenses.delete(targetId);
+
+            // Also map the void entry for future reference if needed
+            correctionToOriginal.set(entry.entryId, targetId);
         }
     }
 

@@ -3,6 +3,8 @@ import type { ReactNode } from 'react';
 import { useApp } from '../context/AppContext';
 import { useI18n, supportedLocales, localeLabels } from '../i18n';
 
+import { BrandLogo } from './Logo';
+
 export function Layout({ children }: { children: ReactNode }) {
     const { isOnboarded, identity, syncStatus } = useApp();
     const { t, locale, setLocale } = useI18n();
@@ -21,11 +23,16 @@ export function Layout({ children }: { children: ReactNode }) {
             <nav className="app-nav">
                 <div className="app-nav__inner">
                     <Link to="/dashboard" className="app-nav__logo" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        SplitLedger
+                        <BrandLogo width={28} height={28} />
+                        <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.1 }}>
+                            <span>Fair Money</span>
+                            <span style={{ fontSize: '0.65em', fontWeight: 500, opacity: 0.8 }}>Split Ledger</span>
+                        </div>
                         <span title={syncStatus} style={{
                             width: '8px', height: '8px', borderRadius: '50%',
                             background: syncColor, display: 'inline-block',
                             boxShadow: syncStatus === 'connected' ? `0 0 6px ${syncColor}` : 'none',
+                            marginLeft: '4px'
                         }} />
                     </Link>
                     <div className="app-nav__links">
