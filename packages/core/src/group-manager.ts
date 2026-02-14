@@ -381,7 +381,10 @@ export class GroupManager {
      */
     async getGroupState(groupId: GroupId): Promise<GroupState | null> {
         try {
-            return await this.deriveGroupState(groupId);
+            const state = await this.deriveGroupState(groupId);
+            // Cache state back to storage so SyncManager can see it
+            await this.storage.saveGroupState(state);
+            return state;
         } catch {
             return null;
         }
