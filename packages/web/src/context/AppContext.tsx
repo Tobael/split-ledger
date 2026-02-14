@@ -160,9 +160,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
             const encoder = new TextEncoder();
             const groupKey = deriveGroupKey(encoder.encode(groupId), groupId);
             syncMgr.registerGroupKey(groupId, groupKey);
-            await syncMgr.startSync(groupId);
+
+            try {
+                await syncMgr.startSync(groupId);
+            } catch (err) {
+                console.warn(`[AppContext] Sync failed for ${groupId}, attempting broadcast anyway:`, err);
+            }
 
             // Push local entries to relay (relay deduplicates)
+            // Crucial: We do this even if startSync failed, to ensure we push our Genesis/Data
             const localEntries = await storage.getAllEntries(groupId);
             for (const entry of localEntries) {
                 try {
@@ -323,9 +329,25 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
         // Use initialSync to ensure we get the full history (Genesis included)
         // irrespective of any previous zombie state
-        await syncMgr.initialSync(groupId);
+        try {
+            await syncMgr.initialSync(groupId);
+        } catch (err) {
+            console.warn('[AppContext] initialSync failed (relay might be empty or offline), proceeding to broadcast:', err);
+        }
+
         // Start background sync for future updates
         syncMgr.startSync(groupId);
+
+        // Always push local entries to relay (relay deduplicates)
+        // This ensures that even if initialSync failed (e.g. empty relay), we populate it.
+        const localEntries = await storage.getAllEntries(groupId);
+        for (const entry of localEntries) {
+            try {
+                await syncMgr.broadcastEntry(groupId, entry);
+            } catch {
+                // Entry may already exist on relay — ignore
+            }
+        }
 
         return groupId;
     }, []);
