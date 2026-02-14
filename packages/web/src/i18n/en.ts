@@ -82,6 +82,8 @@ export interface Translations {
         settlementDescription: string;
         deleteGroup: string;
         confirmDelete: string;
+        accessDeniedTitle: string;
+        accessDeniedText: string;
     };
     chain: {
         title: string;
@@ -240,6 +242,8 @@ const en: Translations = {
         settlementDescription: 'Settlement',
         deleteGroup: 'Delete Group',
         confirmDelete: 'Are you sure you want to delete this group? This cannot be undone.',
+        accessDeniedTitle: 'Access Denied',
+        accessDeniedText: 'You are not a member of this group or the group does not exist locally.',
     },
     chain: {
         title: 'Hash Chain',

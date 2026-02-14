@@ -84,6 +84,8 @@ const de: Translations = {
         settlementDescription: 'Ausgleich',
         deleteGroup: 'Gruppe löschen',
         confirmDelete: 'Möchtest du diese Gruppe wirklich löschen? Dies kann nicht rückgängig gemacht werden.',
+        accessDeniedTitle: 'Zugriff verweigert',
+        accessDeniedText: 'Du bist kein Mitglied dieser Gruppe oder die Gruppe existiert lokal nicht.',
     },
     chain: {
         title: 'Hash-Kette',

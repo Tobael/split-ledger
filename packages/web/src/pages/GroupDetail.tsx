@@ -38,15 +38,25 @@ export function GroupDetail() {
     const [showInvite, setShowInvite] = useState(false);
     const [copied, setCopied] = useState(false);
     const [showChain, setShowChain] = useState(false);
+    const [loading, setLoading] = useState(true);
 
     const refresh = useCallback(async () => {
-        const s = await getGroupState(groupId);
-        const e = await getGroupEntries(groupId);
-        setState(s);
-        setEntries(e);
-    }, [groupId, getGroupState, getGroupEntries]);
+        if (!manager) return;
+        try {
+            const s = await getGroupState(groupId);
+            const e = await getGroupEntries(groupId);
+            setState(s);
+            setEntries(e);
+        } finally {
+            setLoading(false);
+        }
+    }, [groupId, getGroupState, getGroupEntries, manager]);
 
-    useEffect(() => { refresh(); }, [refresh]);
+    useEffect(() => {
+        if (manager) {
+            refresh();
+        }
+    }, [manager, refresh]);
 
     const handleCreateInvite = () => {
         if (!manager) return;
@@ -126,8 +136,28 @@ export function GroupDetail() {
         }
     };
 
-    if (!state) {
+    if (loading || !manager) {
         return <div style={{ padding: 'var(--space-8)', color: 'var(--text-secondary)' }}>{t.common.loading}</div>;
+    }
+
+    if (!state) {
+        return (
+            <div className="empty-state animate-fade-in">
+                <div className="empty-state__icon">🚫</div>
+                <h2 className="empty-state__title">{t.groupDetail?.accessDeniedTitle ?? 'Access Denied'}</h2>
+                <p className="empty-state__text">
+                    {t.groupDetail?.accessDeniedText ?? 'You are not a member of this group or the group does not exist locally.'}
+                </p>
+                <div style={{ display: 'flex', gap: 'var(--space-4)' }}>
+                    <Link to="/dashboard" className="btn btn--secondary">
+                        {t.groupDetail.backToGroups}
+                    </Link>
+                    <Link to="/join" className="btn btn--primary">
+                        {t.dashboard.joinGroup}
+                    </Link>
+                </div>
+            </div>
+        );
     }
 
     const activeMembers = [...state.members.values()].filter(m => m.isActive);
