@@ -39,9 +39,23 @@ export function serializeInviteLink(data: InviteLinkData): string {
  * Returns the embedded invite token and optional metadata.
  */
 export function parseInviteLink(link: string): InviteLinkData {
+    // Extract token if input is a full URL
+    let tokenStr = link;
+    if (link.includes('?token=')) {
+        try {
+            const url = new URL(link);
+            const t = url.searchParams.get('token');
+            if (t) tokenStr = t;
+        } catch {
+            // Check if it's a partial URL or just has the param
+            const parts = link.split('?token=');
+            if (parts.length > 1) tokenStr = parts[1]!;
+        }
+    }
+
     let json: string;
     try {
-        const bytes = base64UrlDecode(link);
+        const bytes = base64UrlDecode(tokenStr);
         json = new TextDecoder().decode(bytes);
     } catch {
         throw new Error('Invalid invite link: cannot decode');

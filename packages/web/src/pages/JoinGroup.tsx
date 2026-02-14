@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { useI18n } from '../i18n';
 
@@ -7,7 +7,19 @@ export function JoinGroup() {
     const { manager, refreshGroups, syncGroupFromRelay, broadcastEntry } = useApp();
     const { t } = useI18n();
     const navigate = useNavigate();
-    const [inviteLink, setInviteLink] = useState('');
+    const [searchParams] = useSearchParams();
+    const tokenParam = searchParams.get('token');
+
+    // If token is in URL, constructing the full link for the input field or just using the token
+    // The manager.joinGroup expects the token string, but we show the link in the UI usually.
+    // However, the `syncGroupFromRelay` and `joinGroup` might expect just the token or handle both.
+    // Let's pre-fill the input with the full link if possible, or just the token?
+    // The previous implementation used `inviteLink.trim()` which implied the user pasted something.
+    // If we put the full URL in the input, `parseInviteLink` in core/web/context needs to handle it.
+    // Let's assume the user wants to see the token or link.
+    // We will construct the full link if it's missing.
+
+    const [inviteLink, setInviteLink] = useState(tokenParam ? `${window.location.origin}/join?token=${tokenParam}` : '');
     const [displayName, setDisplayName] = useState('');
     const [joining, setJoining] = useState(false);
     const [status, setStatus] = useState('');

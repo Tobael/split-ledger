@@ -49,7 +49,8 @@ export function GroupDetail() {
 
     const handleCreateInvite = () => {
         if (!manager) return;
-        const link = manager.createInviteLink(groupId);
+        const token = manager.createInviteLink(groupId);
+        const link = `${window.location.origin}/join?token=${token}`;
         setInviteLink(link);
         setShowInvite(true);
     };
@@ -87,12 +88,14 @@ export function GroupDetail() {
                 return;
             }
 
+            const currency = getCurrency(entries);
+
             const entry = buildEntry(
                 EntryType.ExpenseCreated,
                 {
                     description: t.groupDetail.settlementDescription,
                     amountMinorUnits: amount,
-                    currency: 'EUR', // TODO: match group currency
+                    currency,
                     paidByRootPubkey: from as PublicKey, // Debtor pays
                     splits: { [to]: amount }, // Creditor receives/consumes full amount
                 },
@@ -323,6 +326,15 @@ function formatAmount(minorUnits: number): string {
 function hashColor(pubkey: string): string {
     const hue = parseInt(pubkey.slice(0, 4), 16) % 360;
     return `hsl(${hue}, 60%, 40%)`;
+}
+
+function getCurrency(entries: LedgerEntry[]): string {
+    for (const e of entries) {
+        if (e.entryType === EntryType.ExpenseCreated) {
+            return (e.payload as { currency: string }).currency;
+        }
+    }
+    return 'EUR';
 }
 
 
