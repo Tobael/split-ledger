@@ -206,7 +206,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setGroups(summaries);
 
         // Wait for all syncs to complete (ensures relay has data before we claim success)
-        await Promise.all(promises);
+        await Promise.allSettled(promises);
 
         // Persist entries to localStorage after refresh
         await persistEntries();
@@ -320,7 +320,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
         const encoder = new TextEncoder();
         const groupKey = deriveGroupKey(encoder.encode(groupId), groupId);
         syncMgr.registerGroupKey(groupId, groupKey);
-        await syncMgr.startSync(groupId);
+
+        // Use initialSync to ensure we get the full history (Genesis included)
+        // irrespective of any previous zombie state
+        await syncMgr.initialSync(groupId);
+        // Start background sync for future updates
+        syncMgr.startSync(groupId);
 
         return groupId;
     }, []);
