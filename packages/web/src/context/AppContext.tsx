@@ -180,6 +180,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         if (!manager || !identity) return;
         const groupIds = await manager.listGroups();
         const summaries: GroupSummary[] = [];
+        const promises: Promise<void>[] = [];
 
         for (const groupId of groupIds) {
             const state = await manager.getGroupState(groupId);
@@ -199,10 +200,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
             });
 
             // Start sync for each group (idempotent)
-            syncGroupWithRelay(groupId);
+            promises.push(syncGroupWithRelay(groupId));
         }
 
         setGroups(summaries);
+
+        // Wait for all syncs to complete (ensures relay has data before we claim success)
+        await Promise.all(promises);
 
         // Persist entries to localStorage after refresh
         await persistEntries();

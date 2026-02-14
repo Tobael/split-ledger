@@ -170,6 +170,7 @@ export function createWsHandler(db: RelayDatabase, config: RelayConfig, rooms: R
         // Parse groupId from URL query params
         const url = new URL(req.url ?? '/', `http://${req.headers.host ?? 'localhost'}`);
         const groupId = url.searchParams.get('groupId');
+        console.log(`[Relay] New connection from ${req.socket.remoteAddress} for group ${groupId || 'none'}`);
 
         if (groupId) {
             rooms.subscribe(groupId, ws);
@@ -188,6 +189,7 @@ export function createWsHandler(db: RelayDatabase, config: RelayConfig, rooms: R
             let msg: ClientMessage;
             try {
                 msg = JSON.parse(raw.toString()) as ClientMessage;
+                console.log(`[Relay] Received ${msg.type} from ${req.socket.remoteAddress}`);
             } catch {
                 sendError(ws, 'PARSE_ERROR', 'Invalid JSON');
                 return;
