@@ -42,6 +42,7 @@ interface AppContextValue {
     // Identity
     identity: IdentityState | null;
     createIdentity: (displayName: string) => void;
+    restoreIdentity: (imported: IdentityState) => void;
     isOnboarded: boolean;
 
     // Group Manager
@@ -61,6 +62,8 @@ interface AppContextValue {
     syncGroupFromRelay: (inviteLink: string) => Promise<GroupId>;
     broadcastEntry: (groupId: GroupId, entry: LedgerEntry) => Promise<void>;
 }
+
+export type { IdentityState };
 
 const AppContext = createContext<AppContextValue | null>(null);
 
@@ -305,9 +308,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
         }
     }, [manager, refreshGroups]);
 
+    const restoreIdentity = useCallback((imported: IdentityState) => {
+        saveIdentityToStorage(imported);
+        setIdentity(imported);
+    }, []);
+
     const value: AppContextValue = {
         identity,
         createIdentity,
+        restoreIdentity,
         isOnboarded: identity !== null,
         manager,
         storage,

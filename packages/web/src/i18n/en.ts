@@ -117,6 +117,19 @@ export interface Translations {
         displayNameLabel: string;
         rootKeyLabel: string;
         deviceTitle: string;
+        transferTitle: string;
+        transferDescription: string;
+        exportButton: string;
+        importButton: string;
+        passwordPrompt: string;
+        passwordMinLength: string;
+        exporting: string;
+        importing: string;
+        exportSuccess: string;
+        importSuccess: string;
+        importWarning: string;
+        importError: string;
+        wrongPassword: string;
         securityTitle: string;
         securityEd25519: string;
         securitySigned: string;
@@ -247,6 +260,19 @@ const en: Translations = {
         displayNameLabel: 'Display Name',
         rootKeyLabel: 'Root Public Key',
         deviceTitle: 'This Device',
+        transferTitle: 'Account Transfer',
+        transferDescription: 'Move your identity to another browser or device',
+        exportButton: '📤 Export Identity',
+        importButton: '📥 Import Identity',
+        passwordPrompt: 'Enter a password to protect the export:',
+        passwordMinLength: 'Password must be at least 6 characters',
+        exporting: 'Encrypting…',
+        importing: 'Decrypting…',
+        exportSuccess: 'Identity exported successfully!',
+        importSuccess: 'Identity imported successfully! Reloading…',
+        importWarning: 'This will replace your current identity. Make sure you have a backup.',
+        importError: 'Invalid or corrupted identity file.',
+        wrongPassword: 'Wrong password. Please try again.',
         securityTitle: 'Security',
         securityEd25519: 'Ed25519 cryptographic identity',
         securitySigned: 'All entries are signed and hash-linked',
