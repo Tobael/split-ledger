@@ -150,6 +150,7 @@ export class SyncManager {
      */
     async initialSync(groupId: GroupId): Promise<GroupState | null> {
         this.emit({ type: 'sync:start', groupId });
+        await this.transport.connect(groupId);
         const groupKey = this.getGroupKey(groupId);
 
         try {
