@@ -31,7 +31,7 @@ export function Onboarding() {
                         <div style={styles.logoContainer}>
                             <span style={styles.logo}>💸</span>
                             <h1 style={styles.title}>Fair Money</h1>
-                            <h2 style={{ fontSize: '1.5rem', fontWeight: 500, color: 'var(--text-secondary)', marginTop: '-0.5rem' }}>Split Ledger</h2>
+                            <h2 style={{ fontSize: '1.25rem', fontWeight: 500, color: 'var(--text-secondary)', marginTop: '-0.25rem' }}>Split Ledger</h2>
                         </div>
                         <p style={styles.tagline}>
                             {t.onboarding.tagline}<br />
@@ -100,18 +100,35 @@ export function Onboarding() {
                     </div>
                 )}
             </div>
-            <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 10 }}>
-                <Footer />
-            </div>
+
+            <Footer />
         </div>
     );
 }
 
 const styles: Record<string, React.CSSProperties> = {
-    container: { minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 'var(--space-6)', position: 'relative', overflow: 'hidden' },
+    container: {
+        minHeight: '100vh',
+        display: 'flex',
+        flexDirection: 'column',
+        position: 'relative',
+        overflowX: 'hidden'
+    },
     bgOrb1: { position: 'absolute', width: '500px', height: '500px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(34, 211, 238, 0.08), transparent 70%)', top: '-200px', right: '-100px', pointerEvents: 'none' },
     bgOrb2: { position: 'absolute', width: '400px', height: '400px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(129, 140, 248, 0.06), transparent 70%)', bottom: '-150px', left: '-100px', pointerEvents: 'none' },
-    content: { width: '100%', maxWidth: '420px', textAlign: 'center' as const, position: 'relative' as const, zIndex: 1 },
+    content: {
+        flex: 1,
+        width: '100%',
+        maxWidth: '420px',
+        margin: '0 auto',
+        padding: 'var(--space-6)',
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'center',
+        textAlign: 'center' as const,
+        position: 'relative' as const,
+        zIndex: 1
+    },
     logoContainer: { display: 'flex', flexDirection: 'column' as const, alignItems: 'center', gap: 'var(--space-3)', marginBottom: 'var(--space-6)' },
     logo: { fontSize: '4rem' },
     title: { fontSize: 'var(--font-size-4xl)', fontWeight: 700, background: 'var(--accent-gradient)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', letterSpacing: '-0.03em' },

@@ -594,6 +594,31 @@ select.form-input {
     border-radius: 3px;
 }
 
-::-webkit-scrollbar-thumb:hover {
-    background: var(--text-tertiary);
+/* ═══════════════════════════════════════════════════════════════════════════ */
+/* Responsive Utils                                                           */
+/* ═══════════════════════════════════════════════════════════════════════════ */
+
+.grid-responsive-cards {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: var(--space-4);
+}
+
+@media (min-width: 768px) {
+    .grid-responsive-cards {
+        grid-template-columns: 1fr 1fr;
+    }
+}
+
+.form-row-responsive {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: var(--space-3);
+    margin-bottom: var(--space-4);
+}
+
+@media (min-width: 480px) {
+    .form-row-responsive {
+        grid-template-columns: 1fr 100px;
+    }
 }

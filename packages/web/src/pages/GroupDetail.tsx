@@ -168,19 +168,19 @@ export function GroupDetail() {
     return (
         <div className="animate-fade-in">
             {/* Header */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 'var(--space-8)' }}>
-                <div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', marginBottom: 'var(--space-8)' }}>
+                <div style={{ width: '100%' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', marginBottom: 'var(--space-1)' }}>
                         <Link to="/dashboard" style={{ color: 'var(--text-tertiary)', fontSize: 'var(--font-size-sm)' }}>{t.groupDetail.backToGroups}</Link>
                     </div>
                     <h1 className="page-header__title">{state.groupName}</h1>
                     <p className="page-header__subtitle">{activeMembers.length} {activeMembers.length === 1 ? t.common.member : t.common.members}</p>
                 </div>
-                <div style={{ display: 'flex', gap: 'var(--space-3)' }}>
+                <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
                     <button className="btn btn--ghost" onClick={() => setShowChain(v => !v)}>{showChain ? t.groupDetail.hideChain : t.groupDetail.viewChain}</button>
                     <Link to={`/group/${groupId}/recovery`} className="btn btn--secondary">🛡️</Link>
                     <button className="btn btn--secondary" onClick={handleCreateInvite}>{t.groupDetail.invite}</button>
-                    <Link to={`/group/${groupId}/expense`} className="btn btn--primary">{t.groupDetail.addExpense}</Link>
+                    <Link to={`/group/${groupId}/expense`} className="btn btn--primary" style={{ flex: 1, minWidth: '140px' }}>{t.groupDetail.addExpense}</Link>
                 </div>
             </div>
 
@@ -220,7 +220,7 @@ export function GroupDetail() {
             )}
 
             {/* Grid: Members + Balances */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-4)', marginBottom: 'var(--space-6)' }}>
+            <div className="grid-responsive-cards" style={{ marginBottom: 'var(--space-6)' }}>
                 {/* Members */}
                 <div className="glass-card glass-card--static" style={{ padding: 'var(--space-5)' }}>
                     <h3 style={{ fontSize: 'var(--font-size-sm)', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 'var(--space-4)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{t.groupDetail.membersTitle}</h3>

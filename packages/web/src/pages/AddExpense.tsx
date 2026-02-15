@@ -171,7 +171,7 @@ export function AddExpense() {
                     <input className="form-input" type="text" placeholder={t.addExpense.descriptionPlaceholder} value={description} onChange={e => setDescription(e.target.value)} autoFocus />
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 100px', gap: 'var(--space-3)', marginBottom: 'var(--space-4)' }}>
+                <div className="form-row-responsive">
                     <div className="form-group">
                         <label className="form-label">{t.addExpense.amountLabel}</label>
                         <input className="form-input" type="number" step="0.01" min="0" placeholder="0.00" value={amount} onChange={e => setAmount(e.target.value)} />
