@@ -622,3 +622,40 @@ select.form-input {
         grid-template-columns: 1fr 100px;
     }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════ */
+/* Fold 5 / Ultra-Small Screens (max-width: 320px)                            */
+/* ═══════════════════════════════════════════════════════════════════════════ */
+
+@media (max-width: 320px) {
+    :root {
+        --space-4: 0.75rem;
+        /* Reduce spacing */
+        --space-5: 1rem;
+        --space-6: 1.25rem;
+        --space-8: 1.5rem;
+        --font-size-lg: 1.125rem;
+        /* Smaller headings */
+        --font-size-xl: 1.25rem;
+        --font-size-2xl: 1.5rem;
+    }
+
+    .container {
+        padding: 0 var(--space-3);
+    }
+
+    .btn {
+        padding: var(--space-2) var(--space-3);
+        font-size: var(--font-size-sm);
+    }
+
+    .page-header__title {
+        font-size: var(--font-size-xl);
+    }
+
+    /* Stack buttons in Onboarding footer if needed */
+    .onboarding-buttons {
+        flex-direction: column;
+        gap: var(--space-3);
+    }
+}

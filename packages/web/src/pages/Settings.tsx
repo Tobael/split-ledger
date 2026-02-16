@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { useApp, type IdentityState } from '../context/AppContext';
+import { useApp } from '../context/AppContext';
 import { useI18n, supportedLocales, localeLabels } from '../i18n';
 import {
     encryptIdentity,
@@ -7,7 +7,9 @@ import {
     decryptIdentity,
     readFileAsText,
 } from '../utils/identity-export';
-import { type GroupId, type PublicKey } from '@splitledger/core';
+import { IdentityExport } from '../components/IdentityExport';
+import type { GroupId, PublicKey } from '@splitledger/core';
+import type { IdentityState } from '../context/AppContext';
 
 export function Settings() {
     const { identity, restoreIdentity, groups, getGroupState, manager, broadcastEntry, refreshGroups } = useApp();
@@ -32,20 +34,8 @@ export function Settings() {
                 const state = await getGroupState(g.groupId);
                 if (!state) continue;
                 const me = state.members.get(identity.rootKeyPair.publicKey);
-                if (me) { // 'isActive' check? likely yes, but let's list all authorized even if removed? No, if removed, can't revoke.
-                    // But authorizedDevices is on Member object. If I am removed, I can't revoke devices anyway?
-                    // Let's assume active.
+                if (me) {
                     me.authorizedDevices.forEach(dKey => {
-                        // We don't have device name stored in authorizedDevices set (it is just PKs).
-                        // Wait, where is device name stored?
-                        // GroupManager.authorizeDevice takes deviceName.
-                        // But GroupMember only has Set<PublicKey>.
-                        // Ah, DeviceAuthorized entry has name.
-                        // We'd need to index them or look them up.
-                        // For now, allow unnamed or just "Device <FirstChars>"
-                        // Actually, GroupState doesn't map device keys to names easily without replaying.
-                        // Maybe we skip names for now and just show ID? Or "Unknown Device".
-                        // Current device has a name in identity.
                         const existing = devices.get(dKey) || { name: dKey === identity.device.deviceKeyPair.publicKey ? identity.device.deviceName : t.settings.unknownDevice, groups: [] as GroupId[] };
                         if (dKey === identity.device.deviceKeyPair.publicKey) existing.name = identity.device.deviceName; // Ensure my device name is correct
                         if (!existing.groups.includes(g.groupId)) existing.groups.push(g.groupId);
@@ -241,7 +231,10 @@ export function Settings() {
                 </p>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-                    {/* Export */}
+                    {/* Identity Export QR Code */}
+                    <IdentityExport />
+
+                    {/* Export File */}
                     {!showExport ? (
                         <button className="btn btn--secondary" onClick={() => { setShowExport(true); setShowImport(false); setStatus(null); }}>
                             {t.settings.exportButton}
@@ -278,7 +271,7 @@ export function Settings() {
                         </div>
                     )}
 
-                    {/* Import */}
+                    {/* Import File */}
                     {!showImport ? (
                         <button className="btn btn--secondary" onClick={() => { setShowImport(true); setShowExport(false); setStatus(null); }}>
                             {t.settings.importButton}

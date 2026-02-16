@@ -17,7 +17,7 @@ export function AddExpense() {
     const [searchParams] = useSearchParams();
     const editId = searchParams.get('edit');
 
-    const { manager, getGroupState, storage, identity, refreshGroups, broadcastEntry, voidExpense } = useApp();
+    const { manager, getGroupState, storage, identity, refreshGroup, broadcastEntry, voidExpense } = useApp();
     const { t } = useI18n();
     const groupId = id as GroupId;
 
@@ -150,7 +150,7 @@ export function AddExpense() {
 
             await storage.appendEntry(groupId, entry);
             await broadcastEntry(groupId, entry);
-            await refreshGroups();
+            await refreshGroup(groupId); // Optimistic/Local refresh only
             navigate(`/group/${groupId}`);
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed to add expense');

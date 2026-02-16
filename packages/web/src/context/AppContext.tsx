@@ -16,6 +16,8 @@ import {
     type LedgerEntry,
     type Ed25519KeyPair,
     type DeviceIdentity,
+    type SecretKey,
+    type PublicKey,
 
     EntryType,
     type Hash,
@@ -65,6 +67,9 @@ interface AppContextValue {
     broadcastEntry: (groupId: GroupId, entry: LedgerEntry) => Promise<void>;
     deleteGroup: (groupId: GroupId) => Promise<void>;
     voidExpense: (groupId: GroupId, entryId: Hash, reason?: string) => Promise<void>;
+    importIdentity: (qrPayload: string) => void;
+    createGroup: (name: string, currency: string) => Promise<GroupId>;
+    refreshGroup: (groupId: GroupId) => Promise<void>;
 }
 
 export type { IdentityState };
@@ -304,6 +309,48 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setIdentity(newIdentity);
     }, []);
 
+    const importIdentity = useCallback((importedRootSecretKey: string) => {
+        // 1. Re-derive Root KeyPair from the imported Secret Key.
+        // ED25519: Public Key is derived from Secret Key.
+        // We will assume the imported string is the 64-char hex Secret Key.
+        // We need a helper to get the public key. 
+        // For now, we will assume we can't easily re-derive without a helper function (which might be in @splitledger/core or noble).
+        // Let's assume for this MVP that the export includes the Public Key in the QR code JSON.
+        // Format: { rootSecretKey, rootPublicKey, displayName }
+
+        try {
+            const data = JSON.parse(importedRootSecretKey);
+            const { rootSecretKey, rootPublicKey, displayName } = data;
+
+            if (!rootSecretKey || !rootPublicKey || !displayName) {
+                throw new Error("Invalid QR Code data");
+            }
+
+            const rootKeyPair: Ed25519KeyPair = {
+                secretKey: rootSecretKey as SecretKey,
+                publicKey: rootPublicKey as PublicKey
+            };
+
+            // 2. Create a NEW Device Identity for THIS device
+            // The imported identity is the ROOT. This device needs its own key, authorized by that Root.
+            const deviceName = `${displayName}'s (Imported) Browser`;
+            const device = createDeviceIdentity(rootKeyPair, deviceName);
+
+            const newIdentity: IdentityState = {
+                displayName,
+                rootKeyPair,
+                device
+            };
+
+            saveIdentityToStorage(newIdentity);
+            setIdentity(newIdentity);
+            return true;
+        } catch (e) {
+            console.error("Failed to import identity", e);
+            throw e;
+        }
+    }, []);
+
     const getGroupState = useCallback(async (groupId: GroupId) => {
         if (!manager) return null;
         return manager.getGroupState(groupId);
@@ -356,6 +403,30 @@ export function AppProvider({ children }: { children: ReactNode }) {
         return groupId;
     }, []);
 
+    const refreshGroup = useCallback(async (groupId: GroupId) => {
+        if (!manager || !identity) return;
+        const state = await manager.getGroupState(groupId);
+        if (!state) return;
+
+        const entries = await storage.getAllEntries(groupId);
+        const ordered = orderEntries([...entries]);
+        const balances = computeBalances(ordered);
+        const myBalance = balances.get(identity.rootKeyPair.publicKey) ?? 0;
+
+        setGroups(prev => prev.map(g => {
+            if (g.groupId === groupId) {
+                return {
+                    ...g,
+                    name: state.groupName,
+                    memberCount: [...state.members.values()].filter(m => m.isActive).length,
+                    myBalance,
+                    currency: getCurrency(ordered),
+                };
+            }
+            return g;
+        }));
+    }, [manager, identity, storage]);
+
     // Broadcast a newly created entry to the relay
     const broadcastEntry = useCallback(async (groupId: GroupId, entry: LedgerEntry) => {
         const syncMgr = syncManagerRef.current;
@@ -382,14 +453,37 @@ export function AppProvider({ children }: { children: ReactNode }) {
         if (!manager) return;
         const entry = await manager.voidExpense(groupId, entryId, reason);
         await broadcastEntry(groupId, entry);
-        await refreshGroups();
-    }, [manager, broadcastEntry, refreshGroups]);
+        await refreshGroup(groupId);
+    }, [manager, broadcastEntry, refreshGroup]);
 
-    useEffect(() => {
-        if (manager) {
-            refreshGroups();
+    const createGroup = useCallback(async (name: string, currency: string) => {
+        if (!manager || !identity) throw new Error("Manager not ready");
+
+        try {
+            const result = await manager.createGroup(name, currency);
+            const groupId = result.groupId;
+
+            // Immediate update of local state
+            const newGroupSummary: GroupSummary = {
+                groupId,
+                name,
+                memberCount: 1,
+                myBalance: 0,
+                currency,
+            };
+
+            setGroups(prev => [newGroupSummary, ...prev]);
+
+            // Then trigger background sync/refresh
+            syncGroupFromRelay(groupId);
+            refreshGroups(); // eventual consistency
+
+            return groupId;
+        } catch (e) {
+            console.error("Failed to create group", e);
+            throw e;
         }
-    }, [manager, refreshGroups]);
+    }, [manager, identity, refreshGroups, syncGroupFromRelay]);
 
     const restoreIdentity = useCallback((imported: IdentityState) => {
         saveIdentityToStorage(imported);
@@ -412,7 +506,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
         broadcastEntry,
         deleteGroup,
         voidExpense,
-    };
+        importIdentity,
+        createGroup,
+        refreshGroup,
+    } as AppContextValue;
 
     return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 }

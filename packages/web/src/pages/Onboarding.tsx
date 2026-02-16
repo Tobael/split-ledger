@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { useI18n } from '../i18n';
 import { Footer } from '../components/Footer';
+import { IdentityImport } from '../components/IdentityImport';
 
 export function Onboarding() {
     const { createIdentity } = useApp();
@@ -10,6 +11,16 @@ export function Onboarding() {
     const navigate = useNavigate();
     const [name, setName] = useState('');
     const [step, setStep] = useState<'welcome' | 'name' | 'creating'>('welcome');
+    const [showScanner, setShowScanner] = useState(false);
+
+    useEffect(() => {
+        const style = document.createElement('style');
+        style.textContent = `@keyframes spin {to {transform: rotate(360deg); } }`;
+        document.head.appendChild(style);
+        return () => {
+            document.head.removeChild(style);
+        };
+    }, []);
 
     const handleCreate = () => {
         if (!name.trim()) return;
@@ -26,7 +37,7 @@ export function Onboarding() {
             <div style={styles.bgOrb2} />
 
             <div style={styles.content} className="animate-slide-up">
-                {step === 'welcome' && (
+                {step === 'welcome' && !showScanner && (
                     <>
                         <div style={styles.logoContainer}>
                             <span style={styles.logo}>💸</span>
@@ -49,14 +60,28 @@ export function Onboarding() {
                                 </div>
                             ))}
                         </div>
-                        <button
-                            className="btn btn--primary btn--lg btn--full"
-                            onClick={() => setStep('name')}
-                            style={{ marginTop: 'var(--space-6)' }}
-                        >
-                            {t.onboarding.getStarted}
-                        </button>
+                        <div className="onboarding-buttons" style={{ marginTop: 'var(--space-6)', display: 'flex', gap: 'var(--space-3)' }}>
+                            <button
+                                className="btn btn--primary btn--lg"
+                                onClick={() => setStep('name')}
+                                style={{ flex: 1 }}
+                            >
+                                {t.onboarding.getStarted}
+                            </button>
+                            <button
+                                className="btn btn--secondary btn--lg"
+                                onClick={() => setShowScanner(true)}
+                                style={{ padding: '0 var(--space-3)' }}
+                                title={t.onboarding?.importTitle ?? "Scan QR to import identity"}
+                            >
+                                📷
+                            </button>
+                        </div>
                     </>
+                )}
+
+                {showScanner && (
+                    <IdentityImport onCancel={() => setShowScanner(false)} />
                 )}
 
                 {step === 'name' && (
@@ -122,6 +147,7 @@ const styles: Record<string, React.CSSProperties> = {
         maxWidth: '420px',
         margin: '0 auto',
         padding: 'var(--space-6)',
+        paddingBottom: '80px', // Extra padding for small screens to prevent footer overlap
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'center',
@@ -145,7 +171,3 @@ const styles: Record<string, React.CSSProperties> = {
     creatingContainer: { display: 'flex', flexDirection: 'column' as const, alignItems: 'center', gap: 'var(--space-4)' },
     spinner: { width: '48px', height: '48px', border: '3px solid var(--bg-tertiary)', borderTopColor: 'var(--accent-primary)', borderRadius: '50%', animation: 'spin 0.8s linear infinite' },
 };
-
-const style = document.createElement('style');
-style.textContent = `@keyframes spin { to { transform: rotate(360deg); } }`;
-document.head.appendChild(style);

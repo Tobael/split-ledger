@@ -31,6 +31,9 @@ export interface Translations {
         keyHint: string;
         generatingTitle: string;
         generatingSub: string;
+        importTitle: string;
+        scanQrTitle: string;
+        importInvalid: string;
     };
     dashboard: {
         title: string;
@@ -47,6 +50,7 @@ export interface Translations {
         subtitle: string;
         nameLabel: string;
         namePlaceholder: string;
+        currencyLabel: string;
         creating: string;
         createButton: string;
     };
@@ -84,6 +88,7 @@ export interface Translations {
         confirmDelete: string;
         accessDeniedTitle: string;
         accessDeniedText: string;
+        exportData: string;
     };
     chain: {
         title: string;
@@ -150,6 +155,11 @@ export interface Translations {
         securityP2P: string;
         securityRecovery: string;
         languageTitle: string;
+        exportIdentityTitle: string;
+        exportIdentitySubtitle: string;
+        exportWarning: string;
+        revealQr: string;
+        keepPrivate: string;
     };
     nav: {
         groups: string;
@@ -191,6 +201,9 @@ const en: Translations = {
         keyHint: '🔑 A unique cryptographic identity will be generated on your device. No passwords, no accounts.',
         generatingTitle: 'Generating your identity…',
         generatingSub: 'Creating cryptographic keys on your device',
+        importTitle: 'Scan QR to import identity',
+        scanQrTitle: 'Scan Identity QR',
+        importInvalid: 'Invalid QR Code. Please try again.',
     },
     dashboard: {
         title: 'Your Groups',
@@ -207,6 +220,7 @@ const en: Translations = {
         subtitle: 'Start a new expense-sharing group',
         nameLabel: 'Group Name',
         namePlaceholder: 'e.g., Summer Trip 2026',
+        currencyLabel: 'Currency',
         creating: 'Creating…',
         createButton: 'Create Group',
     },
@@ -244,6 +258,7 @@ const en: Translations = {
         confirmDelete: 'Are you sure you want to delete this group? This cannot be undone.',
         accessDeniedTitle: 'Access Denied',
         accessDeniedText: 'You are not a member of this group or the group does not exist locally.',
+        exportData: 'Export Data',
     },
     chain: {
         title: 'Hash Chain',
@@ -311,6 +326,11 @@ const en: Translations = {
         securityP2P: 'Peer-to-peer sync (no central server stores your data)',
         securityRecovery: 'Social recovery available for root key rotation',
         languageTitle: 'Language',
+        exportIdentityTitle: 'Export Identity',
+        exportIdentitySubtitle: 'Scan this QR code on another device to log in.',
+        exportWarning: 'This QR code contains your private key. Do not share it!',
+        revealQr: 'Reveal QR Code',
+        keepPrivate: 'Keep this screen private!',
     },
     nav: {
         groups: 'Groups',
