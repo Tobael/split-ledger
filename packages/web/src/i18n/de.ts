@@ -36,6 +36,7 @@ const de: Translations = {
         importTitle: 'Identität importieren',
         scanQrTitle: 'QR-Code scannen',
         importInvalid: 'Ungültiger QR-Code. Bitte versuchen Sie es erneut.',
+        cameraError: 'Kamera konnte nicht gestartet werden. Bitte Berechtigungen prüfen.',
     },
     dashboard: {
         title: 'Deine Gruppen',

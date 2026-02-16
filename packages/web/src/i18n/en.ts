@@ -34,6 +34,7 @@ export interface Translations {
         importTitle: string;
         scanQrTitle: string;
         importInvalid: string;
+        cameraError: string;
     };
     dashboard: {
         title: string;
@@ -204,6 +205,7 @@ const en: Translations = {
         importTitle: 'Scan QR to import identity',
         scanQrTitle: 'Scan Identity QR',
         importInvalid: 'Invalid QR Code. Please try again.',
+        cameraError: 'Could not access camera. Please check permissions.',
     },
     dashboard: {
         title: 'Your Groups',

@@ -280,7 +280,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
         const promises: Promise<void>[] = [];
 
         for (const groupId of groupIds) {
-            if (groupId === personalGroupId) continue;
+            if (groupId === personalGroupId) {
+                // Ensure Personal Group is synced, but don't show in UI
+                promises.push(syncGroupWithRelay(groupId));
+                continue;
+            }
 
             const state = await manager.getGroupState(groupId);
             if (!state) continue;
@@ -352,7 +356,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
         if (!manager || !identity) throw new Error("Manager not ready");
 
         try {
-            const result = await manager.createGroup(name, currency);
+            // Fix: Pass identity.displayName (or undefined) as the second argument, NOT currency.
+            // currency is part of the GroupJoined announcement, not the Genesis entry (which uses displayName).
+            const result = await manager.createGroup(name, identity.displayName);
             const groupId = result.groupId;
 
             if (personalGroupId) {
