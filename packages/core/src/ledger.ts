@@ -31,6 +31,8 @@ import type {
     LedgerEntry,
     MemberAddedPayload,
     MemberRemovedPayload,
+    GroupJoinedPayload, // New
+    GroupLeftPayload,   // New
     PublicKey,
     RootKeyRotationPayload,
     SecretKey,
@@ -237,6 +239,12 @@ function validatePayload(
             break;
         case EntryType.RootKeyRotation:
             validateRootKeyRotationPayload(entry.payload, groupState, errors);
+            break;
+        case EntryType.GroupJoined:
+            validateGroupJoinedPayload(entry.payload, errors);
+            break;
+        case EntryType.GroupLeft:
+            validateGroupLeftPayload(entry.payload, errors);
             break;
     }
 }
@@ -447,6 +455,16 @@ function validateRootKeyRotationPayload(
     }
 }
 
+function validateGroupJoinedPayload(payload: GroupJoinedPayload, errors: ValidationError[]): void {
+    if (!payload.groupId) errors.push({ field: 'payload.groupId', message: 'Missing groupId' });
+    if (!payload.groupName) errors.push({ field: 'payload.groupName', message: 'Missing groupName' });
+    if (!payload.currency) errors.push({ field: 'payload.currency', message: 'Missing currency' });
+}
+
+function validateGroupLeftPayload(payload: GroupLeftPayload, errors: ValidationError[]): void {
+    if (!payload.groupId) errors.push({ field: 'payload.groupId', message: 'Missing groupId' });
+}
+
 // =============================================================================
 // State Application
 // =============================================================================
@@ -477,6 +495,10 @@ export function applyEntry(entry: LedgerEntry, state: GroupState): void {
             break;
         case EntryType.RootKeyRotation:
             applyRootKeyRotation(entry.payload, state);
+            break;
+        case EntryType.GroupJoined:
+        case EntryType.GroupLeft:
+            // These payloads are for metadata sync only and don't affect the personal group's state
             break;
         // ExpenseCreated, ExpenseCorrection, and ExpenseVoided don't change membership state
         // Balances are recomputed separately via computeBalances()

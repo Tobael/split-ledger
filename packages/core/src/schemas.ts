@@ -84,6 +84,18 @@ export const rootKeyRotationPayloadSchema = z.object({
     coSignatures: z.array(coSignatureSchema).min(1),
 });
 
+export const groupJoinedPayloadSchema = z.object({
+    groupId: groupIdSchema,
+    groupName: z.string().min(1).max(200),
+    currency: z.string().length(3),
+    joinedAt: z.number().int().positive(),
+});
+
+export const groupLeftPayloadSchema = z.object({
+    groupId: groupIdSchema,
+    leftAt: z.number().int().positive(),
+});
+
 // --- Entry base schema ------------------------------------------------------
 
 export const ledgerEntryBaseSchema = z.object({
@@ -108,6 +120,8 @@ export const payloadSchemas: Record<EntryType, z.ZodType> = {
     [EntryType.DeviceAuthorized]: deviceAuthorizedPayloadSchema,
     [EntryType.DeviceRevoked]: deviceRevokedPayloadSchema,
     [EntryType.RootKeyRotation]: rootKeyRotationPayloadSchema,
+    [EntryType.GroupJoined]: groupJoinedPayloadSchema,
+    [EntryType.GroupLeft]: groupLeftPayloadSchema,
 };
 
 /**

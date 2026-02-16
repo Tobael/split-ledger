@@ -141,6 +141,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const [storageReady, setStorageReady] = useState(false);
 
     const storage = useMemo(() => new InMemoryStorageAdapter(), []);
+    const transportRef = useRef<RelayTransport | null>(null);
+    const syncManagerRef = useRef<SyncManager | null>(null);
 
     // Load persisted group entries on mount
     useEffect(() => {
@@ -160,14 +162,95 @@ export function AppProvider({ children }: { children: ReactNode }) {
         });
     }, [identity, storage, storageReady]);
 
-    // Auto-sync group with relay after creation or joining
+    // ─── Personal Sync Group ───
+    const personalGroupId = useMemo(() => {
+        if (!identity) return null;
+        const p = identity.rootKeyPair.publicKey;
+        return `${p.slice(0, 8)}-${p.slice(8, 12)}-${p.slice(12, 16)}-${p.slice(16, 20)}-${p.slice(20, 32)}` as GroupId;
+    }, [identity]);
+
+    // Ensure Personal Group exists and sync it
+    useEffect(() => {
+        if (!manager || !personalGroupId || !identity) return;
+
+        const initPersonalGroup = async () => {
+            const syncMgr = syncManagerRef.current;
+            if (syncMgr) {
+                // 1. Register for sync and try to fetch first
+                const encoder = new TextEncoder();
+                const groupKey = await deriveGroupKey(encoder.encode(personalGroupId), personalGroupId);
+                syncMgr.registerGroupKey(personalGroupId, groupKey);
+
+                try {
+                    await syncMgr.initialSync(personalGroupId);
+                } catch (e) {
+                    console.debug("[AppContext] Personal group initial sync failed (offline or empty), will ensure local genesis", e);
+                }
+
+                syncMgr.startSync(personalGroupId);
+            }
+
+            // 2. Ensure it exists locally (create Genesis if not found after sync)
+            await manager.ensurePersonalGroupExists(personalGroupId);
+            // If we just created it, we should broadcast the Genesis?
+            // ensurePersonalGroupExists adds to storage.
+            // entries listener might pick it up? 
+            // Better to explicitly broadcast if we created it.
+            // But manager doesn't return "created" boolean easily.
+            // However, syncMgr.startSync will pick up new local entries eventually or we can broadcast.
+
+            if (syncMgr) {
+                const entries = await storage.getAllEntries(personalGroupId);
+                for (const entry of entries) {
+                    // efficient enough for small personal group
+                    syncMgr.broadcastEntry(personalGroupId, entry).catch(() => { });
+                }
+            }
+        };
+
+        initPersonalGroup();
+    }, [manager, personalGroupId, identity, storage]);
+
+    // ─── Core Methods ───
+
+    const syncGroupById = useCallback(async (groupId: GroupId) => {
+        const syncMgr = syncManagerRef.current;
+        if (!syncMgr) return;
+
+        const encoder = new TextEncoder();
+        const groupKey = await deriveGroupKey(encoder.encode(groupId), groupId);
+        syncMgr.registerGroupKey(groupId, groupKey);
+
+        try {
+            await syncMgr.initialSync(groupId);
+        } catch (err) {
+            console.warn('[AppContext] initialSync failed for group:', groupId, err);
+        }
+        syncMgr.startSync(groupId);
+    }, []);
+
+    const checkPersonalGroupForUpdates = useCallback(async () => {
+        if (!storage || !personalGroupId) return;
+        const entries = await storage.getAllEntries(personalGroupId);
+
+        for (const entry of entries) {
+            if (entry.entryType === EntryType.GroupJoined) {
+                const payload = entry.payload as { groupId: GroupId; groupName: string; currency: string };
+                const exists = await storage.getGroupState(payload.groupId);
+                if (!exists) {
+                    console.log(`[PersonalSync] Discovered new group: ${payload.groupName} (${payload.groupId})`);
+                    await syncGroupById(payload.groupId);
+                }
+            }
+        }
+    }, [storage, personalGroupId, syncGroupById]);
+
     const syncGroupWithRelay = useCallback(async (groupId: GroupId) => {
         const syncMgr = syncManagerRef.current;
         if (!syncMgr || !identity) return;
         try {
-            // Derive group key from group ID as shared secret
             const encoder = new TextEncoder();
-            const groupKey = deriveGroupKey(encoder.encode(groupId), groupId);
+            const groupKey = await deriveGroupKey(encoder.encode(groupId), groupId);
             syncMgr.registerGroupKey(groupId, groupKey);
 
             try {
@@ -176,28 +259,29 @@ export function AppProvider({ children }: { children: ReactNode }) {
                 console.warn(`[AppContext] Sync failed for ${groupId}, attempting broadcast anyway:`, err);
             }
 
-            // Push local entries to relay (relay deduplicates)
-            // Crucial: We do this even if startSync failed, to ensure we push our Genesis/Data
             const localEntries = await storage.getAllEntries(groupId);
             for (const entry of localEntries) {
                 try {
                     await syncMgr.broadcastEntry(groupId, entry);
-                } catch {
-                    // Entry may already exist on relay — ignore
-                }
+                } catch { /* ignore */ }
             }
-        } catch {
-            // Relay offline — continue in offline mode
-        }
+        } catch { /* Relay offline */ }
     }, [identity, storage]);
 
     const refreshGroups = useCallback(async () => {
         if (!manager || !identity) return;
+
+        if (personalGroupId) {
+            await checkPersonalGroupForUpdates();
+        }
+
         const groupIds = await manager.listGroups();
         const summaries: GroupSummary[] = [];
         const promises: Promise<void>[] = [];
 
         for (const groupId of groupIds) {
+            if (groupId === personalGroupId) continue;
+
             const state = await manager.getGroupState(groupId);
             if (!state) continue;
 
@@ -214,194 +298,31 @@ export function AppProvider({ children }: { children: ReactNode }) {
                 currency: getCurrency(ordered),
             });
 
-            // Start sync for each group (idempotent)
             promises.push(syncGroupWithRelay(groupId));
         }
 
         setGroups(summaries);
-
-        // Wait for all syncs to complete (ensures relay has data before we claim success)
         await Promise.allSettled(promises);
-
-        // Persist entries to localStorage after refresh
         await persistEntries();
-    }, [manager, identity, storage, syncGroupWithRelay, persistEntries]);
+    }, [manager, identity, storage, syncGroupWithRelay, persistEntries, personalGroupId, checkPersonalGroupForUpdates]);
 
-
-    // Relay transport + sync manager (created once when identity is ready)
-    const transportRef = useRef<RelayTransport | null>(null);
-    const syncManagerRef = useRef<SyncManager | null>(null);
-
-    useEffect(() => {
-        if (!identity) return;
-
-        try {
-            const transport = new RelayTransport({ url: getRelayWsUrl() });
-            const syncMgr = new SyncManager({
-                transport,
-                storage,
-                syncIntervalMs: 30_000,
-            });
-
-            transport.onConnectionState((state) => {
-                setSyncStatus(state === 'connected' ? 'connected' : state === 'reconnecting' ? 'reconnecting' : 'disconnected');
-            });
-
-            syncMgr.on(async (event) => {
-                if (event.type === 'entry:received') {
-                    // SyncManager already appended to storage, but we need to persist to disk
-                    await saveGroupEntriesToStorage(storage);
-
-                    // Force a check/refresh of the UI
-                    // const { groupId } = event; // We could optimize to only refresh specific group
-                    refreshGroups();
-                }
-            });
-
-            transportRef.current = transport;
-            syncManagerRef.current = syncMgr;
-            setSyncStatus('connecting');
-
-        } catch {
-            // Relay unavailable — app works offline
-            setSyncStatus('disconnected');
-        }
-
-        return () => {
-            transportRef.current?.disconnectAll();
-            syncManagerRef.current?.stopAll();
-            transportRef.current = null;
-            syncManagerRef.current = null;
-            setSyncStatus('disconnected');
-        };
-    }, [identity, storage, refreshGroups]);
-
-    // Initialize sync for existing groups
-    useEffect(() => {
-        const syncMgr = syncManagerRef.current;
-        if (!syncMgr || !identity || groups.length === 0) return;
-
-        const initGroups = async () => {
-            for (const g of groups) {
-                try {
-                    // Derive group key from group ID as shared secret
-                    const encoder = new TextEncoder();
-                    const groupKey = await deriveGroupKey(encoder.encode(g.groupId), g.groupId);
-                    syncMgr.registerGroupKey(g.groupId, groupKey);
-                    await syncMgr.startSync(g.groupId);
-                } catch (err) {
-                    // console.error('Failed to init sync for group', g.groupId, err);
-                }
-            }
-        };
-        initGroups();
-    }, [groups, identity]);
-
-    const createIdentity = useCallback((displayName: string) => {
-        const root = createRootIdentity(displayName);
-        const device = createDeviceIdentity(root.rootKeyPair, `${displayName}'s Browser`);
-        const newIdentity = {
-            displayName,
-            rootKeyPair: root.rootKeyPair,
-            device,
-        };
-        saveIdentityToStorage(newIdentity);
-        setIdentity(newIdentity);
-    }, []);
-
-    const importIdentity = useCallback((importedRootSecretKey: string) => {
-        // 1. Re-derive Root KeyPair from the imported Secret Key.
-        // ED25519: Public Key is derived from Secret Key.
-        // We will assume the imported string is the 64-char hex Secret Key.
-        // We need a helper to get the public key. 
-        // For now, we will assume we can't easily re-derive without a helper function (which might be in @splitledger/core or noble).
-        // Let's assume for this MVP that the export includes the Public Key in the QR code JSON.
-        // Format: { rootSecretKey, rootPublicKey, displayName }
-
-        try {
-            const data = JSON.parse(importedRootSecretKey);
-            const { rootSecretKey, rootPublicKey, displayName } = data;
-
-            if (!rootSecretKey || !rootPublicKey || !displayName) {
-                throw new Error("Invalid QR Code data");
-            }
-
-            const rootKeyPair: Ed25519KeyPair = {
-                secretKey: rootSecretKey as SecretKey,
-                publicKey: rootPublicKey as PublicKey
-            };
-
-            // 2. Create a NEW Device Identity for THIS device
-            // The imported identity is the ROOT. This device needs its own key, authorized by that Root.
-            const deviceName = `${displayName}'s (Imported) Browser`;
-            const device = createDeviceIdentity(rootKeyPair, deviceName);
-
-            const newIdentity: IdentityState = {
-                displayName,
-                rootKeyPair,
-                device
-            };
-
-            saveIdentityToStorage(newIdentity);
-            setIdentity(newIdentity);
-            return true;
-        } catch (e) {
-            console.error("Failed to import identity", e);
-            throw e;
-        }
-    }, []);
-
-    const getGroupState = useCallback(async (groupId: GroupId) => {
-        if (!manager) return null;
-        return manager.getGroupState(groupId);
-    }, [manager]);
-
-    const getGroupEntries = useCallback(async (groupId: GroupId) => {
-        const entries = await storage.getAllEntries(groupId);
-        return orderEntries([...entries]);
-    }, [storage]);
-
-
-
-    // Pre-sync a group's entries from relay before joining
     const syncGroupFromRelay = useCallback(async (inviteLink: string): Promise<GroupId> => {
         const { token } = parseInviteLink(inviteLink);
         const groupId = token.groupId;
+
+        await syncGroupById(groupId);
+
         const syncMgr = syncManagerRef.current;
-
-        if (!syncMgr) {
-            throw new Error('Not connected to relay');
-        }
-
-        // Register group key and sync (fetches + decrypts + stores all entries)
-        const encoder = new TextEncoder();
-        const groupKey = deriveGroupKey(encoder.encode(groupId), groupId);
-        syncMgr.registerGroupKey(groupId, groupKey);
-
-        // Use initialSync to ensure we get the full history (Genesis included)
-        // irrespective of any previous zombie state
-        try {
-            await syncMgr.initialSync(groupId);
-        } catch (err) {
-            console.warn('[AppContext] initialSync failed (relay might be empty or offline), proceeding to broadcast:', err);
-        }
-
-        // Start background sync for future updates
-        syncMgr.startSync(groupId);
-
-        // Always push local entries to relay (relay deduplicates)
-        // This ensures that even if initialSync failed (e.g. empty relay), we populate it.
-        const localEntries = await storage.getAllEntries(groupId);
-        for (const entry of localEntries) {
-            try {
-                await syncMgr.broadcastEntry(groupId, entry);
-            } catch {
-                // Entry may already exist on relay — ignore
+        if (syncMgr) {
+            const localEntries = await storage.getAllEntries(groupId);
+            for (const entry of localEntries) {
+                try {
+                    await syncMgr.broadcastEntry(groupId, entry);
+                } catch { /* ignore */ }
             }
         }
-
         return groupId;
-    }, []);
+    }, [syncGroupById, storage]);
 
     const refreshGroup = useCallback(async (groupId: GroupId) => {
         if (!manager || !identity) return;
@@ -427,15 +348,49 @@ export function AppProvider({ children }: { children: ReactNode }) {
         }));
     }, [manager, identity, storage]);
 
-    // Broadcast a newly created entry to the relay
+    const createGroup = useCallback(async (name: string, currency: string) => {
+        if (!manager || !identity) throw new Error("Manager not ready");
+
+        try {
+            const result = await manager.createGroup(name, currency);
+            const groupId = result.groupId;
+
+            if (personalGroupId) {
+                await manager.announceGroupJoin(personalGroupId, groupId, name, currency);
+                const syncMgr = syncManagerRef.current;
+                if (syncMgr) {
+                    const entries = await storage.getAllEntries(personalGroupId);
+                    const latest = entries[entries.length - 1];
+                    if (latest) syncMgr.broadcastEntry(personalGroupId, latest);
+                }
+            }
+
+            const newGroupSummary: GroupSummary = {
+                groupId,
+                name,
+                memberCount: 1,
+                myBalance: 0,
+                currency,
+            };
+
+            setGroups(prev => [newGroupSummary, ...prev]);
+
+            syncGroupById(groupId);
+            refreshGroups();
+
+            return groupId;
+        } catch (e) {
+            console.error("Failed to create group", e);
+            throw e;
+        }
+    }, [manager, identity, refreshGroups, syncGroupById, personalGroupId, storage]);
+
     const broadcastEntry = useCallback(async (groupId: GroupId, entry: LedgerEntry) => {
         const syncMgr = syncManagerRef.current;
-        if (!syncMgr) return; // Relay offline — entry stays local
+        if (!syncMgr) return;
         try {
             await syncMgr.broadcastEntry(groupId, entry);
-        } catch {
-            // Relay offline — entry will be synced later
-        }
+        } catch { }
     }, []);
 
     const deleteGroup = useCallback(async (groupId: GroupId) => {
@@ -456,39 +411,126 @@ export function AppProvider({ children }: { children: ReactNode }) {
         await refreshGroup(groupId);
     }, [manager, broadcastEntry, refreshGroup]);
 
-    const createGroup = useCallback(async (name: string, currency: string) => {
-        if (!manager || !identity) throw new Error("Manager not ready");
+    const createIdentity = useCallback((displayName: string) => {
+        const root = createRootIdentity(displayName);
+        const device = createDeviceIdentity(root.rootKeyPair, `${displayName}'s Browser`);
+        const newIdentity = {
+            displayName,
+            rootKeyPair: root.rootKeyPair,
+            device,
+        };
+        saveIdentityToStorage(newIdentity);
+        setIdentity(newIdentity);
+    }, []);
 
+    const importIdentity = useCallback((importedRootSecretKey: string) => {
         try {
-            const result = await manager.createGroup(name, currency);
-            const groupId = result.groupId;
+            const data = JSON.parse(importedRootSecretKey);
+            const { rootSecretKey, rootPublicKey, displayName } = data;
 
-            // Immediate update of local state
-            const newGroupSummary: GroupSummary = {
-                groupId,
-                name,
-                memberCount: 1,
-                myBalance: 0,
-                currency,
+            if (!rootSecretKey || !rootPublicKey || !displayName) {
+                throw new Error("Invalid QR Code data");
+            }
+
+            const rootKeyPair: Ed25519KeyPair = {
+                secretKey: rootSecretKey as SecretKey,
+                publicKey: rootPublicKey as PublicKey
             };
 
-            setGroups(prev => [newGroupSummary, ...prev]);
+            const deviceName = `${displayName}'s (Imported) Browser`;
+            const device = createDeviceIdentity(rootKeyPair, deviceName);
 
-            // Then trigger background sync/refresh
-            syncGroupFromRelay(groupId);
-            refreshGroups(); // eventual consistency
+            const newIdentity: IdentityState = {
+                displayName,
+                rootKeyPair,
+                device
+            };
 
-            return groupId;
+            saveIdentityToStorage(newIdentity);
+            setIdentity(newIdentity);
+            return true;
         } catch (e) {
-            console.error("Failed to create group", e);
+            console.error("Failed to import identity", e);
             throw e;
         }
-    }, [manager, identity, refreshGroups, syncGroupFromRelay]);
+    }, []);
 
     const restoreIdentity = useCallback((imported: IdentityState) => {
         saveIdentityToStorage(imported);
         setIdentity(imported);
     }, []);
+
+    const getGroupState = useCallback(async (groupId: GroupId) => {
+        if (!manager) return null;
+        return manager.getGroupState(groupId);
+    }, [manager]);
+
+    const getGroupEntries = useCallback(async (groupId: GroupId) => {
+        const entries = await storage.getAllEntries(groupId);
+        return orderEntries([...entries]);
+    }, [storage]);
+
+    // Setup Sync Manager
+    useEffect(() => {
+        if (!identity) return;
+
+        try {
+            const transport = new RelayTransport({ url: getRelayWsUrl() });
+            const syncMgr = new SyncManager({
+                transport,
+                storage,
+                syncIntervalMs: 30_000,
+            });
+
+            transport.onConnectionState((state) => {
+                setSyncStatus(state === 'connected' ? 'connected' : state === 'reconnecting' ? 'reconnecting' : 'disconnected');
+            });
+
+            syncMgr.on(async (event) => {
+                if (event.type === 'entry:received') {
+                    await saveGroupEntriesToStorage(storage);
+                    if (personalGroupId && event.groupId === personalGroupId) {
+                        await checkPersonalGroupForUpdates();
+                        refreshGroups();
+                    } else {
+                        refreshGroups();
+                    }
+                }
+            });
+
+            transportRef.current = transport;
+            syncManagerRef.current = syncMgr;
+            setSyncStatus('connecting');
+        } catch {
+            setSyncStatus('disconnected');
+        }
+
+        return () => {
+            transportRef.current?.disconnectAll();
+            syncManagerRef.current?.stopAll();
+            transportRef.current = null;
+            syncManagerRef.current = null;
+            setSyncStatus('disconnected');
+        };
+    }, [identity, storage, refreshGroups, personalGroupId, checkPersonalGroupForUpdates]);
+
+    // Initialize sync for existing groups
+    useEffect(() => {
+        const syncMgr = syncManagerRef.current;
+        if (!syncMgr || !identity || groups.length === 0) return;
+
+        const initGroups = async () => {
+            for (const g of groups) {
+                try {
+                    const encoder = new TextEncoder();
+                    const groupKey = await deriveGroupKey(encoder.encode(g.groupId), g.groupId);
+                    syncMgr.registerGroupKey(g.groupId, groupKey);
+                    await syncMgr.startSync(g.groupId);
+                } catch (err) { }
+            }
+        };
+        initGroups();
+    }, [groups, identity]);
 
     const value: AppContextValue = {
         identity,

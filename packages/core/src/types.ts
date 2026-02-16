@@ -62,6 +62,8 @@ export enum EntryType {
     DeviceAuthorized = 'DeviceAuthorized',
     DeviceRevoked = 'DeviceRevoked',
     RootKeyRotation = 'RootKeyRotation',
+    GroupJoined = 'GroupJoined', // New: for personal device sync
+    GroupLeft = 'GroupLeft',     // New: for personal device sync
 }
 
 export interface LedgerEntryBase {
@@ -155,6 +157,20 @@ export interface CoSignature {
     signature: Signature;
 }
 
+// --- Group Sync Payloads (for Personal Group) -------------------------------
+
+export interface GroupJoinedPayload {
+    groupId: GroupId;
+    groupName: string;
+    currency: string;
+    joinedAt: number; // Unix ms
+}
+
+export interface GroupLeftPayload {
+    groupId: GroupId;
+    leftAt: number; // Unix ms
+}
+
 // --- Entry Payload Map (for discriminated union) ----------------------------
 
 export type PayloadMap = {
@@ -167,6 +183,8 @@ export type PayloadMap = {
     [EntryType.DeviceAuthorized]: DeviceAuthorizedPayload;
     [EntryType.DeviceRevoked]: DeviceRevokedPayload;
     [EntryType.RootKeyRotation]: RootKeyRotationPayload;
+    [EntryType.GroupJoined]: GroupJoinedPayload;
+    [EntryType.GroupLeft]: GroupLeftPayload;
 };
 
 // --- Discriminated Union for LedgerEntry ------------------------------------

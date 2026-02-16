@@ -469,4 +469,59 @@ export class GroupManager {
     async deleteGroup(groupId: GroupId): Promise<void> {
         await this.storage.deleteGroup(groupId);
     }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // Personal Device Sync (Group List)
+    // ═══════════════════════════════════════════════════════════════════════
+
+    /**
+     * Create/Update the personal sync group.
+     * This group is used to sync the list of joined groups between devices.
+     * ID = UUID derived from root pubkey (not cryptographically bound, just convention)
+     */
+    async ensurePersonalGroupExists(personalGroupId: GroupId): Promise<void> {
+        const state = await this.getGroupState(personalGroupId);
+        if (!state) {
+            // Create silently
+            const genesisEntry = buildEntry(
+                EntryType.Genesis,
+                {
+                    groupId: personalGroupId,
+                    groupName: 'My Devices',
+                    creatorRootPubkey: this.device.rootPublicKey,
+                    creatorDisplayName: 'Me',
+                },
+                null,
+                0,
+                this.device.deviceKeyPair.publicKey,
+                this.device.deviceKeyPair.secretKey,
+            );
+            await this.storage.appendEntry(personalGroupId, genesisEntry);
+            await this.deriveGroupState(personalGroupId);
+        }
+    }
+
+    async announceGroupJoin(personalGroupId: GroupId, groupId: GroupId, groupName: string, currency: string): Promise<LedgerEntry> {
+        const entries = await this.storage.getAllEntries(personalGroupId);
+        const ordered = orderEntries([...entries]);
+        const latestEntry = ordered[ordered.length - 1]!;
+        const state = await this.deriveGroupState(personalGroupId); // Re-derive to get clock
+
+        const entry = buildEntry(
+            EntryType.GroupJoined,
+            {
+                groupId,
+                groupName,
+                currency,
+                joinedAt: Date.now(),
+            },
+            latestEntry.entryId,
+            state.currentLamportClock + 1,
+            this.device.deviceKeyPair.publicKey,
+            this.device.deviceKeyPair.secretKey,
+        );
+
+        await this.storage.appendEntry(personalGroupId, entry);
+        return entry;
+    }
 }
