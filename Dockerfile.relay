@@ -5,6 +5,8 @@
 # Stage 1: Build
 FROM node:20-alpine AS builder
 
+RUN apk add --no-cache python3 make g++
+
 WORKDIR /build
 
 # Copy root workspace config
@@ -28,7 +30,7 @@ RUN npm run build --workspace=packages/core && \
 # Stage 2: Runtime
 FROM node:20-alpine AS runtime
 
-RUN apk add --no-cache tini
+RUN apk add --no-cache tini python3 make g++
 WORKDIR /app
 
 # Copy root package files for workspace resolution
