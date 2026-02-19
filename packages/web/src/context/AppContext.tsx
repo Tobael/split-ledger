@@ -71,6 +71,7 @@ interface AppContextValue {
     createGroup: (name: string, currency: string) => Promise<GroupId>;
     refreshGroup: (groupId: GroupId) => Promise<void>;
     getConnectedGroups: () => GroupId[];
+    lastUpdate: number;
 }
 
 export type { IdentityState };
@@ -138,6 +139,7 @@ async function loadGroupEntriesFromStorage(storage: InMemoryStorageAdapter): Pro
 export function AppProvider({ children }: { children: ReactNode }) {
     const [identity, setIdentity] = useState<IdentityState | null>(() => loadIdentityFromStorage());
     const [groups, setGroups] = useState<GroupSummary[]>([]);
+    const [lastUpdate, setLastUpdate] = useState(0);
     const [syncStatus, setSyncStatus] = useState<SyncStatus>('disconnected');
     const [storageReady, setStorageReady] = useState(false);
 
@@ -233,15 +235,30 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const checkPersonalGroupForUpdates = useCallback(async () => {
         if (!storage || !personalGroupId) return;
         const entries = await storage.getAllEntries(personalGroupId);
+        const ordered = orderEntries([...entries]);
 
-        for (const entry of entries) {
+        // Track the set of groups we should be a member of
+        const activeGroups = new Map<GroupId, { groupName: string; currency: string }>();
+
+        console.debug(`[PersonalSync] Recomputing active groups from ${ordered.length} entries`);
+
+        for (const entry of ordered) {
             if (entry.entryType === EntryType.GroupJoined) {
-                const payload = entry.payload as { groupId: GroupId; groupName: string; currency: string };
-                const exists = await storage.getGroupState(payload.groupId);
-                if (!exists) {
-                    console.log(`[PersonalSync] Discovered new group: ${payload.groupName} (${payload.groupId})`);
-                    await syncGroupById(payload.groupId);
-                }
+                const p = entry.payload as { groupId: GroupId; groupName: string; currency: string };
+                // console.debug(`[PersonalSync] Found GroupJoined: ${p.groupName} (${p.groupId})`);
+                activeGroups.set(p.groupId, { ...p });
+            } else if (entry.entryType === EntryType.GroupLeft) {
+                const p = entry.payload as { groupId: GroupId };
+                console.debug(`[PersonalSync] Found GroupLeft: ${p.groupId}`);
+                activeGroups.delete(p.groupId);
+            }
+        }
+
+        for (const [groupId, meta] of activeGroups) {
+            const exists = await storage.getGroupState(groupId);
+            if (!exists) {
+                console.log(`[PersonalSync] Discovered new group: ${meta.groupName} (${groupId})`);
+                await syncGroupById(groupId);
             }
         }
     }, [storage, personalGroupId, syncGroupById]);
@@ -307,6 +324,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         }
 
         setGroups(summaries);
+        setLastUpdate(Date.now());
         await Promise.allSettled(promises);
         await persistEntries();
     }, [manager, identity, storage, syncGroupWithRelay, persistEntries, personalGroupId, checkPersonalGroupForUpdates]);
@@ -326,8 +344,33 @@ export function AppProvider({ children }: { children: ReactNode }) {
                 } catch { /* ignore */ }
             }
         }
+
+        // Announce join to personal group so it persists
+        if (manager && personalGroupId) {
+            try {
+                // Wait a bit for sync? Or assume we have it?
+                // syncGroupById started sync.
+                // Let's try to get state.
+                let state = await manager.getGroupState(groupId);
+                if (!state) {
+                    // Since sync is async, we might not have state yet.
+                    // But we have the invite link token. We don't have group name in token.
+                    // We must rely on sync.
+                    // For now, let's just try once.
+                }
+
+                if (state) {
+                    const entries = await storage.getAllEntries(groupId);
+                    const currency = getCurrency(entries);
+                    await manager.announceGroupJoin(personalGroupId, groupId, state.groupName, currency);
+                }
+            } catch (e) {
+                console.warn("Failed to announce join to personal group", e);
+            }
+        }
+
         return groupId;
-    }, [syncGroupById, storage]);
+    }, [syncGroupById, storage, manager, personalGroupId]);
 
     const refreshGroup = useCallback(async (groupId: GroupId) => {
         if (!manager || !identity) return;
@@ -351,6 +394,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
             }
             return g;
         }));
+        setLastUpdate(Date.now());
     }, [manager, identity, storage]);
 
     const createGroup = useCallback(async (name: string, currency: string) => {
@@ -402,6 +446,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     const deleteGroup = useCallback(async (groupId: GroupId) => {
         const syncMgr = syncManagerRef.current;
+        if (personalGroupId && manager) {
+            try {
+                const entry = await manager.announceGroupLeave(personalGroupId, groupId);
+                if (syncMgr) {
+                    syncMgr.broadcastEntry(personalGroupId, entry).catch(() => { });
+                }
+            } catch (e) {
+                console.warn("Failed to announce group leave", e);
+            }
+        }
+
         if (syncMgr) {
             await syncMgr.stopSync(groupId);
         }
@@ -409,7 +464,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
             await manager.deleteGroup(groupId);
         }
         await refreshGroups();
-    }, [manager, refreshGroups]);
+    }, [manager, refreshGroups, personalGroupId]);
 
     const voidExpense = useCallback(async (groupId: GroupId, entryId: Hash, reason?: string) => {
         if (!manager) return;
@@ -539,6 +594,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
         initGroups();
     }, [groups, identity]);
 
+    // Initial load of groups from manager
+    useEffect(() => {
+        if (manager && identity) {
+            refreshGroups();
+        }
+    }, [manager, identity, refreshGroups]);
+
 
 
     const getConnectedGroups = useCallback(() => {
@@ -565,6 +627,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         createGroup,
         refreshGroup,
         getConnectedGroups,
+        lastUpdate, // Add this
     } as AppContextValue;
 
     return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

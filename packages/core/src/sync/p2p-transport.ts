@@ -54,6 +54,10 @@ export class P2PTransport implements Transport {
         return this._connected;
     }
 
+    getConnectedGroups(): GroupId[] {
+        return Array.from(this.connectedGroups);
+    }
+
     // ─── Connection Management ───
 
     async connect(groupId: GroupId): Promise<void> {

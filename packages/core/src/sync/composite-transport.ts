@@ -51,6 +51,13 @@ export class CompositeTransport implements Transport {
         return this.relay.connected || this.p2p.connected;
     }
 
+    getConnectedGroups(): GroupId[] {
+        const groups = new Set<GroupId>();
+        for (const g of this.relay.getConnectedGroups()) groups.add(g);
+        for (const g of this.p2p.getConnectedGroups()) groups.add(g);
+        return Array.from(groups);
+    }
+
     // ─── Connection Management ───
 
     async connect(groupId: GroupId): Promise<void> {

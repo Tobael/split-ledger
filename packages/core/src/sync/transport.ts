@@ -52,4 +52,7 @@ export interface Transport {
 
     /** Current connection state */
     readonly connected: boolean;
+
+    /** Get list of currently connected/subscribed groups */
+    getConnectedGroups(): GroupId[];
 }

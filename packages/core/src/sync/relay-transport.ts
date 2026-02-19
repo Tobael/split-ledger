@@ -243,6 +243,7 @@ export class RelayTransport implements Transport {
         try {
             msg = JSON.parse(raw) as ServerMessage;
         } catch {
+            console.warn('[RelayTransport] Failed to parse message', raw);
             return;
         }
 
@@ -252,6 +253,7 @@ export class RelayTransport implements Transport {
                 break;
 
             case 'NEW_ENTRY': {
+                console.log(`[RelayTransport] Received NEW_ENTRY for group ${msg.groupId}, clock=${msg.lamportClock}, sender=${msg.senderPubkey.slice(0, 8)}`);
                 const entry: TransportEntry = {
                     encryptedEntry: msg.encryptedEntry,
                     lamportClock: msg.lamportClock,
@@ -264,6 +266,7 @@ export class RelayTransport implements Transport {
             }
 
             case 'ENTRIES_RESPONSE': {
+                console.log(`[RelayTransport] Received ENTRIES_RESPONSE for group ${msg.groupId}, count=${msg.entries.length}`);
                 const pending = this.pendingGetEntries.get(msg.groupId);
                 if (pending) {
                     clearTimeout(pending.timeout);
@@ -274,6 +277,7 @@ export class RelayTransport implements Transport {
             }
 
             case 'FULL_LEDGER': {
+                console.log(`[RelayTransport] Received FULL_LEDGER for group ${msg.groupId}, count=${msg.entries.length}`);
                 const pending = this.pendingGetFull.get(msg.groupId);
                 if (pending) {
                     clearTimeout(pending.timeout);
@@ -291,6 +295,10 @@ export class RelayTransport implements Transport {
 
     private send(msg: unknown): void {
         if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+            const m = msg as { type: string; groupId?: string };
+            if (m.type !== 'PING') {
+                console.log(`[RelayTransport] Sending ${m.type} for ${m.groupId ?? 'unknown'}`);
+            }
             this.ws.send(JSON.stringify(msg));
         }
     }

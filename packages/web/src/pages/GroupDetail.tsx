@@ -28,7 +28,7 @@ export function GroupDetail() {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
 
-    const { manager, getGroupState, getGroupEntries, identity, broadcastEntry, refreshGroups, storage, deleteGroup } = useApp();
+    const { manager, getGroupState, getGroupEntries, identity, broadcastEntry, refreshGroups, storage, deleteGroup, lastUpdate } = useApp();
     const { t } = useI18n();
     const groupId = id as GroupId;
 
@@ -56,7 +56,7 @@ export function GroupDetail() {
         if (manager) {
             refresh();
         }
-    }, [manager, refresh]);
+    }, [manager, refresh, lastUpdate]);
 
     const handleCreateInvite = () => {
         if (!manager) return;

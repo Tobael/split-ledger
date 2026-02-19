@@ -524,4 +524,26 @@ export class GroupManager {
         await this.storage.appendEntry(personalGroupId, entry);
         return entry;
     }
+
+    async announceGroupLeave(personalGroupId: GroupId, groupId: GroupId): Promise<LedgerEntry> {
+        const entries = await this.storage.getAllEntries(personalGroupId);
+        const ordered = orderEntries([...entries]);
+        const latestEntry = ordered[ordered.length - 1]!;
+        const state = await this.deriveGroupState(personalGroupId);
+
+        const entry = buildEntry(
+            EntryType.GroupLeft,
+            {
+                groupId,
+                leftAt: Date.now(),
+            },
+            latestEntry.entryId,
+            state.currentLamportClock + 1,
+            this.device.deviceKeyPair.publicKey,
+            this.device.deviceKeyPair.secretKey,
+        );
+
+        await this.storage.appendEntry(personalGroupId, entry);
+        return entry;
+    }
 }

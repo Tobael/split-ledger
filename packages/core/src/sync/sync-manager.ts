@@ -264,7 +264,10 @@ export class SyncManager {
 
         // Check for duplicates
         const existing = await this.storage.getEntry(entry.entryId);
-        if (existing) return false;
+        if (existing) {
+            console.debug(`[SyncManager] Duplicate entry ignored: ${entry.entryId.slice(0, 8)}`);
+            return false;
+        }
 
         // Validate
         const allEntries = await this.storage.getAllEntries(groupId);
@@ -287,6 +290,8 @@ export class SyncManager {
             this.emit({ type: 'entry:rejected', groupId, detail: { errors: result.errors, entryId: entry.entryId } });
             return false;
         }
+
+        console.log(`[SyncManager] Applying validated entry: ${entry.entryType} (clock=${entry.lamportClock}) to group ${groupId.slice(0, 8)}`);
 
         // Append and update state
         await this.storage.appendEntry(groupId, entry);
