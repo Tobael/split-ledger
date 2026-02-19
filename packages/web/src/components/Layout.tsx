@@ -5,6 +5,7 @@ import { useI18n, supportedLocales, localeLabels } from '../i18n';
 
 import { BrandLogo } from './Logo';
 import { Footer } from './Footer';
+import { ConnectionStatus } from './ConnectionStatus';
 
 export function Layout({ children }: { children: ReactNode }) {
     const { isOnboarded, identity, syncStatus } = useApp();
@@ -29,54 +30,53 @@ export function Layout({ children }: { children: ReactNode }) {
                             <span>Fair Money</span>
                             <span style={{ fontSize: '0.65em', fontWeight: 500, opacity: 0.8 }}>Split Ledger</span>
                         </div>
-                        <span title={syncStatus} style={{
-                            width: '8px', height: '8px', borderRadius: '50%',
-                            background: syncColor, display: 'inline-block',
-                            boxShadow: syncStatus === 'connected' ? `0 0 6px ${syncColor}` : 'none',
-                            marginLeft: '4px'
-                        }} />
-                    </Link>
-                    <div className="app-nav__links">
-                        <Link
-                            to="/dashboard"
-                            className={`app-nav__link ${isActive('/dashboard') ? 'app-nav__link--active' : ''}`}
-                        >
-                            {t.nav.groups}
-                        </Link>
-                        <Link
-                            to="/settings"
-                            className={`app-nav__link ${isActive('/settings') ? 'app-nav__link--active' : ''}`}
-                        >
-                            {identity?.displayName ?? t.settings.title}
-                        </Link>
-                        {/* Compact language switcher in nav */}
-                        <select
-                            value={locale}
-                            onChange={e => setLocale(e.target.value as typeof locale)}
-                            className="nav-lang-select"
-                            style={{
-                                background: 'transparent',
-                                border: '1px solid var(--glass-border)',
-                                borderRadius: 'var(--radius-sm)',
-                                color: 'var(--text-secondary)',
-                                fontSize: 'var(--font-size-xs)',
-                                padding: '4px 8px',
-                                cursor: 'pointer',
-                                fontFamily: 'var(--font-family)',
-                                outline: 'none',
-                            }}
-                        >
-                            {supportedLocales.map(l => (
-                                <option key={l} value={l} style={{ background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}>
-                                    {localeLabels[l]}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
+                        <span style={{ fontSize: '0.65em', fontWeight: 500, opacity: 0.8 }}>Split Ledger</span>
                 </div>
-            </nav>
+            </Link>
+            <div style={{ marginLeft: '4px' }}>
+                <ConnectionStatus />
+            </div>
+            <div className="app-nav__links">
+                <Link
+                    to="/dashboard"
+                    className={`app-nav__link ${isActive('/dashboard') ? 'app-nav__link--active' : ''}`}
+                >
+                    {t.nav.groups}
+                </Link>
+                <Link
+                    to="/settings"
+                    className={`app-nav__link ${isActive('/settings') ? 'app-nav__link--active' : ''}`}
+                >
+                    {identity?.displayName ?? t.settings.title}
+                </Link>
+                {/* Compact language switcher in nav */}
+                <select
+                    value={locale}
+                    onChange={e => setLocale(e.target.value as typeof locale)}
+                    className="nav-lang-select"
+                    style={{
+                        background: 'transparent',
+                        border: '1px solid var(--glass-border)',
+                        borderRadius: 'var(--radius-sm)',
+                        color: 'var(--text-secondary)',
+                        fontSize: 'var(--font-size-xs)',
+                        padding: '4px 8px',
+                        cursor: 'pointer',
+                        fontFamily: 'var(--font-family)',
+                        outline: 'none',
+                    }}
+                >
+                    {supportedLocales.map(l => (
+                        <option key={l} value={l} style={{ background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}>
+                            {localeLabels[l]}
+                        </option>
+                    ))}
+                </select>
+            </div>
+        </div>
+            </nav >
             <main className="app-main">{children}</main>
             <Footer />
-        </div>
+        </div >
     );
 }

@@ -70,6 +70,7 @@ interface AppContextValue {
     importIdentity: (qrPayload: string) => void;
     createGroup: (name: string, currency: string) => Promise<GroupId>;
     refreshGroup: (groupId: GroupId) => Promise<void>;
+    getConnectedGroups: () => GroupId[];
 }
 
 export type { IdentityState };
@@ -538,6 +539,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
         initGroups();
     }, [groups, identity]);
 
+
+
+    const getConnectedGroups = useCallback(() => {
+        return transportRef.current?.getConnectedGroups() ?? [];
+    }, []);
+
     const value: AppContextValue = {
         identity,
         createIdentity,
@@ -557,6 +564,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         importIdentity,
         createGroup,
         refreshGroup,
+        getConnectedGroups,
     } as AppContextValue;
 
     return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

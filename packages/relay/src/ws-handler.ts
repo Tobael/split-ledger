@@ -32,6 +32,11 @@ interface PingMsg {
     type: 'PING';
 }
 
+interface SubscribeMsg {
+    type: 'SUBSCRIBE';
+    groupId: string;
+}
+
 // ─── Signaling Types (WebRTC) ───
 
 interface SignalOfferMsg {
@@ -60,7 +65,7 @@ interface SignalIceMsg {
 
 type SignalMsg = SignalOfferMsg | SignalAnswerMsg | SignalIceMsg;
 
-type ClientMessage = PublishEntryMsg | GetEntriesAfterMsg | GetFullLedgerMsg | PingMsg | SignalMsg;
+type ClientMessage = PublishEntryMsg | GetEntriesAfterMsg | GetFullLedgerMsg | PingMsg | SignalMsg | SubscribeMsg;
 
 interface NewEntryMsg {
     type: 'NEW_ENTRY';
@@ -218,6 +223,10 @@ export function createWsHandler(db: RelayDatabase, config: RelayConfig, rooms: R
                     handleSignaling(ws, msg, rooms);
                     break;
 
+                case 'SUBSCRIBE':
+                    handleSubscribe(ws, msg, rooms);
+                    break;
+
                 default:
                     sendError(ws, 'UNKNOWN_TYPE', `Unknown message type: ${(msg as { type: string }).type}`);
             }
@@ -342,6 +351,15 @@ function handleSignaling(_ws: WebSocket, msg: SignalMsg, rooms: RoomManager): vo
         targetWs.send(JSON.stringify(msg));
     }
     // If target not found, silently drop (they may be offline)
+}
+
+function handleSubscribe(ws: WebSocket, msg: SubscribeMsg, rooms: RoomManager): void {
+    const { groupId } = msg;
+    if (!groupId) {
+        sendError(ws, 'INVALID_PARAMS', 'Missing groupId');
+        return;
+    }
+    rooms.subscribe(groupId, ws);
 }
 
 // ─── Helpers ───

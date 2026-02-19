@@ -95,6 +95,10 @@ export class RelayTransport implements Transport {
         return this._connected;
     }
 
+    getConnectedGroups(): GroupId[] {
+        return Array.from(this.connectedGroups);
+    }
+
     // ─── Connection Management ───
 
     async connect(groupId: GroupId): Promise<void> {
@@ -102,6 +106,12 @@ export class RelayTransport implements Transport {
 
         if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
             await this.ensureConnection(groupId);
+        } else {
+            // Already connected, just subscribe to the new group
+            this.send({
+                type: 'SUBSCRIBE',
+                groupId,
+            });
         }
     }
 
@@ -191,6 +201,7 @@ export class RelayTransport implements Transport {
                 this._connected = true;
                 this.emitConnectionState('connected');
                 this.startPingInterval();
+                this.subscribeToAllGroups();
                 resolve();
             };
 
@@ -214,6 +225,17 @@ export class RelayTransport implements Transport {
                 this.scheduleReconnect();
             });
         });
+    }
+
+    private async subscribeToAllGroups(): Promise<void> {
+        if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
+
+        for (const groupId of this.connectedGroups) {
+            this.send({
+                type: 'SUBSCRIBE',
+                groupId,
+            });
+        }
     }
 
     private handleMessage(raw: string): void {
