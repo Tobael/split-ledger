@@ -265,7 +265,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     const syncGroupWithRelay = useCallback(async (groupId: GroupId) => {
         const syncMgr = syncManagerRef.current;
-        if (!syncMgr || !identity) return;
+        if (!syncMgr || !identity || !manager) return;
         try {
             const encoder = new TextEncoder();
             const groupKey = await deriveGroupKey(encoder.encode(groupId), groupId);
@@ -273,6 +273,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
             try {
                 await syncMgr.startSync(groupId);
+
+                // --- Auto-Authorize Device if needed ---
+                const state = await manager.getGroupState(groupId);
+                if (state) {
+                    const me = state.members.get(identity.rootKeyPair.publicKey);
+                    if (me && me.isActive && !me.authorizedDevices.has(identity.device.deviceKeyPair.publicKey)) {
+                        console.log(`[AppContext] Auto-authorizing device for group ${groupId}`);
+                        try {
+                            const entry = await manager.authorizeDevice(groupId, identity.device.deviceKeyPair.publicKey, identity.device.deviceName);
+                            await syncMgr.broadcastEntry(groupId, entry);
+                        } catch (authErr) {
+                            console.warn(`[AppContext] Failed to auto-authorize device for group ${groupId}`, authErr);
+                        }
+                    }
+                }
             } catch (err) {
                 console.warn(`[AppContext] Sync failed for ${groupId}, attempting broadcast anyway:`, err);
             }
@@ -284,7 +299,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
                 } catch { /* ignore */ }
             }
         } catch { /* Relay offline */ }
-    }, [identity, storage]);
+    }, [identity, storage, manager]);
 
     const refreshGroups = useCallback(async () => {
         if (!manager || !identity) return;

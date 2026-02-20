@@ -185,6 +185,11 @@ function validateCreatorAuthorization(
         return;
     }
 
+    if (entry.entryType === EntryType.DeviceAuthorized && entry.creatorDevicePubkey === (entry.payload as any).devicePublicKey) {
+        // DeviceAuthorized is self-authorizing if the device is authorizing itself
+        return;
+    }
+
     const owner = findDeviceOwner(entry.creatorDevicePubkey, groupState);
     if (!owner) {
         errors.push({

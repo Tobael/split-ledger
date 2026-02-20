@@ -9,7 +9,6 @@ export function CreateGroup() {
     const { t } = useI18n();
     const navigate = useNavigate();
     const [name, setName] = useState('');
-    const [currency, setCurrency] = useState('EUR');
     const [isCreating, setIsCreating] = useState(false);
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -19,7 +18,7 @@ export function CreateGroup() {
         setIsCreating(true);
         try {
             // Optimistic createGroup returns the ID immediately after local creation
-            const groupId = await createGroup(name.trim(), currency);
+            const groupId = await createGroup(name.trim(), 'EUR');
             navigate(`/group/${groupId}`);
         } catch (err) {
             console.error('Failed to create group:', err);
@@ -46,21 +45,6 @@ export function CreateGroup() {
                         onKeyDown={e => e.key === 'Enter' && handleSubmit(e)}
                         autoFocus
                     />
-                </div>
-
-                <div className="form-group" style={{ marginBottom: 'var(--space-6)' }}>
-                    <label className="form-label">{t.createGroup.currencyLabel}</label>
-                    <select
-                        className="form-input"
-                        value={currency}
-                        onChange={e => setCurrency(e.target.value)}
-                    >
-                        <option value="EUR">EUR (€)</option>
-                        <option value="USD">USD ($)</option>
-                        <option value="GBP">GBP (£)</option>
-                        <option value="CHF">CHF</option>
-                        <option value="JPY">JPY (¥)</option>
-                    </select>
                 </div>
                 <div style={{ display: 'flex', gap: 'var(--space-3)' }}>
                     <button className="btn btn--ghost" onClick={() => navigate('/dashboard')}>{t.common.cancel}</button>

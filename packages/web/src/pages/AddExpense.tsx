@@ -24,7 +24,6 @@ export function AddExpense() {
     const [state, setState] = useState<GroupState | null>(null);
     const [description, setDescription] = useState('');
     const [amount, setAmount] = useState('');
-    const [currency, setCurrency] = useState('EUR');
     const [paidBy, setPaidBy] = useState<string>('');
     const [splitMode, setSplitMode] = useState<'equal' | 'custom'>('equal');
     const [customSplits, setCustomSplits] = useState<Record<string, string>>({});
@@ -48,7 +47,6 @@ export function AddExpense() {
                 const p = entry.payload;
                 setDescription(p.description);
                 setAmount((p.amountMinorUnits / 100).toFixed(2));
-                setCurrency(p.currency);
                 setPaidBy(p.paidByRootPubkey);
 
                 // Determine split mode
@@ -138,7 +136,7 @@ export function AddExpense() {
                 {
                     description: description.trim(),
                     amountMinorUnits: amountMinor,
-                    currency,
+                    currency: 'EUR',
                     paidByRootPubkey: paidBy as PublicKey,
                     splits,
                 },
@@ -171,21 +169,9 @@ export function AddExpense() {
                     <input className="form-input" type="text" placeholder={t.addExpense.descriptionPlaceholder} value={description} onChange={e => setDescription(e.target.value)} autoFocus />
                 </div>
 
-                <div className="form-row-responsive">
-                    <div className="form-group">
-                        <label className="form-label">{t.addExpense.amountLabel}</label>
-                        <input className="form-input" type="number" step="0.01" min="0" placeholder="0.00" value={amount} onChange={e => setAmount(e.target.value)} />
-                    </div>
-                    <div className="form-group">
-                        <label className="form-label">{t.addExpense.currencyLabel}</label>
-                        <select className="form-input" value={currency} onChange={e => setCurrency(e.target.value)}>
-                            <option value="EUR">EUR</option>
-                            <option value="USD">USD</option>
-                            <option value="GBP">GBP</option>
-                            <option value="CHF">CHF</option>
-                            <option value="JPY">JPY</option>
-                        </select>
-                    </div>
+                <div className="form-group" style={{ marginBottom: 'var(--space-4)' }}>
+                    <label className="form-label">{t.addExpense.amountLabel}</label>
+                    <input className="form-input" type="number" step="0.01" min="0" placeholder="0.00" value={amount} onChange={e => setAmount(e.target.value)} />
                 </div>
 
                 <div className="form-group" style={{ marginBottom: 'var(--space-4)' }}>
