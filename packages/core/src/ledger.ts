@@ -185,9 +185,13 @@ function validateCreatorAuthorization(
         return;
     }
 
-    if (entry.entryType === EntryType.DeviceAuthorized && entry.creatorDevicePubkey === (entry.payload as any).devicePublicKey) {
-        // DeviceAuthorized is self-authorizing if the device is authorizing itself
-        return;
+    if (entry.entryType === EntryType.DeviceAuthorized) {
+        console.log(`[Ledger] Validating DeviceAuthorized. creator: ${entry.creatorDevicePubkey}, payload.devicePublicKey: ${(entry.payload as any).devicePublicKey}`);
+        if (entry.creatorDevicePubkey === (entry.payload as any).devicePublicKey) {
+            // DeviceAuthorized is self-authorizing if the device is authorizing itself
+            console.log(`[Ledger] Device is self-authorizing, skipping owner check.`);
+            return;
+        }
     }
 
     const owner = findDeviceOwner(entry.creatorDevicePubkey, groupState);
