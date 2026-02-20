@@ -514,7 +514,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
                 publicKey: rootPublicKey as PublicKey
             };
 
-            const deviceName = `${displayName}'s (Imported) Browser`;
+            const ua = navigator.userAgent;
+            const isIOS = /iPad|iPhone|iPod/.test(ua);
+            const isMac = /Mac OS X/.test(ua);
+            const isAndroid = /Android/.test(ua);
+            const isWindows = /Windows/.test(ua);
+            const platform = isIOS ? 'iOS Device' : isMac ? 'Mac' : isAndroid ? 'Android Device' : isWindows ? 'Windows PC' : 'Browser';
+
+            const deviceName = `${displayName}'s ${platform}`;
             const device = createDeviceIdentity(rootKeyPair, deviceName);
 
             const newIdentity: IdentityState = {

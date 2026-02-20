@@ -196,6 +196,7 @@ function validateCreatorAuthorization(
 
     const owner = findDeviceOwner(entry.creatorDevicePubkey, groupState);
     if (!owner) {
+        console.error(`[Ledger] Authorization failed for ${entry.entryType}. Creator: ${entry.creatorDevicePubkey}. Active members:`, Array.from(groupState.members.values()).filter(m => m.isActive).map(m => ({ root: m.rootPubkey, devices: Array.from(m.authorizedDevices) })));
         errors.push({
             field: 'creatorDevicePubkey',
             message: 'Device key not authorized by any active member',
