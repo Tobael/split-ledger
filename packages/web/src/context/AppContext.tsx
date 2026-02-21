@@ -7,6 +7,7 @@ import {
     createDeviceIdentity,
     computeBalances,
     orderEntries,
+    validateFullChain,
     RelayTransport,
     SyncManager,
     deriveGroupKey,
@@ -68,6 +69,7 @@ interface AppContextValue {
     deleteGroup: (groupId: GroupId) => Promise<void>;
     voidExpense: (groupId: GroupId, entryId: Hash, reason?: string) => Promise<void>;
     importIdentity: (qrPayload: string) => void;
+    importIdentityFromJson: (jsonPayload: string) => void;
     createGroup: (name: string, currency: string) => Promise<GroupId>;
     refreshGroup: (groupId: GroupId) => Promise<void>;
     getConnectedGroups: () => GroupId[];
@@ -125,8 +127,17 @@ async function loadGroupEntriesFromStorage(storage: InMemoryStorageAdapter): Pro
         if (!raw) return;
         const data = JSON.parse(raw) as Record<string, LedgerEntry[]>;
         for (const [groupId, entries] of Object.entries(data)) {
-            for (const entry of entries) {
-                await storage.appendEntry(groupId as GroupId, entry);
+            // Validate chain and derive state
+            const result = validateFullChain(entries);
+            if (result.valid && result.finalState) {
+                for (const entry of entries) {
+                    await storage.appendEntry(groupId as GroupId, entry);
+                }
+                await storage.saveGroupState(result.finalState);
+            } else {
+                console.warn(`[AppContext] Local storage chain invalid for group ${groupId}`, result.errors);
+                // We could still append entries if we wanted, but state is broken. 
+                // We'll trust that the sync manager will fetch correctly if local state is bad.
             }
         }
     } catch {
@@ -273,23 +284,24 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
             try {
                 await syncMgr.startSync(groupId);
-
-                // --- Auto-Authorize Device if needed ---
-                const state = await manager.getGroupState(groupId);
-                if (state) {
-                    const me = state.members.get(identity.rootKeyPair.publicKey);
-                    if (me && me.isActive && !me.authorizedDevices.has(identity.device.deviceKeyPair.publicKey)) {
-                        console.log(`[AppContext] Auto-authorizing device for group ${groupId}`);
-                        try {
-                            const entry = await manager.authorizeDevice(groupId, identity.device.deviceKeyPair.publicKey, identity.device.deviceName);
-                            await syncMgr.broadcastEntry(groupId, entry);
-                        } catch (authErr) {
-                            console.warn(`[AppContext] Failed to auto-authorize device for group ${groupId}`, authErr);
-                        }
-                    }
-                }
             } catch (err) {
                 console.warn(`[AppContext] Sync failed for ${groupId}, attempting broadcast anyway:`, err);
+            }
+
+            // Auto-authorize new device on this group if needed
+            const state = await manager.getGroupState(groupId);
+            if (state) {
+                const me = state.members.get(identity.rootKeyPair.publicKey);
+                // If I am a member, but THIS device's public key is not among the authorized devices
+                if (me && me.isActive && !me.authorizedDevices.has(identity.device.deviceKeyPair.publicKey)) {
+                    console.log(`[AppContext] Auto-authorizing imported device for expense group ${groupId}`);
+                    try {
+                        const authEntry = await manager.authorizeDevice(groupId, identity.device.deviceKeyPair.publicKey, identity.device.deviceName);
+                        await syncMgr.broadcastEntry(groupId, authEntry);
+                    } catch (authErr) {
+                        console.warn(`[AppContext] Failed to auto-authorize device for expense group ${groupId}`, authErr);
+                    }
+                }
             }
 
             const localEntries = await storage.getAllEntries(groupId);
@@ -534,7 +546,40 @@ export function AppProvider({ children }: { children: ReactNode }) {
             setIdentity(newIdentity);
             return true;
         } catch (e) {
-            console.error("Failed to import identity", e);
+            console.error("Failed to import identity from QR", e);
+            throw e;
+        }
+    }, []);
+
+    const importIdentityFromJson = useCallback((jsonPayload: string) => {
+        try {
+            const data = JSON.parse(jsonPayload) as IdentityState;
+            const { rootKeyPair, displayName } = data;
+
+            if (!rootKeyPair || !rootKeyPair.publicKey || !rootKeyPair.secretKey || !displayName) {
+                throw new Error("Invalid Identity JSON data");
+            }
+
+            const ua = navigator.userAgent;
+            const isIOS = /iPad|iPhone|iPod/.test(ua);
+            const isMac = /Mac OS X/.test(ua);
+            const isAndroid = /Android/.test(ua);
+            const isWindows = /Windows/.test(ua);
+            const platform = isIOS ? 'iOS Device' : isMac ? 'Mac' : isAndroid ? 'Android Device' : isWindows ? 'Windows PC' : 'Browser';
+
+            const deviceName = `${displayName}'s ${platform}`;
+            const device = createDeviceIdentity(rootKeyPair, deviceName);
+
+            const newIdentity: IdentityState = {
+                displayName,
+                rootKeyPair,
+                device
+            };
+
+            saveIdentityToStorage(newIdentity);
+            setIdentity(newIdentity);
+        } catch (e) {
+            console.error("Failed to import identity from JSON", e);
             throw e;
         }
     }, []);
@@ -646,6 +691,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         deleteGroup,
         voidExpense,
         importIdentity,
+        importIdentityFromJson,
         createGroup,
         refreshGroup,
         getConnectedGroups,

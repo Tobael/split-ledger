@@ -363,6 +363,26 @@ export function Settings() {
                     ))}
                 </div>
             </div>
+
+            {/* Danger Zone */}
+            <div className="glass-card glass-card--static animate-fade-in stagger-4" style={{ ...cardStyle, border: '1px solid var(--danger-dim)' }}>
+                <h3 style={{ ...sectionHeading, color: 'var(--danger)' }}>Danger Zone</h3>
+                <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)', marginBottom: 'var(--space-4)' }}>
+                    Irreversibly delete your account, keys, and local data from this device. You will lose access to all groups unless you have a backup.
+                </p>
+                <button
+                    className="btn btn--secondary"
+                    style={{ color: 'var(--danger)', borderColor: 'var(--danger-dim)' }}
+                    onClick={() => {
+                        if (confirm("Are you absolutely sure? This will delete all your local keys and data irreversibly.")) {
+                            localStorage.clear();
+                            window.location.reload();
+                        }
+                    }}
+                >
+                    Delete Account
+                </button>
+            </div>
         </div>
     );
 }

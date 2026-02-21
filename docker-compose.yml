@@ -48,6 +48,11 @@ services:
       - "traefik.http.services.splitledger.loadbalancer.server.port=80"
       - "traefik.docker.network=external_network"
 
+      # ─── Cache Control Middleware ───
+      # Prevent browser caching of index.html so updates are visible immediately
+      - "traefik.http.middlewares.splitledger-nocache.headers.customresponseheaders.Cache-Control=no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0"
+      - "traefik.http.routers.splitledger.middlewares=splitledger-nocache"
+
 networks:
   external_network:
     external: true

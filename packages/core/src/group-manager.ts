@@ -482,7 +482,13 @@ export class GroupManager {
     async ensurePersonalGroupExists(personalGroupId: GroupId): Promise<void> {
         const state = await this.getGroupState(personalGroupId);
         if (!state) {
-            // Create silently
+            // Create deterministically using the root key pair so that all devices synced to this root key 
+            // generate the exact same genesis block.
+            if (!this.rootKeyPair) {
+                console.warn("[GroupManager] Cannot ensure personal group without root key pair");
+                return;
+            }
+
             const genesisEntry = buildEntry(
                 EntryType.Genesis,
                 {
@@ -492,12 +498,29 @@ export class GroupManager {
                     creatorDisplayName: 'Me',
                 },
                 null,
-                0,
-                this.device.deviceKeyPair.publicKey,
-                this.device.deviceKeyPair.secretKey,
+                0, // Lamport clock 0
+                this.device.rootPublicKey, // Use root pubkey as device pubkey so it's deterministic
+                this.rootKeyPair.secretKey, // Sign with root secret so it's deterministic
+                1 // Timestamp 1 (> 0) so hash is valid and deterministic
             );
+
             await this.storage.appendEntry(personalGroupId, genesisEntry);
             await this.deriveGroupState(personalGroupId);
+        }
+
+        // Now that the group exists (either just created or already existed), ensure THIS device is authorized.
+        const currentState = await this.getGroupState(personalGroupId);
+        if (currentState) {
+            const me = currentState.members.get(this.device.rootPublicKey);
+            if (me && me.isActive && !me.authorizedDevices.has(this.device.deviceKeyPair.publicKey)) {
+                console.log(`[GroupManager] Auto-authorizing device for personal group ${personalGroupId}`);
+                try {
+                    // Try to authorize our own device
+                    await this.authorizeDevice(personalGroupId, this.device.deviceKeyPair.publicKey, this.device.deviceName);
+                } catch (authErr) {
+                    console.warn(`[GroupManager] Failed to auto-authorize device for personal group`, authErr);
+                }
+            }
         }
     }
 

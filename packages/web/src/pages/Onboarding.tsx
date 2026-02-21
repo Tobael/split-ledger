@@ -6,7 +6,7 @@ import { Footer } from '../components/Footer';
 import { IdentityImport } from '../components/IdentityImport';
 
 export function Onboarding() {
-    const { createIdentity } = useApp();
+    const { createIdentity, importIdentityFromJson } = useApp();
     const { t } = useI18n();
     const navigate = useNavigate();
     const [name, setName] = useState('');
@@ -75,6 +75,48 @@ export function Onboarding() {
                                 title={t.onboarding?.importTitle ?? "Scan QR to import identity"}
                             >
                                 📷
+                            </button>
+                            <button
+                                className="btn btn--secondary btn--lg"
+                                onClick={() => {
+                                    // Hidden file input to trigger JSON import
+                                    const input = document.createElement('input');
+                                    input.type = 'file';
+                                    input.accept = '.json';
+                                    input.onchange = (e) => {
+                                        const file = (e.target as HTMLInputElement).files?.[0];
+                                        if (file) {
+                                            const reader = new FileReader();
+                                            reader.onload = async (re) => {
+                                                const content = re.target?.result as string;
+                                                const pwd = prompt(t.settings?.passwordPrompt ?? "Enter password to decrypt:");
+                                                if (pwd) {
+                                                    try {
+                                                        const { decryptIdentity } = await import('../utils/identity-export');
+                                                        const decryptedJson = await decryptIdentity(content, pwd);
+                                                        const imported = JSON.parse(decryptedJson);
+
+                                                        // Validate it looks like our identity JSON
+                                                        if (imported && imported.rootKeyPair) {
+                                                            importIdentityFromJson(decryptedJson);
+                                                            navigate('/dashboard');
+                                                        } else {
+                                                            throw new Error("Invalid identity file structure");
+                                                        }
+                                                    } catch (err) {
+                                                        alert(t.settings?.importError ?? "Invalid file or password");
+                                                    }
+                                                }
+                                            };
+                                            reader.readAsText(file);
+                                        }
+                                    };
+                                    input.click();
+                                }}
+                                style={{ padding: '0 var(--space-3)' }}
+                                title={t.settings?.importButton ?? "Import Identity from JSON"}
+                            >
+                                📁
                             </button>
                         </div>
                     </>

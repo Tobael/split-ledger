@@ -3,7 +3,7 @@ import { useApp } from '../context/AppContext';
 import { useI18n } from '../i18n';
 
 export function Dashboard() {
-    const { groups } = useApp();
+    const { groups, importIdentityFromJson } = useApp();
     const { t } = useI18n();
 
     return (
@@ -27,6 +27,45 @@ export function Dashboard() {
                     <div style={{ display: 'flex', gap: 'var(--space-3)' }}>
                         <Link to="/join" className="btn btn--secondary">{t.dashboard.joinGroup}</Link>
                         <Link to="/create-group" className="btn btn--primary">{t.dashboard.createGroup}</Link>
+                        <button
+                            className="btn btn--secondary"
+                            onClick={() => {
+                                const input = document.createElement('input');
+                                input.type = 'file';
+                                input.accept = '.json';
+                                input.onchange = (e) => {
+                                    const file = (e.target as HTMLInputElement).files?.[0];
+                                    if (file) {
+                                        const reader = new FileReader();
+                                        reader.onload = async (re) => {
+                                            const content = re.target?.result as string;
+                                            const pwd = prompt(t.settings?.passwordPrompt ?? "Enter password to decrypt:");
+                                            if (pwd) {
+                                                try {
+                                                    const { decryptIdentity } = await import('../utils/identity-export');
+                                                    const decryptedJson = await decryptIdentity(content, pwd);
+                                                    const imported = JSON.parse(decryptedJson);
+
+                                                    if (imported && imported.rootKeyPair) {
+                                                        importIdentityFromJson(decryptedJson);
+                                                        // Page will likely reload or refresh AppContext state implicitly
+                                                    } else {
+                                                        throw new Error("Invalid identity file structure");
+                                                    }
+                                                } catch (err) {
+                                                    alert(t.settings?.importError ?? "Invalid file or password");
+                                                }
+                                            }
+                                        };
+                                        reader.readAsText(file);
+                                    }
+                                };
+                                input.click();
+                            }}
+                            title={t.settings?.importButton ?? "Import Identity from JSON"}
+                        >
+                            📁 {t.settings?.importButton ?? "Import"}
+                        </button>
                     </div>
                 </div>
             ) : (

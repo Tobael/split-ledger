@@ -31,6 +31,15 @@ export function IdentityImport({ onCancel }: { onCancel: () => void }) {
 
         const startScanning = async () => {
             try {
+                // Check if any camera exists before starting
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                const hasCamera = devices.some(d => d.kind === 'videoinput');
+                if (!hasCamera) {
+                    setPermissionError(true);
+                    setError(t.onboarding?.cameraError ?? "No camera found. Please use JSON import.");
+                    return;
+                }
+
                 // Prefer back camera, fallback to any if not available (e.g. laptop)
                 await scanner.start(
                     { facingMode: "environment" },
