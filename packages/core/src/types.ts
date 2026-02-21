@@ -215,6 +215,7 @@ export interface GroupMember {
     isActive: boolean;
     removedAt?: number;
     authorizedDevices: Set<PublicKey>;
+    deviceNames: Map<PublicKey, string>;
 }
 
 export interface GroupState {

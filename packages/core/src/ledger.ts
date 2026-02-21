@@ -526,6 +526,7 @@ function applyGenesis(payload: GenesisPayload, entry: LedgerEntry, state: GroupS
         joinedAt: entry.timestamp,
         isActive: true,
         authorizedDevices: new Set([entry.creatorDevicePubkey]),
+        deviceNames: new Map([[entry.creatorDevicePubkey, "Initial Device"]]),
     };
     state.members.set(payload.creatorRootPubkey, member);
 }
@@ -538,6 +539,7 @@ function applyMemberAdded(payload: MemberAddedPayload, entry: LedgerEntry, state
         isActive: true,
         // The device that created the MemberAdded entry is the joiner's first authorized device
         authorizedDevices: new Set([entry.creatorDevicePubkey]),
+        deviceNames: new Map([[entry.creatorDevicePubkey, "Initial Device"]]),
     };
     state.members.set(payload.memberRootPubkey, member);
 }
@@ -554,6 +556,7 @@ function applyDeviceAuthorized(payload: DeviceAuthorizedPayload, state: GroupSta
     const member = state.members.get(payload.ownerRootPubkey);
     if (member) {
         member.authorizedDevices.add(payload.devicePublicKey);
+        member.deviceNames.set(payload.devicePublicKey, payload.deviceName);
     }
 }
 
@@ -561,6 +564,7 @@ function applyDeviceRevoked(payload: DeviceRevokedPayload, state: GroupState): v
     const member = state.members.get(payload.ownerRootPubkey);
     if (member) {
         member.authorizedDevices.delete(payload.devicePublicKey);
+        member.deviceNames.delete(payload.devicePublicKey);
     }
 }
 
@@ -575,6 +579,7 @@ function applyRootKeyRotation(payload: RootKeyRotationPayload, state: GroupState
         joinedAt: oldMember.joinedAt,
         isActive: true,
         authorizedDevices: new Set(), // new root key must re-authorize devices
+        deviceNames: new Map(),
     };
 
     // Deactivate old member

@@ -74,6 +74,7 @@ interface AppContextValue {
     refreshGroup: (groupId: GroupId) => Promise<void>;
     getConnectedGroups: () => GroupId[];
     lastUpdate: number;
+    personalGroupId: GroupId | null;
 }
 
 export type { IdentityState };
@@ -318,6 +319,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
         if (personalGroupId) {
             await checkPersonalGroupForUpdates();
+            // Check if WE are revoked from the identity by checking our own status in the Personal Group
+            const personalState = await manager.getGroupState(personalGroupId);
+            if (personalState) {
+                const me = personalState.members.get(identity.rootKeyPair.publicKey);
+                if (me && !me.authorizedDevices.has(identity.device.deviceKeyPair.publicKey)) {
+                    console.warn(`[AppContext] This device was revoked from the identity! Logging out...`);
+                    localStorage.clear();
+                    window.location.reload();
+                    return; // Stop processing
+                }
+            }
         }
 
         const groupIds = await manager.listGroups();
@@ -695,7 +707,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         createGroup,
         refreshGroup,
         getConnectedGroups,
-        lastUpdate, // Add this
+        lastUpdate,
+        personalGroupId,
     } as AppContextValue;
 
     return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

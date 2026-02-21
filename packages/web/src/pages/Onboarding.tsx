@@ -12,6 +12,15 @@ export function Onboarding() {
     const [name, setName] = useState('');
     const [step, setStep] = useState<'welcome' | 'name' | 'creating'>('welcome');
     const [showScanner, setShowScanner] = useState(false);
+    const [hasCamera, setHasCamera] = useState(false);
+
+    useEffect(() => {
+        if (navigator.mediaDevices && navigator.mediaDevices.enumerateDevices) {
+            navigator.mediaDevices.enumerateDevices()
+                .then(devices => setHasCamera(devices.some(d => d.kind === 'videoinput')))
+                .catch(() => setHasCamera(false));
+        }
+    }, []);
 
     useEffect(() => {
         const style = document.createElement('style');
@@ -68,14 +77,16 @@ export function Onboarding() {
                             >
                                 {t.onboarding.getStarted}
                             </button>
-                            <button
-                                className="btn btn--secondary btn--lg"
-                                onClick={() => setShowScanner(true)}
-                                style={{ padding: '0 var(--space-3)' }}
-                                title={t.onboarding?.importTitle ?? "Scan QR to import identity"}
-                            >
-                                📷
-                            </button>
+                            {hasCamera && (
+                                <button
+                                    className="btn btn--secondary btn--lg"
+                                    onClick={() => setShowScanner(true)}
+                                    style={{ padding: '0 var(--space-3)' }}
+                                    title={t.onboarding?.importTitle ?? "Scan QR to import identity"}
+                                >
+                                    📷
+                                </button>
+                            )}
                             <button
                                 className="btn btn--secondary btn--lg"
                                 onClick={() => {

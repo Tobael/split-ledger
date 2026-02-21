@@ -161,6 +161,10 @@ export interface Translations {
         exportWarning: string;
         revealQr: string;
         keepPrivate: string;
+        dangerZone: string;
+        dangerZoneDesc: string;
+        deleteAccount: string;
+        deleteConfirm: string;
     };
     nav: {
         groups: string;
@@ -333,6 +337,10 @@ const en: Translations = {
         exportWarning: 'This QR code contains your private key. Do not share it!',
         revealQr: 'Reveal QR Code',
         keepPrivate: 'Keep this screen private!',
+        dangerZone: 'Danger Zone',
+        dangerZoneDesc: 'Irreversibly delete your account, keys, and local data from this device. You will lose access to all groups unless you have a backup.',
+        deleteAccount: 'Delete Account',
+        deleteConfirm: 'Are you absolutely sure? This will delete all your local keys and data irreversibly.',
     },
     nav: {
         groups: 'Groups',

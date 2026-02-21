@@ -12,7 +12,7 @@ import type { GroupId, PublicKey } from '@splitledger/core';
 import type { IdentityState } from '../context/AppContext';
 
 export function Settings() {
-    const { identity, restoreIdentity, groups, getGroupState, manager, broadcastEntry, refreshGroups } = useApp();
+    const { identity, restoreIdentity, groups, getGroupState, manager, broadcastEntry, refreshGroups, personalGroupId } = useApp();
     const { t, locale, setLocale } = useI18n();
 
     // Export/Import state
@@ -36,7 +36,12 @@ export function Settings() {
                 const me = state.members.get(identity.rootKeyPair.publicKey);
                 if (me) {
                     me.authorizedDevices.forEach(dKey => {
-                        const existing = devices.get(dKey) || { name: dKey === identity.device.deviceKeyPair.publicKey ? identity.device.deviceName : t.settings.unknownDevice, groups: [] as GroupId[] };
+                        const existing = devices.get(dKey) || {
+                            name: dKey === identity.device.deviceKeyPair.publicKey
+                                ? identity.device.deviceName
+                                : (me.deviceNames?.get(dKey) || t.settings.unknownDevice),
+                            groups: [] as GroupId[]
+                        };
                         if (dKey === identity.device.deviceKeyPair.publicKey) existing.name = identity.device.deviceName; // Ensure my device name is correct
                         if (!existing.groups.includes(g.groupId)) existing.groups.push(g.groupId);
                         devices.set(dKey, existing);
@@ -53,7 +58,8 @@ export function Settings() {
         setBusy(true);
         setStatus(null);
         try {
-            for (const gid of groupIds) {
+            const allGroupsToRevoke = personalGroupId ? [...groupIds, personalGroupId] : groupIds;
+            for (const gid of Array.from(new Set(allGroupsToRevoke))) {
                 try {
                     const entry = await manager.revokeDevice(gid, deviceKey as PublicKey, 'Revoked by user');
                     await broadcastEntry(gid, entry);
@@ -366,21 +372,21 @@ export function Settings() {
 
             {/* Danger Zone */}
             <div className="glass-card glass-card--static animate-fade-in stagger-4" style={{ ...cardStyle, border: '1px solid var(--danger-dim)' }}>
-                <h3 style={{ ...sectionHeading, color: 'var(--danger)' }}>Danger Zone</h3>
+                <h3 style={{ ...sectionHeading, color: 'var(--danger)' }}>{t.settings.dangerZone}</h3>
                 <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)', marginBottom: 'var(--space-4)' }}>
-                    Irreversibly delete your account, keys, and local data from this device. You will lose access to all groups unless you have a backup.
+                    {t.settings.dangerZoneDesc}
                 </p>
                 <button
                     className="btn btn--secondary"
                     style={{ color: 'var(--danger)', borderColor: 'var(--danger-dim)' }}
                     onClick={() => {
-                        if (confirm("Are you absolutely sure? This will delete all your local keys and data irreversibly.")) {
+                        if (confirm(t.settings.deleteConfirm)) {
                             localStorage.clear();
                             window.location.reload();
                         }
                     }}
                 >
-                    Delete Account
+                    {t.settings.deleteAccount}
                 </button>
             </div>
         </div>

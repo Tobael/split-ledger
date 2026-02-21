@@ -163,6 +163,10 @@ const de: Translations = {
         exportWarning: 'Zeige diesen QR-Code niemandem! Er enthält deinen privaten Schlüssel.',
         revealQr: 'QR-Code anzeigen',
         keepPrivate: 'BEWAHR DIESEN CODE PRIVAT AUF',
+        dangerZone: 'Gefahrenzone',
+        dangerZoneDesc: 'Lösche dein Konto, deine Schlüssel und lokale Daten von diesem Gerät unwiderruflich. Du verlierst den Zugriff auf alle Gruppen, es sei denn, du hast ein Backup.',
+        deleteAccount: 'Konto löschen',
+        deleteConfirm: 'Bist du dir absolut sicher? Dies wird alle deine lokalen Schlüssel und Daten unwiderruflich löschen.',
     },
     nav: {
         groups: 'Gruppen',
