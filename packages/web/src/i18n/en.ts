@@ -83,6 +83,7 @@ export interface Translations {
         removeMember: string;
         confirmRemove: string;
         settleUp: string;
+        confirmSettleUp: string;
         markAsPaid: string;
         settlementDescription: string;
         deleteGroup: string;
@@ -142,6 +143,7 @@ export interface Translations {
         importing: string;
         exportSuccess: string;
         importSuccess: string;
+        renameSuccess: string;
         importWarning: string;
         importError: string;
         wrongPassword: string;
@@ -258,6 +260,7 @@ const en: Translations = {
         removeMember: 'Remove',
         confirmRemove: 'Are you sure you want to remove this member?',
         settleUp: 'Settle Up',
+        confirmSettleUp: 'Are you sure you want to mark this as paid?',
         markAsPaid: 'Mark as Paid',
         settlementDescription: 'Settlement',
         deleteGroup: 'Delete Group',
@@ -318,6 +321,7 @@ const en: Translations = {
         importing: 'Decrypting…',
         exportSuccess: 'Identity exported successfully!',
         importSuccess: 'Identity imported successfully! Reloading…',
+        renameSuccess: 'Name updated successfully!',
         importWarning: 'This will replace your current identity. Make sure you have a backup.',
         importError: 'Failed to import identity',
         wrongPassword: 'Wrong password',

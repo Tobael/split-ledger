@@ -137,7 +137,11 @@ export class SyncManager {
             const state = await this.storage.getGroupState(groupId);
             const currentClock = state?.currentLamportClock ?? -1;
 
-            const remoteEntries = await this.transport.getEntriesAfter(groupId, currentClock);
+            // Fetch entries from slightly before our current clock to catch any concurrent offline entries
+            // that might have the same lamportClock but a different entryId (which deduplication handles).
+            const syncFromClock = Math.max(-1, currentClock - 50);
+
+            const remoteEntries = await this.transport.getEntriesAfter(groupId, syncFromClock);
             let accepted = 0;
 
             for (const transportEntry of remoteEntries) {

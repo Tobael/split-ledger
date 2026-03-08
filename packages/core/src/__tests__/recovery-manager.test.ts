@@ -288,19 +288,23 @@ describe('RecoveryManager', () => {
         expect(state.creatorRootPubkey).toBe(request.newRootPubkey);
     });
 
-    it('new root key starts with no authorized devices', async () => {
+    it('new root key preserves authorized devices and authorizes rotating device', async () => {
         const { groupId, bobManager, carolManager } = await setupThreeMemberGroup();
 
         const request = aliceManager.initiateRecovery(groupId);
         const bobSig = bobManager.contributeRecoverySignature(request);
         const carolSig = carolManager.contributeRecoverySignature(request);
 
+        const stateBefore = await aliceManager.deriveGroupState(groupId);
+        const oldMember = stateBefore.members.get(request.previousRootPubkey);
+        const oldDeviceCount = oldMember ? oldMember.authorizedDevices.size : 0;
+
         await aliceManager.completeRecovery(request, [bobSig, carolSig]);
 
         const state = await aliceManager.deriveGroupState(groupId);
         const newMember = state.members.get(request.newRootPubkey);
-        // Per applyRootKeyRotation: new root key must re-authorize devices
-        expect(newMember!.authorizedDevices.size).toBe(0);
+        // Per applyRootKeyRotation: new root key preserves devices and authorizes the one used to rotate
+        expect(newMember!.authorizedDevices.size).toBeGreaterThanOrEqual(oldDeviceCount);
     });
 
     it('completes recovery in 2-member group (threshold = 1)', async () => {

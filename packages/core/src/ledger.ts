@@ -31,10 +31,12 @@ import type {
     LedgerEntry,
     MemberAddedPayload,
     MemberRemovedPayload,
+    MemberRenamedPayload,
     GroupJoinedPayload, // New
     GroupLeftPayload,   // New
     PublicKey,
     RootKeyRotationPayload,
+    SelfRootKeyRotationPayload,
     SecretKey,
     UnsignedEntryFields,
     ValidationError,
@@ -86,7 +88,7 @@ function deviceBelongsToMember(
 
 function findDeviceOwner(devicePubkey: PublicKey, state: GroupState): GroupMember | null {
     for (const member of state.members.values()) {
-        if (member.authorizedDevices.has(devicePubkey)) {
+        if (member.isActive && member.authorizedDevices.has(devicePubkey)) {
             return member;
         }
     }
@@ -241,6 +243,9 @@ function validatePayload(
         case EntryType.MemberRemoved:
             validateMemberRemovedPayload(entry.payload, entry.creatorDevicePubkey, groupState, errors);
             break;
+        case EntryType.MemberRenamed:
+            validateMemberRenamedPayload(entry.payload, entry.creatorDevicePubkey, groupState, errors);
+            break;
         case EntryType.DeviceAuthorized:
             validateDeviceAuthorizedPayload(entry.payload, entry.timestamp, groupState, errors);
             break;
@@ -249,6 +254,9 @@ function validatePayload(
             break;
         case EntryType.RootKeyRotation:
             validateRootKeyRotationPayload(entry.payload, groupState, errors);
+            break;
+        case EntryType.SelfRootKeyRotation:
+            validateSelfRootKeyRotationPayload(entry.payload, groupState, errors);
             break;
         case EntryType.GroupJoined:
             validateGroupJoinedPayload(entry.payload, errors);
@@ -383,6 +391,23 @@ function validateMemberRemovedPayload(
     }
 }
 
+function validateMemberRenamedPayload(
+    payload: MemberRenamedPayload,
+    creatorDevicePubkey: PublicKey,
+    state: GroupState,
+    errors: ValidationError[],
+): void {
+    if (!isActiveMember(payload.memberRootPubkey, state)) {
+        errors.push({ field: 'payload.memberRootPubkey', message: 'Member not found or not active' });
+    }
+
+    // Only the member themselves can rename themselves
+    const isSelfRename = deviceBelongsToMember(creatorDevicePubkey, payload.memberRootPubkey, state);
+    if (!isSelfRename) {
+        errors.push({ field: 'creatorDevicePubkey', message: 'Unauthorized rename: only the member can rename themselves' });
+    }
+}
+
 function validateDeviceAuthorizedPayload(
     payload: DeviceAuthorizedPayload,
     entryTimestamp: number,
@@ -465,6 +490,30 @@ function validateRootKeyRotationPayload(
     }
 }
 
+function validateSelfRootKeyRotationPayload(
+    payload: SelfRootKeyRotationPayload,
+    state: GroupState,
+    errors: ValidationError[],
+): void {
+    if (!isActiveMember(payload.previousRootPubkey, state)) {
+        errors.push({ field: 'payload.previousRootPubkey', message: 'Previous root key is not an active member' });
+    }
+
+    // Verify self-signature: Signed by the OLD root key over the NEW root key
+    if (!verifyRecoveryCoSignature(
+        payload.previousRootPubkey,
+        payload.newRootPubkey,
+        state.groupId,
+        payload.previousRootPubkey,
+        payload.authorizationSignature,
+    )) {
+        errors.push({
+            field: 'payload.authorizationSignature',
+            message: 'Invalid self-rotation signature from old root key',
+        });
+    }
+}
+
 function validateGroupJoinedPayload(payload: GroupJoinedPayload, errors: ValidationError[]): void {
     if (!payload.groupId) errors.push({ field: 'payload.groupId', message: 'Missing groupId' });
     if (!payload.groupName) errors.push({ field: 'payload.groupName', message: 'Missing groupName' });
@@ -497,6 +546,9 @@ export function applyEntry(entry: LedgerEntry, state: GroupState): void {
         case EntryType.MemberRemoved:
             applyMemberRemoved(entry.payload, entry, state);
             break;
+        case EntryType.MemberRenamed:
+            applyMemberRenamed(entry.payload, state);
+            break;
         case EntryType.DeviceAuthorized:
             applyDeviceAuthorized(entry.payload, state);
             break;
@@ -504,7 +556,10 @@ export function applyEntry(entry: LedgerEntry, state: GroupState): void {
             applyDeviceRevoked(entry.payload, state);
             break;
         case EntryType.RootKeyRotation:
-            applyRootKeyRotation(entry.payload, state);
+            applyRootKeyRotation(entry.payload as RootKeyRotationPayload, entry, state);
+            break;
+        case EntryType.SelfRootKeyRotation:
+            applyRootKeyRotation(entry.payload as SelfRootKeyRotationPayload, entry, state);
             break;
         case EntryType.GroupJoined:
         case EntryType.GroupLeft:
@@ -552,6 +607,13 @@ function applyMemberRemoved(payload: MemberRemovedPayload, _entry: LedgerEntry, 
     }
 }
 
+function applyMemberRenamed(payload: MemberRenamedPayload, state: GroupState): void {
+    const member = state.members.get(payload.memberRootPubkey);
+    if (member) {
+        member.displayName = payload.newDisplayName;
+    }
+}
+
 function applyDeviceAuthorized(payload: DeviceAuthorizedPayload, state: GroupState): void {
     const member = state.members.get(payload.ownerRootPubkey);
     if (member) {
@@ -568,9 +630,19 @@ function applyDeviceRevoked(payload: DeviceRevokedPayload, state: GroupState): v
     }
 }
 
-function applyRootKeyRotation(payload: RootKeyRotationPayload, state: GroupState): void {
+function applyRootKeyRotation(payload: RootKeyRotationPayload | SelfRootKeyRotationPayload, entry: LedgerEntry, state: GroupState): void {
     const oldMember = state.members.get(payload.previousRootPubkey);
     if (!oldMember) return;
+
+    // Preserve all previously authorized devices and device names
+    const newAuthorizedDevices = new Set(oldMember.authorizedDevices);
+    const newDeviceNames = new Map(oldMember.deviceNames);
+
+    // Also authorize the newly rotating device if it's not already in there
+    newAuthorizedDevices.add(entry.creatorDevicePubkey);
+    if (!newDeviceNames.has(entry.creatorDevicePubkey)) {
+        newDeviceNames.set(entry.creatorDevicePubkey, "Imported Device");
+    }
 
     // Create new member entry with the new root key, inheriting display name
     const newMember: GroupMember = {
@@ -578,8 +650,8 @@ function applyRootKeyRotation(payload: RootKeyRotationPayload, state: GroupState
         displayName: oldMember.displayName,
         joinedAt: oldMember.joinedAt,
         isActive: true,
-        authorizedDevices: new Set(), // new root key must re-authorize devices
-        deviceNames: new Map(),
+        authorizedDevices: newAuthorizedDevices,
+        deviceNames: newDeviceNames,
     };
 
     // Deactivate old member

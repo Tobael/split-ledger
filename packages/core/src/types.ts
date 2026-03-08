@@ -59,9 +59,11 @@ export enum EntryType {
     ExpenseCorrection = 'ExpenseCorrection',
     MemberAdded = 'MemberAdded',
     MemberRemoved = 'MemberRemoved',
+    MemberRenamed = 'MemberRenamed',
     DeviceAuthorized = 'DeviceAuthorized',
     DeviceRevoked = 'DeviceRevoked',
     RootKeyRotation = 'RootKeyRotation',
+    SelfRootKeyRotation = 'SelfRootKeyRotation',
     GroupJoined = 'GroupJoined', // New: for personal device sync
     GroupLeft = 'GroupLeft',     // New: for personal device sync
 }
@@ -130,6 +132,11 @@ export interface MemberRemovedPayload {
     reason: string;
 }
 
+export interface MemberRenamedPayload {
+    memberRootPubkey: PublicKey;
+    newDisplayName: string;
+}
+
 export interface DeviceAuthorizedPayload {
     ownerRootPubkey: PublicKey;
     devicePublicKey: PublicKey;
@@ -149,6 +156,13 @@ export interface RootKeyRotationPayload {
     newRootPubkey: PublicKey;
     /** Signatures from majority of active group members' root keys */
     coSignatures: CoSignature[];
+}
+
+export interface SelfRootKeyRotationPayload {
+    previousRootPubkey: PublicKey;
+    newRootPubkey: PublicKey;
+    /** Signature by the previous root secret key over the new root public key, proving ownership */
+    authorizationSignature: Signature;
 }
 
 export interface CoSignature {
@@ -180,9 +194,11 @@ export type PayloadMap = {
     [EntryType.ExpenseCorrection]: ExpenseCorrectionPayload;
     [EntryType.MemberAdded]: MemberAddedPayload;
     [EntryType.MemberRemoved]: MemberRemovedPayload;
+    [EntryType.MemberRenamed]: MemberRenamedPayload;
     [EntryType.DeviceAuthorized]: DeviceAuthorizedPayload;
     [EntryType.DeviceRevoked]: DeviceRevokedPayload;
     [EntryType.RootKeyRotation]: RootKeyRotationPayload;
+    [EntryType.SelfRootKeyRotation]: SelfRootKeyRotationPayload;
     [EntryType.GroupJoined]: GroupJoinedPayload;
     [EntryType.GroupLeft]: GroupLeftPayload;
 };

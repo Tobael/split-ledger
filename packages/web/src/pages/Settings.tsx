@@ -20,6 +20,8 @@ export function Settings() {
     const [importPassword, setImportPassword] = useState('');
     const [showExport, setShowExport] = useState(false);
     const [showImport, setShowImport] = useState(false);
+    const [isEditingName, setIsEditingName] = useState(false);
+    const [editNameValue, setEditNameValue] = useState(identity?.displayName ?? '');
     const [importFile, setImportFile] = useState<File | null>(null);
     const [status, setStatus] = useState<{ type: 'success' | 'error'; msg: string } | null>(null);
     const [busy, setBusy] = useState(false);
@@ -139,6 +141,41 @@ export function Settings() {
         }
     };
 
+    const handleSaveName = async () => {
+        const newName = editNameValue.trim();
+        if (!newName) return;
+
+        setBusy(true);
+        setStatus(null);
+        try {
+            // Update personal identity
+            const newIdentity = { ...identity, displayName: newName };
+            restoreIdentity(newIdentity);
+
+            // Broadcast to all active groups
+            if (manager) {
+                const activeGroupIds = await manager.listGroups();
+                for (const gid of activeGroupIds) {
+                    if (gid !== personalGroupId) {
+                        try {
+                            const entry = await manager.renameMember(gid, newName);
+                            await broadcastEntry(gid, entry);
+                        } catch (e) {
+                            console.error(`Failed to rename in group ${gid}`, e);
+                        }
+                    }
+                }
+            }
+
+            setStatus({ type: 'success', msg: t.settings.renameSuccess || 'Name updated' });
+            setIsEditingName(false);
+        } catch (e) {
+            setStatus({ type: 'error', msg: 'Failed to update name' });
+        } finally {
+            setBusy(false);
+        }
+    };
+
     const sectionHeading = { fontSize: 'var(--font-size-sm)', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 'var(--space-4)', textTransform: 'uppercase' as const, letterSpacing: '0.05em' };
     const cardStyle = { padding: 'var(--space-6)', marginBottom: 'var(--space-4)' };
 
@@ -169,7 +206,25 @@ export function Settings() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
                     <div>
                         <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-tertiary)', marginBottom: 'var(--space-1)' }}>{t.settings.displayNameLabel}</div>
-                        <div style={{ fontWeight: 600 }}>{identity.displayName}</div>
+                        {isEditingName ? (
+                            <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+                                <input
+                                    className="form-input"
+                                    value={editNameValue}
+                                    onChange={e => setEditNameValue(e.target.value)}
+                                    disabled={busy}
+                                    autoFocus
+                                    onKeyDown={e => e.key === 'Enter' && handleSaveName()}
+                                />
+                                <button className="btn btn--primary" onClick={handleSaveName} disabled={busy || !editNameValue.trim()}>Save</button>
+                                <button className="btn btn--ghost" onClick={() => { setIsEditingName(false); setEditNameValue(identity.displayName); }} disabled={busy}>Cancel</button>
+                            </div>
+                        ) : (
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <div style={{ fontWeight: 600 }}>{identity.displayName}</div>
+                                <button className="btn btn--secondary btn--sm" onClick={() => setIsEditingName(true)}>Edit</button>
+                            </div>
+                        )}
                     </div>
                     <div>
                         <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-tertiary)', marginBottom: 'var(--space-1)' }}>{t.settings.rootKeyLabel}</div>

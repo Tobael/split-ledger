@@ -12,6 +12,7 @@ import {
     SyncManager,
     deriveGroupKey,
     parseInviteLink,
+    generateKeyPair,
     type GroupId,
     type GroupState,
     type LedgerEntry,
@@ -314,6 +315,60 @@ export function AppProvider({ children }: { children: ReactNode }) {
         } catch { /* Relay offline */ }
     }, [identity, storage, manager]);
 
+    const broadcastEntry = useCallback(async (groupId: GroupId, entry: LedgerEntry) => {
+        const syncMgr = syncManagerRef.current;
+        if (!syncMgr) return;
+        try {
+            await syncMgr.broadcastEntry(groupId, entry);
+        } catch { }
+    }, []);
+
+    const performRootKeyRotation = useCallback(async () => {
+        if (!manager || !identity || !personalGroupId) return;
+        try {
+            console.log("[AppContext] Starting Root Key Auto-Rotation for JSON import...");
+
+            // FORCE a full sync of the personal group and all discovered expense groups
+            // so that we don't accidentally leave some expense groups un-rotated.
+            console.log("[AppContext] Force syncing groups before rotation...");
+            await syncGroupById(personalGroupId);
+            await checkPersonalGroupForUpdates();
+
+            const newRootKeyPair = generateKeyPair();
+
+            // 1. Rotate in Personal Group
+            const pEntry = await manager.rotateRootKey(personalGroupId, identity.rootKeyPair.secretKey, newRootKeyPair);
+            await broadcastEntry(personalGroupId, pEntry);
+
+            // 2. Rotate in all Expense Groups
+            const activeGroupIds = await manager.listGroups();
+            for (const gid of activeGroupIds) {
+                if (gid !== personalGroupId) {
+                    try {
+                        const entry = await manager.rotateRootKey(gid, identity.rootKeyPair.secretKey, newRootKeyPair);
+                        await broadcastEntry(gid, entry);
+                    } catch (err) {
+                        console.error(`[AppContext] Failed to rotate root key in group ${gid}:`, err);
+                    }
+                }
+            }
+
+            // 3. Update Identity locally
+            const newIdentity: IdentityState = {
+                ...identity,
+                rootKeyPair: newRootKeyPair,
+            };
+            saveIdentityToStorage(newIdentity);
+            setIdentity(newIdentity);
+
+            localStorage.removeItem('PENDING_JSON_ROTATION');
+            console.log("[AppContext] Root Key Auto-Rotation complete!");
+            alert("Security Notice: Your imported identity has been automatically secured with a new Root Key. The imported JSON file can no longer be used.");
+        } catch (e) {
+            console.error("[AppContext] Failed to auto-rotate root key", e);
+        }
+    }, [manager, identity, personalGroupId, broadcastEntry, syncGroupById, checkPersonalGroupForUpdates]);
+
     const refreshGroups = useCallback(async () => {
         if (!manager || !identity) return;
 
@@ -366,7 +421,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setLastUpdate(Date.now());
         await Promise.allSettled(promises);
         await persistEntries();
-    }, [manager, identity, storage, syncGroupWithRelay, persistEntries, personalGroupId, checkPersonalGroupForUpdates]);
+
+        // Check if we need to rotate root key after importing JSON
+        if (localStorage.getItem('PENDING_JSON_ROTATION') === 'true') {
+            await performRootKeyRotation();
+        }
+    }, [manager, identity, storage, syncGroupWithRelay, persistEntries, personalGroupId, checkPersonalGroupForUpdates, performRootKeyRotation]);
 
     const syncGroupFromRelay = useCallback(async (inviteLink: string): Promise<GroupId> => {
         const { token } = parseInviteLink(inviteLink);
@@ -475,13 +535,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         }
     }, [manager, identity, refreshGroups, syncGroupById, personalGroupId, storage]);
 
-    const broadcastEntry = useCallback(async (groupId: GroupId, entry: LedgerEntry) => {
-        const syncMgr = syncManagerRef.current;
-        if (!syncMgr) return;
-        try {
-            await syncMgr.broadcastEntry(groupId, entry);
-        } catch { }
-    }, []);
+
 
     const deleteGroup = useCallback(async (groupId: GroupId) => {
         const syncMgr = syncManagerRef.current;
@@ -588,6 +642,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
                 device
             };
 
+            localStorage.setItem('PENDING_JSON_ROTATION', 'true');
             saveIdentityToStorage(newIdentity);
             setIdentity(newIdentity);
         } catch (e) {

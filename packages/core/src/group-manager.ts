@@ -15,6 +15,7 @@ import type {
     Hash,
     LedgerEntry,
     PublicKey,
+    SecretKey,
     StorageAdapter,
 } from './types.js';
 import { EntryType } from './types.js';
@@ -28,6 +29,7 @@ import {
     verifyInviteSignature,
     generateGroupId,
     createDeviceAuthorization,
+    createRecoveryCoSignature,
 } from './identity.js';
 import { serializeInviteLink, parseInviteLink, type InviteLinkData } from './invite-link.js';
 import { RecoveryManager, type RecoveryRequest } from './recovery-manager.js';
@@ -247,6 +249,41 @@ export class GroupManager {
         return entry;
     }
 
+    /**
+     * Rename oneself in a group.
+     */
+    async renameMember(
+        groupId: GroupId,
+        newDisplayName: string,
+    ): Promise<LedgerEntry> {
+        const state = await this.deriveGroupState(groupId);
+
+        // Check we're an active member
+        const member = state.members.get(this.device.rootPublicKey);
+        if (!member || !member.isActive) {
+            throw new Error('Cannot rename member: not an active member');
+        }
+
+        const entries = await this.storage.getAllEntries(groupId);
+        const ordered = orderEntries([...entries]);
+        const latestEntry = ordered[ordered.length - 1]!;
+
+        const entry = buildEntry(
+            EntryType.MemberRenamed,
+            {
+                memberRootPubkey: this.device.rootPublicKey,
+                newDisplayName,
+            },
+            latestEntry.entryId,
+            state.currentLamportClock + 1,
+            this.device.deviceKeyPair.publicKey,
+            this.device.deviceKeyPair.secretKey,
+        );
+
+        await this.storage.appendEntry(groupId, entry);
+        return entry;
+    }
+
     // ═══════════════════════════════════════════════════════════════════════
     // Device Authorization
     // ═══════════════════════════════════════════════════════════════════════
@@ -433,6 +470,52 @@ export class GroupManager {
             deviceIdentity: this.device,
             rootKeyPair: this.rootKeyPair ?? undefined,
         });
+    }
+
+    /**
+     * Self-rotate the root key. This is used when a JSON backup is imported,
+     * to immediately invalidate the old root key and switch to a new one.
+     */
+    async rotateRootKey(
+        groupId: GroupId,
+        oldRootSecretKey: SecretKey,
+        newRootKeyPair: Ed25519KeyPair
+    ): Promise<LedgerEntry> {
+        if (!this.rootKeyPair) throw new Error("Root key pair required");
+
+        const entries = await this.storage.getAllEntries(groupId);
+        const ordered = orderEntries([...entries]);
+        const latestEntry = ordered[ordered.length - 1]!;
+        const state = await this.deriveGroupState(groupId);
+
+        const member = state.members.get(this.rootKeyPair.publicKey);
+        if (!member || !member.isActive) {
+            throw new Error(`Cannot rotate root key: Member not active in group ${groupId}`);
+        }
+
+        const { signature: authorizationSignature } = createRecoveryCoSignature(
+            this.rootKeyPair.publicKey,
+            newRootKeyPair.publicKey,
+            groupId,
+            oldRootSecretKey,
+            this.rootKeyPair.publicKey
+        );
+
+        const entry = buildEntry(
+            EntryType.SelfRootKeyRotation,
+            {
+                previousRootPubkey: this.rootKeyPair.publicKey,
+                newRootPubkey: newRootKeyPair.publicKey,
+                authorizationSignature,
+            },
+            latestEntry.entryId,
+            state.currentLamportClock + 1,
+            this.device.deviceKeyPair.publicKey,
+            this.device.deviceKeyPair.secretKey,
+        );
+
+        await this.storage.appendEntry(groupId, entry);
+        return entry;
     }
 
     /**

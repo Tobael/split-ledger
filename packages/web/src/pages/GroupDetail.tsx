@@ -14,6 +14,7 @@ import {
     buildEntry,
     orderEntries,
     validateFullChain,
+    getEffectiveExpenses,
 } from '@splitledger/core';
 
 interface ExpensePayload {
@@ -98,6 +99,7 @@ export function GroupDetail() {
 
     const handleSettleUp = async (from: string, to: string, amount: number) => {
         if (!manager || !identity || !storage) return;
+        if (!confirm(t.groupDetail.confirmSettleUp ?? 'Are you sure you want to mark this as paid?')) return;
         try {
             // Get latest state for chaining
             const entries = await storage.getAllEntries(groupId);
@@ -164,6 +166,9 @@ export function GroupDetail() {
     const expenses = entries.filter(e => e.entryType === EntryType.ExpenseCreated);
     const balances = computeBalances(entries);
     const myPubkey = identity?.rootKeyPair.publicKey;
+
+    const effectiveExpenses = getEffectiveExpenses(entries);
+    const totalGroupExpenses = Array.from(effectiveExpenses.values()).reduce((sum, e) => sum + e.amountMinorUnits, 0);
 
     return (
         <div className="animate-fade-in">
@@ -286,9 +291,14 @@ export function GroupDetail() {
 
             {/* Expense Feed */}
             <div>
-                <h3 style={{ fontSize: 'var(--font-size-sm)', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 'var(--space-4)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                    {t.groupDetail.expensesTitle} ({expenses.length})
-                </h3>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-4)' }}>
+                    <h3 style={{ fontSize: 'var(--font-size-sm)', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', margin: 0 }}>
+                        {t.groupDetail.expensesTitle} ({expenses.length})
+                    </h3>
+                    <div style={{ fontSize: 'var(--font-size-sm)', fontWeight: 600, color: 'var(--text-primary)' }}>
+                        Total: {getCurrency(entries)} {(totalGroupExpenses / 100).toFixed(2)}
+                    </div>
+                </div>
                 {expenses.length === 0 ? (
                     <div className="glass-card glass-card--static" style={{ padding: 'var(--space-8)', textAlign: 'center' }}>
                         <p style={{ color: 'var(--text-tertiary)' }}>{t.groupDetail.noExpenses}</p>

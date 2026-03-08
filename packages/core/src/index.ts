@@ -24,6 +24,7 @@ export type {
     LedgerEntryBase,
     MemberAddedPayload,
     MemberRemovedPayload,
+    MemberRenamedPayload,
     PayloadMap,
     PublicKey,
     RootIdentity,

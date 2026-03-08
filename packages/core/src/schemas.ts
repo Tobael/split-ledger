@@ -60,6 +60,11 @@ export const memberRemovedPayloadSchema = z.object({
     reason: z.string().min(1).max(500),
 });
 
+export const memberRenamedPayloadSchema = z.object({
+    memberRootPubkey: publicKeySchema,
+    newDisplayName: z.string().min(1).max(100),
+});
+
 export const deviceAuthorizedPayloadSchema = z.object({
     ownerRootPubkey: publicKeySchema,
     devicePublicKey: publicKeySchema,
@@ -82,6 +87,12 @@ export const rootKeyRotationPayloadSchema = z.object({
     previousRootPubkey: publicKeySchema,
     newRootPubkey: publicKeySchema,
     coSignatures: z.array(coSignatureSchema).min(1),
+});
+
+export const selfRootKeyRotationPayloadSchema = z.object({
+    previousRootPubkey: publicKeySchema,
+    newRootPubkey: publicKeySchema,
+    authorizationSignature: signatureSchema,
 });
 
 export const groupJoinedPayloadSchema = z.object({
@@ -117,9 +128,11 @@ export const payloadSchemas: Record<EntryType, z.ZodType> = {
     [EntryType.ExpenseCorrection]: expenseCorrectionPayloadSchema,
     [EntryType.MemberAdded]: memberAddedPayloadSchema,
     [EntryType.MemberRemoved]: memberRemovedPayloadSchema,
+    [EntryType.MemberRenamed]: memberRenamedPayloadSchema,
     [EntryType.DeviceAuthorized]: deviceAuthorizedPayloadSchema,
     [EntryType.DeviceRevoked]: deviceRevokedPayloadSchema,
     [EntryType.RootKeyRotation]: rootKeyRotationPayloadSchema,
+    [EntryType.SelfRootKeyRotation]: selfRootKeyRotationPayloadSchema,
     [EntryType.GroupJoined]: groupJoinedPayloadSchema,
     [EntryType.GroupLeft]: groupLeftPayloadSchema,
 };
