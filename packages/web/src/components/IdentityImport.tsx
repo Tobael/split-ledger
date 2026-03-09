@@ -2,12 +2,12 @@ import { useEffect, useRef, useState } from 'react';
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
 import { useApp } from '../context/AppContext';
 import { useI18n } from '../i18n';
-import { useNavigate } from 'react-router-dom';
-
+import { useNavigate, useLocation } from 'react-router-dom';
 export function IdentityImport({ onCancel }: { onCancel: () => void }) {
     const { importIdentity } = useApp();
     const { t } = useI18n();
     const navigate = useNavigate();
+    const location = useLocation();
     const [error, setError] = useState('');
     const [permissionError, setPermissionError] = useState(false);
 
@@ -85,7 +85,11 @@ export function IdentityImport({ onCancel }: { onCancel: () => void }) {
                 isScanningRef.current = false;
                 scanner.stop().then(() => {
                     scanner.clear();
-                    navigate('/dashboard');
+                    if (location.pathname !== '/' && location.pathname !== '/dashboard') {
+                        navigate(location.pathname + location.search);
+                    } else {
+                        navigate('/dashboard');
+                    }
                 }).catch(console.error);
 
             } catch (err) {

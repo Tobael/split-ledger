@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { useI18n } from '../i18n';
 import { Footer } from '../components/Footer';
@@ -9,6 +9,7 @@ export function Onboarding() {
     const { createIdentity, importIdentityFromJson } = useApp();
     const { t } = useI18n();
     const navigate = useNavigate();
+    const location = useLocation();
     const [name, setName] = useState('');
     const [step, setStep] = useState<'welcome' | 'name' | 'creating'>('welcome');
     const [showScanner, setShowScanner] = useState(false);
@@ -36,7 +37,11 @@ export function Onboarding() {
         setStep('creating');
         setTimeout(() => {
             createIdentity(name.trim());
-            navigate('/dashboard');
+            if (location.pathname !== '/' && location.pathname !== '/dashboard') {
+                navigate(location.pathname + location.search);
+            } else {
+                navigate('/dashboard');
+            }
         }, 800);
     };
 
@@ -110,7 +115,11 @@ export function Onboarding() {
                                                         // Validate it looks like our identity JSON
                                                         if (imported && imported.rootKeyPair) {
                                                             importIdentityFromJson(decryptedJson);
-                                                            navigate('/dashboard');
+                                                            if (location.pathname !== '/' && location.pathname !== '/dashboard') {
+                                                                navigate(location.pathname + location.search);
+                                                            } else {
+                                                                navigate('/dashboard');
+                                                            }
                                                         } else {
                                                             throw new Error("Invalid identity file structure");
                                                         }
