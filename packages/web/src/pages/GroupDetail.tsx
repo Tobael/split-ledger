@@ -122,6 +122,7 @@ export function GroupDetail() {
                     currency,
                     paidByRootPubkey: from as PublicKey, // Debtor pays
                     splits: { [to]: amount }, // Creditor receives/consumes full amount
+                    isSettlement: true,
                 },
                 latestEntry.entryId,
                 result.finalState.currentLamportClock + 1,
@@ -168,7 +169,9 @@ export function GroupDetail() {
     const myPubkey = identity?.rootKeyPair.publicKey;
 
     const effectiveExpenses = getEffectiveExpenses(entries);
-    const totalGroupExpenses = Array.from(effectiveExpenses.values()).reduce((sum, e) => sum + e.amountMinorUnits, 0);
+    const totalGroupExpenses = Array.from(effectiveExpenses.values())
+        .filter(e => !e.isSettlement && e.description !== t.groupDetail.settlementDescription && e.description !== 'Settlement' && e.description !== 'Ausgleich' && e.description !== 'settlement')
+        .reduce((sum, e) => sum + e.amountMinorUnits, 0);
 
     return (
         <div className="animate-fade-in">

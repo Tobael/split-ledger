@@ -103,6 +103,7 @@ export interface ExpenseCreatedPayload {
     splits: Record<string, number>;
     category?: string;
     receiptHash?: Hash;
+    isSettlement?: boolean;
 }
 
 export interface ExpenseVoidedPayload {
