@@ -38,6 +38,7 @@ import {
 } from '@splitledger/core';
 import { IndexedDbStorageAdapter } from '../storage/IndexedDbStorageAdapter';
 import { IndexedDbOperationStorageV2 } from '../storage/IndexedDbOperationStorageV2';
+import { isDeviceExplicitlyRevoked } from '../utils/device-authorization';
 
 // ─── Types ───
 
@@ -472,7 +473,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
             const personalState = await manager.getGroupState(personalGroupId);
             if (personalState) {
                 const me = personalState.members.get(identity.rootKeyPair.publicKey);
-                if (me && !me.authorizedDevices.has(identity.device.deviceKeyPair.publicKey)) {
+                const personalEntries = await storage.getAllEntries(personalGroupId);
+                const explicitlyRevoked = isDeviceExplicitlyRevoked(
+                    personalEntries,
+                    identity.device.deviceKeyPair.publicKey,
+                );
+
+                // A newly created identity briefly has a personal-group member before
+                // ensurePersonalGroupExists() appends its DeviceAuthorized entry. Absence
+                // from authorizedDevices is therefore not proof of revocation.
+                if (me && explicitlyRevoked) {
                     console.warn(`[AppContext] This device was revoked from the identity! Logging out...`);
                     await storage.clearIdentity();
                     localStorage.removeItem('PENDING_JSON_ROTATION');
