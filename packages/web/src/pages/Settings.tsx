@@ -9,10 +9,13 @@ import {
 } from '../utils/identity-export';
 import { IdentityExport } from '../components/IdentityExport';
 import type { GroupId, PublicKey } from '@splitledger/core';
-import type { IdentityState } from '../context/AppContext';
 
 export function Settings() {
-    const { identity, restoreIdentity, groups, getGroupState, manager, broadcastEntry, refreshGroups, personalGroupId } = useApp();
+    const {
+        identity, restoreIdentity, deleteIdentity, groups, getGroupState, manager, broadcastEntry,
+        refreshGroups, personalGroupId, getAuthorizedDevicesV2, revokeDeviceV2,
+        exportIdentityTransferV2, importIdentityFromJson,
+    } = useApp();
     const { t, locale, setLocale } = useI18n();
 
     // Export/Import state
@@ -31,8 +34,8 @@ export function Settings() {
     useEffect(() => {
         if (!identity || !groups) return;
         const loadDevices = async () => {
-            const devices = new Map<string, { name: string; groups: GroupId[] }>();
-            for (const g of groups) {
+            const devices = await getAuthorizedDevicesV2();
+            for (const g of groups.filter(({ protocolVersion }) => protocolVersion === 1)) {
                 const state = await getGroupState(g.groupId);
                 if (!state) continue;
                 const me = state.members.get(identity.rootKeyPair.publicKey);
@@ -53,14 +56,17 @@ export function Settings() {
             setAuthorizedDevices(devices);
         };
         loadDevices();
-    }, [groups, identity, getGroupState, t.settings.unknownDevice]);
+    }, [groups, identity, getAuthorizedDevicesV2, getGroupState, t.settings.unknownDevice]);
 
     const handleRevoke = async (deviceKey: string, groupIds: GroupId[]) => {
         if (!manager || !confirm(t.settings.confirmRevoke)) return;
         setBusy(true);
         setStatus(null);
         try {
-            const allGroupsToRevoke = personalGroupId ? [...groupIds, personalGroupId] : groupIds;
+            await revokeDeviceV2(deviceKey);
+            const legacyGroupIds = groupIds.filter((groupId) =>
+                groups.some((group) => group.groupId === groupId && group.protocolVersion === 1));
+            const allGroupsToRevoke = personalGroupId ? [...legacyGroupIds, personalGroupId] : legacyGroupIds;
             for (const gid of Array.from(new Set(allGroupsToRevoke))) {
                 try {
                     const entry = await manager.revokeDevice(gid, deviceKey as PublicKey, 'Revoked by user');
@@ -71,7 +77,7 @@ export function Settings() {
             }
             await refreshGroups(); // will trigger useEffect to reload devices
             setStatus({ type: 'success', msg: 'Device revoked' });
-        } catch (e) {
+        } catch {
             setStatus({ type: 'error', msg: 'Failed to revoke device' });
         } finally {
             setBusy(false);
@@ -91,8 +97,8 @@ export function Settings() {
         setBusy(true);
         setStatus(null);
         try {
-            const json = JSON.stringify(identity);
-            const encrypted = await encryptIdentity(json, exportPassword);
+            const transfer = await exportIdentityTransferV2();
+            const encrypted = await encryptIdentity(transfer, exportPassword);
             downloadIdentityFile(encrypted);
             setStatus({ type: 'success', msg: t.settings.exportSuccess });
             setShowExport(false);
@@ -115,16 +121,7 @@ export function Settings() {
         try {
             const fileContent = await readFileAsText(importFile);
             const decryptedJson = await decryptIdentity(fileContent, importPassword);
-            const imported = JSON.parse(decryptedJson) as IdentityState;
-
-            // Basic validation
-            if (!imported.displayName || !imported.rootKeyPair?.publicKey || !imported.device?.deviceKeyPair) {
-                setStatus({ type: 'error', msg: t.settings.importError });
-                setBusy(false);
-                return;
-            }
-
-            restoreIdentity(imported);
+            await importIdentityFromJson(decryptedJson);
             setStatus({ type: 'success', msg: t.settings.importSuccess });
 
             // Reload after a short delay so the user sees the success message
@@ -150,7 +147,7 @@ export function Settings() {
         try {
             // Update personal identity
             const newIdentity = { ...identity, displayName: newName };
-            restoreIdentity(newIdentity);
+            await restoreIdentity(newIdentity);
 
             // Broadcast to all active groups
             if (manager) {
@@ -169,7 +166,7 @@ export function Settings() {
 
             setStatus({ type: 'success', msg: t.settings.renameSuccess || 'Name updated' });
             setIsEditingName(false);
-        } catch (e) {
+        } catch {
             setStatus({ type: 'error', msg: 'Failed to update name' });
         } finally {
             setBusy(false);
@@ -414,8 +411,7 @@ export function Settings() {
                     {[
                         ['🔐', t.settings.securityEd25519],
                         ['📋', t.settings.securitySigned],
-                        ['🌐', t.settings.securityP2P],
-                        ['🔄', t.settings.securityRecovery],
+                        ['🌐', t.settings.securityRelay],
                     ].map(([icon, text], i) => (
                         <div key={i} style={{ display: 'flex', gap: 'var(--space-3)', fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)' }}>
                             <span>{icon}</span>
@@ -434,10 +430,9 @@ export function Settings() {
                 <button
                     className="btn btn--secondary"
                     style={{ color: 'var(--danger)', borderColor: 'var(--danger-dim)' }}
-                    onClick={() => {
+                    onClick={async () => {
                         if (confirm(t.settings.deleteConfirm)) {
-                            localStorage.clear();
-                            window.location.reload();
+                            await deleteIdentity();
                         }
                     }}
                 >

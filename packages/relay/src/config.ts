@@ -8,30 +8,51 @@ export interface RelayConfig {
     dbPath: string;
 
     // Rate limits
-    maxEntriesPerGroupPerHour: number;
-    maxEntrySizeBytes: number;
-    maxGroupsPerRelay: number;
-    maxEntriesPerGroup: number;
+    maxOperationSizeBytes: number;
+    maxOperationsPerGroup: number;
     wsIdleTimeoutMs: number;
     maxConnectionsPerIp: number;
+    trustProxy: boolean;
+    pageSize: number;
 
     // Retention
-    entryRetentionDays: number;
+    operationRetentionDays: number;
+}
+
+function integerSetting(
+    env: Record<string, string | undefined>,
+    name: string,
+    fallback: number,
+    minimum: number,
+): number {
+    const value = Number(env[name] ?? fallback);
+    if (!Number.isSafeInteger(value) || value < minimum) {
+        throw new Error(`${name} must be a safe integer greater than or equal to ${minimum}`);
+    }
+    return value;
+}
+
+function booleanSetting(env: Record<string, string | undefined>, name: string, fallback: boolean): boolean {
+    const value = env[name];
+    if (value === undefined) return fallback;
+    if (value === 'true') return true;
+    if (value === 'false') return false;
+    throw new Error(`${name} must be true or false`);
 }
 
 export function loadConfig(env: Record<string, string | undefined> = process.env): RelayConfig {
     return {
-        port: parseInt(env['PORT'] ?? '8443', 10),
+        port: integerSetting(env, 'PORT', 8443, 0),
         host: env['HOST'] ?? '0.0.0.0',
         dbPath: env['DB_PATH'] ?? './relay.db',
 
-        maxEntriesPerGroupPerHour: parseInt(env['MAX_ENTRIES_PER_GROUP_PER_HOUR'] ?? '1000', 10),
-        maxEntrySizeBytes: parseInt(env['MAX_ENTRY_SIZE_BYTES'] ?? '65536', 10),
-        maxGroupsPerRelay: parseInt(env['MAX_GROUPS'] ?? '100000', 10),
-        maxEntriesPerGroup: parseInt(env['MAX_ENTRIES_PER_GROUP'] ?? '1000000', 10),
-        wsIdleTimeoutMs: parseInt(env['WS_IDLE_TIMEOUT_MS'] ?? '300000', 10),
-        maxConnectionsPerIp: parseInt(env['MAX_CONNECTIONS_PER_IP'] ?? '50', 10),
+        maxOperationSizeBytes: integerSetting(env, 'MAX_OPERATION_SIZE_BYTES', 65536, 1),
+        maxOperationsPerGroup: integerSetting(env, 'MAX_OPERATIONS_PER_GROUP', 1000000, 1),
+        wsIdleTimeoutMs: integerSetting(env, 'WS_IDLE_TIMEOUT_MS', 300000, 1),
+        maxConnectionsPerIp: integerSetting(env, 'MAX_CONNECTIONS_PER_IP', 50, 1),
+        trustProxy: booleanSetting(env, 'TRUST_PROXY', false),
+        pageSize: integerSetting(env, 'PAGE_SIZE', 500, 1),
 
-        entryRetentionDays: parseInt(env['ENTRY_RETENTION_DAYS'] ?? '90', 10),
+        operationRetentionDays: integerSetting(env, 'OPERATION_RETENTION_DAYS', 0, 0),
     };
 }

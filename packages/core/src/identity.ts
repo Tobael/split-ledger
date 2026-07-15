@@ -143,13 +143,13 @@ export function verifyInviteSignature(token: InviteToken): boolean {
 }
 
 // =============================================================================
-// Social Recovery Co-signature
+// Self-owned root-key rotation authorization
 // =============================================================================
 
 /**
  * Build the payload bytes for a root key rotation co-signature.
  */
-function recoveryPayload(
+function rootRotationPayload(
     previousRootPubkey: PublicKey,
     newRootPubkey: PublicKey,
     groupId: GroupId,
@@ -158,32 +158,31 @@ function recoveryPayload(
 }
 
 /**
- * Create a co-signature for a root key rotation (social recovery).
+ * Authorize a root-key rotation with the previous root secret key.
  */
-export function createRecoveryCoSignature(
+export function createRootRotationAuthorization(
     previousRootPubkey: PublicKey,
     newRootPubkey: PublicKey,
     groupId: GroupId,
     signerSecretKey: SecretKey,
-    signerRootPubkey: PublicKey,
-): { signerRootPubkey: PublicKey; signature: Signature } {
-    const payload = recoveryPayload(previousRootPubkey, newRootPubkey, groupId);
-    const signature = sign(payload, signerSecretKey);
-    return { signerRootPubkey, signature };
+): Signature {
+    return sign(rootRotationPayload(previousRootPubkey, newRootPubkey, groupId), signerSecretKey);
 }
 
 /**
  * Verify a single co-signature for a root key rotation.
  */
-export function verifyRecoveryCoSignature(
+export function verifyRootRotationAuthorization(
     previousRootPubkey: PublicKey,
     newRootPubkey: PublicKey,
     groupId: GroupId,
-    signerRootPubkey: PublicKey,
     signature: Signature,
 ): boolean {
-    const payload = recoveryPayload(previousRootPubkey, newRootPubkey, groupId);
-    return verify(payload, signature, signerRootPubkey);
+    return verify(
+        rootRotationPayload(previousRootPubkey, newRootPubkey, groupId),
+        signature,
+        previousRootPubkey,
+    );
 }
 
 // =============================================================================

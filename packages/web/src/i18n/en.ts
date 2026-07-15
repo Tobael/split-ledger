@@ -65,6 +65,11 @@ export interface Translations {
         syncing: string;
         joining: string;
         joinButton: string;
+        waitingForMember: string;
+        loadInvite: string;
+        invitedAs: string;
+        chooseParticipant: string;
+        chooseParticipantPlaceholder: string;
     };
     groupDetail: {
         backToGroups: string;
@@ -91,6 +96,26 @@ export interface Translations {
         accessDeniedTitle: string;
         accessDeniedText: string;
         exportData: string;
+        waitingForMemberTitle: string;
+        waitingForMemberText: string;
+        addParticipant: string;
+        participantNamePlaceholder: string;
+        createInviteForParticipant: string;
+        replaceInviteForParticipant: string;
+        copyInvite: string;
+        inviteCopied: string;
+        voidExpense: string;
+        payerMustSettle: string;
+        settling: string;
+        renameParticipant: string;
+        saveParticipantName: string;
+        disableParticipant: string;
+        resetParticipant: string;
+        confirmDisableParticipant: string;
+        confirmResetParticipant: string;
+        createGenericInvite: string;
+        replaceGenericInvite: string;
+        genericInviteHelp: string;
     };
     chain: {
         title: string;
@@ -118,6 +143,9 @@ export interface Translations {
         splitLabel: string;
         equal: string;
         custom: string;
+        eligible: string;
+        excluded: string;
+        customSplitHelp: string;
         splitEqually: string;
         perPerson: string;
         splitMismatch: (splitTotal: string, amount: string) => string;
@@ -155,8 +183,7 @@ export interface Translations {
         securityTitle: string;
         securityEd25519: string;
         securitySigned: string;
-        securityP2P: string;
-        securityRecovery: string;
+        securityRelay: string;
         languageTitle: string;
         exportIdentityTitle: string;
         exportIdentitySubtitle: string;
@@ -196,7 +223,7 @@ const en: Translations = {
     },
     onboarding: {
         tagline: 'Split expenses with friends.',
-        taglineSub: 'Cryptographically secure. Peer-to-peer. Private.',
+        taglineSub: 'Cryptographically secure. Offline-first. Private.',
         featureEncrypted: 'End-to-end encrypted',
         featureDevice: 'Works on any device',
         featureNoAccount: 'No account required',
@@ -242,6 +269,11 @@ const en: Translations = {
         joining: 'Joining…',
         syncing: 'Syncing group data…',
         joinButton: 'Join Group',
+        waitingForMember: 'This relay does not currently have the group history. Ask another group member with this group on their device to come online, then try again.',
+        loadInvite: 'Load invite',
+        invitedAs: 'You were invited as',
+        chooseParticipant: 'Choose your participant identity',
+        chooseParticipantPlaceholder: 'Select a participant',
     },
     groupDetail: {
         backToGroups: '← Groups',
@@ -268,6 +300,26 @@ const en: Translations = {
         accessDeniedTitle: 'Access Denied',
         accessDeniedText: 'You are not a member of this group or the group does not exist locally.',
         exportData: 'Export Data',
+        waitingForMemberTitle: 'Waiting for group history',
+        waitingForMemberText: 'Another group member who has the missing history needs to come online. Your existing local data remains available.',
+        addParticipant: 'Add participant',
+        participantNamePlaceholder: 'Participant name',
+        createInviteForParticipant: 'Create invite',
+        replaceInviteForParticipant: 'Replace invite',
+        copyInvite: 'Copy invite',
+        inviteCopied: 'Invite copied',
+        voidExpense: 'Remove',
+        payerMustSettle: 'The paying participant must record this payment.',
+        settling: 'Recording…',
+        renameParticipant: 'Rename',
+        saveParticipantName: 'Save name',
+        disableParticipant: 'Disable',
+        resetParticipant: 'Reassign lost identity',
+        confirmDisableParticipant: 'Disable this participant? Existing expenses remain in the history, but the participant cannot be used for new expenses.',
+        confirmResetParticipant: 'Reset this claimed participant identity? This does not recover its key. It removes the current identity binding and allows a new person or device to claim the same participant and balances.',
+        createGenericInvite: 'Create open invite',
+        replaceGenericInvite: 'Replace open invite',
+        genericInviteHelp: 'The recipient chooses one currently unclaimed participant.',
     },
     chain: {
         title: 'Hash Chain',
@@ -295,6 +347,9 @@ const en: Translations = {
         splitLabel: 'Split',
         equal: 'Equal',
         custom: 'Custom',
+        eligible: 'Included',
+        excluded: 'Excluded',
+        customSplitHelp: 'Click a participant to include or exclude them. Shares are redistributed equally and remain editable.',
         splitEqually: 'Split equally:',
         perPerson: 'per person',
         splitMismatch: (splitTotal: string, amount: string) =>
@@ -333,8 +388,7 @@ const en: Translations = {
         securityTitle: 'Security',
         securityEd25519: 'Ed25519 cryptographic identity',
         securitySigned: 'All entries are signed and hash-linked',
-        securityP2P: 'Peer-to-peer sync (no central server stores your data)',
-        securityRecovery: 'Social recovery available for root key rotation',
+        securityRelay: 'Disposable encrypted relays; complete history remains on member devices',
         languageTitle: 'Language',
         exportIdentityTitle: 'Export Identity',
         exportIdentitySubtitle: 'Scan this QR code on another device to log in.',

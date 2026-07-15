@@ -8,7 +8,7 @@
 const PBKDF2_ITERATIONS = 100_000;
 const SALT_BYTES = 16;
 const IV_BYTES = 12;
-const EXPORT_VERSION = 1;
+const EXPORT_VERSION = 2;
 
 interface EncryptedEnvelope {
     v: number;       // version
@@ -36,7 +36,7 @@ async function deriveKey(password: string, salt: Uint8Array): Promise<CryptoKey>
         'raw', enc.encode(password), 'PBKDF2', false, ['deriveKey'],
     );
     return crypto.subtle.deriveKey(
-        { name: 'PBKDF2', salt: salt as any, iterations: PBKDF2_ITERATIONS, hash: 'SHA-256' },
+        { name: 'PBKDF2', salt: salt as BufferSource, iterations: PBKDF2_ITERATIONS, hash: 'SHA-256' },
         keyMaterial,
         { name: 'AES-GCM', length: 256 },
         false,

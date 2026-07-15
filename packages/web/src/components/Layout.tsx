@@ -8,17 +8,24 @@ import { Footer } from './Footer';
 import { ConnectionStatus } from './ConnectionStatus';
 
 export function Layout({ children }: { children: ReactNode }) {
-    const { isOnboarded, identity } = useApp();
+    const { isOnboarded, identity, persistenceWarning } = useApp();
     const { t, locale, setLocale } = useI18n();
     const location = useLocation();
 
-    if (!isOnboarded) return <>{children}</>;
+    const storageWarning = persistenceWarning ? (
+        <div role="alert" style={{ padding: '12px 16px', background: 'var(--danger-dim)', color: 'var(--danger)', textAlign: 'center' }}>
+            {persistenceWarning}
+        </div>
+    ) : null;
+
+    if (!isOnboarded) return <>{storageWarning}{children}</>;
 
     const isActive = (path: string) =>
         location.pathname === path || location.pathname.startsWith(path + '/');
 
     return (
         <div className="app-layout">
+            {storageWarning}
             <nav className="app-nav">
                 <div className="app-nav__inner">
                     <div style={{ display: 'flex', alignItems: 'center' }}>

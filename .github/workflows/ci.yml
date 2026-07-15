@@ -1,0 +1,69 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Audit dependencies
+        run: npm audit --audit-level=high
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+  relay-container:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Build relay image
+        run: docker build --file Dockerfile.relay --tag fair-money-relay:ci .
+
+      - name: Start relay
+        run: docker run --detach --name fair-money-relay-ci --publish 127.0.0.1:18443:8443 fair-money-relay:ci
+
+      - name: Verify protocol-v2 health endpoint
+        run: |
+          for attempt in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:18443/api/v2/health > /dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          docker logs fair-money-relay-ci
+          exit 1
+
+      - name: Stop relay
+        if: always()
+        run: docker rm --force fair-money-relay-ci || true

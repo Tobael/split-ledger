@@ -3,7 +3,7 @@
 // =============================================================================
 //
 // Orchestrates synchronization between local ledger and remote peers.
-// Transport-agnostic — works with RelayTransport or future P2PTransport.
+// Uses the authenticated relay transport boundary.
 //
 
 import type {
@@ -13,15 +13,16 @@ import type {
     LedgerEntry,
     StorageAdapter,
 } from '../types.js';
+import { EntryType } from '../types.js';
 import { validateEntry, applyEntry, orderEntries, validateFullChain } from '../ledger.js';
 import { computeBalances } from '../balance.js';
+import { parseLedgerEntry } from '../schemas.js';
 import type { Transport, TransportEntry } from './transport.js';
 import {
     deriveGroupKey,
     encryptForRelay,
     decryptFromRelay,
     serializeEntry,
-    deserializeEntry,
 } from './group-cipher.js';
 
 // ─── Types ───
@@ -32,7 +33,14 @@ export interface SyncManagerOptions {
     syncIntervalMs?: number;
 }
 
-export type SyncEventType = 'sync:start' | 'sync:complete' | 'sync:error' | 'entry:received' | 'entry:rejected';
+export type SyncEventType =
+    | 'sync:start'
+    | 'sync:complete'
+    | 'sync:error'
+    | 'entry:received'
+    | 'entry:rejected'
+    | 'history:missing'
+    | 'history:available';
 
 export interface SyncEvent {
     type: SyncEventType;
@@ -94,9 +102,12 @@ export class SyncManager {
      * Start syncing a group: initial sync + periodic background sync.
      */
     async startSync(groupId: GroupId): Promise<void> {
-        await this.transport.connect(groupId);
-        await this.syncWithRelay(groupId);
-        this.startBackgroundSync(groupId);
+        try {
+            await this.transport.connect(groupId);
+            await this.syncWithRelay(groupId);
+        } finally {
+            this.startBackgroundSync(groupId);
+        }
     }
 
     /**
@@ -134,14 +145,7 @@ export class SyncManager {
         const groupKey = this.getGroupKey(groupId);
 
         try {
-            const state = await this.storage.getGroupState(groupId);
-            const currentClock = state?.currentLamportClock ?? -1;
-
-            // Fetch entries from slightly before our current clock to catch any concurrent offline entries
-            // that might have the same lamportClock but a different entryId (which deduplication handles).
-            const syncFromClock = Math.max(-1, currentClock - 50);
-
-            const remoteEntries = await this.transport.getEntriesAfter(groupId, syncFromClock);
+            const remoteEntries = await this.transport.getOperations(groupId);
             let accepted = 0;
 
             for (const transportEntry of remoteEntries) {
@@ -149,7 +153,25 @@ export class SyncManager {
                 if (wasAccepted) accepted++;
             }
 
-            this.emit({ type: 'sync:complete', groupId, detail: { accepted, total: remoteEntries.length } });
+            // Relays are disposable rendezvous caches. Re-advertise durable local
+            // history on every successful pass so one complete member can seed an
+            // empty, replaced, or pruned relay. Publication is idempotent by ID.
+            const localEntries = await this.storage.getAllEntries(groupId);
+            for (const entry of localEntries) {
+                await this.broadcastEntry(groupId, entry);
+            }
+            const chain = validateFullChain(localEntries);
+            if (chain.valid && chain.finalState) {
+                this.emit({ type: 'history:available', groupId });
+            } else if (hasMissingHistory(localEntries)) {
+                this.emit({ type: 'history:missing', groupId, detail: { reason: 'Required ancestor unavailable' } });
+            }
+
+            this.emit({
+                type: 'sync:complete',
+                groupId,
+                detail: { accepted, received: remoteEntries.length, advertised: localEntries.length },
+            });
             return accepted;
         } catch (err) {
             this.emit({ type: 'sync:error', groupId, detail: err });
@@ -161,30 +183,42 @@ export class SyncManager {
      * Full initial sync for a new group.
      * Downloads and validates the entire chain.
      */
-    async initialSync(groupId: GroupId): Promise<GroupState | null> {
+    async initialSync(groupId: GroupId, options: { expectHistory?: boolean } = {}): Promise<GroupState | null> {
         this.emit({ type: 'sync:start', groupId });
         await this.transport.connect(groupId);
         const groupKey = this.getGroupKey(groupId);
 
         try {
-            const remoteEntries = await this.transport.getFullLedger(groupId);
+            const remoteEntries = await this.transport.getOperations(groupId);
+
+            if (remoteEntries.length === 0 && (await this.storage.getAllEntries(groupId)).length === 0) {
+                if (options.expectHistory) {
+                    this.emit({ type: 'history:missing', groupId, detail: { reason: 'Relay has no group history' } });
+                }
+                this.emit({ type: 'sync:complete', groupId, detail: { accepted: 0, received: 0 } });
+                return null;
+            }
 
             // Decrypt all entries
             const entries: LedgerEntry[] = [];
             for (const te of remoteEntries) {
                 try {
-                    const encrypted = base64ToBytes(te.encryptedEntry);
+                    const encrypted = base64ToBytes(te.encryptedOperation);
                     const decrypted = decryptFromRelay(encrypted, groupKey);
-                    const entry = deserializeEntry<LedgerEntry>(decrypted);
-                    entries.push(entry);
-                } catch {
-                    // Skip entries we can't decrypt
+                    const entry = parseLedgerEntry(decrypted);
+                    if (te.operationId === entry.entryId) entries.push(entry);
+                    else this.emit({ type: 'entry:rejected', groupId, detail: { reason: 'Relay operation ID mismatch' } });
+                } catch (error) {
+                    this.emit({ type: 'entry:rejected', groupId, detail: { reason: 'Invalid encrypted entry', error } });
                 }
             }
 
             // Validate the full chain
             const result = validateFullChain(entries);
             if (!result.valid) {
+                if (hasMissingHistory(entries)) {
+                    this.emit({ type: 'history:missing', groupId, detail: { reason: 'Required ancestor unavailable' } });
+                }
                 this.emit({ type: 'sync:error', groupId, detail: { errors: result.errors } });
                 return null;
             }
@@ -197,6 +231,7 @@ export class SyncManager {
 
             if (result.finalState) {
                 await this.storage.saveGroupState(result.finalState);
+                this.emit({ type: 'history:available', groupId });
             }
 
             this.emit({ type: 'sync:complete', groupId, detail: { accepted: ordered.length } });
@@ -216,9 +251,8 @@ export class SyncManager {
         const encrypted = encryptForRelay(plaintext, groupKey);
 
         const transportEntry: TransportEntry = {
-            encryptedEntry: bytesToBase64(encrypted),
-            lamportClock: entry.lamportClock,
-            senderPubkey: entry.creatorDevicePubkey,
+            operationId: entry.entryId,
+            encryptedOperation: bytesToBase64(encrypted),
         };
 
         await this.transport.publishEntry(groupId, transportEntry);
@@ -257,19 +291,22 @@ export class SyncManager {
         // Decrypt
         let entry: LedgerEntry;
         try {
-            const encrypted = base64ToBytes(transportEntry.encryptedEntry);
+            const encrypted = base64ToBytes(transportEntry.encryptedOperation);
             const decrypted = decryptFromRelay(encrypted, groupKey);
-            entry = deserializeEntry<LedgerEntry>(decrypted);
+            entry = parseLedgerEntry(decrypted);
         } catch (err) {
-            console.error('[SyncManager] Decryption/Deserialization failed:', err);
-            this.emit({ type: 'entry:rejected', groupId, detail: { reason: 'Decryption failed', error: err } });
+            this.emit({ type: 'entry:rejected', groupId, detail: { reason: 'Invalid encrypted entry', error: err } });
+            return false;
+        }
+
+        if (transportEntry.operationId !== entry.entryId) {
+            this.emit({ type: 'entry:rejected', groupId, detail: { reason: 'Relay operation ID mismatch' } });
             return false;
         }
 
         // Check for duplicates
         const existing = await this.storage.getEntry(entry.entryId);
         if (existing) {
-            console.debug(`[SyncManager] Duplicate entry ignored: ${entry.entryId.slice(0, 8)}`);
             return false;
         }
 
@@ -280,7 +317,7 @@ export class SyncManager {
         if (!state) {
             // No state yet — this might be the genesis entry
             if (entry.entryType !== 'Genesis') {
-                console.error('[SyncManager] Rejected: Expected genesis entry first, got', entry.entryType, entry.lamportClock);
+                this.emit({ type: 'history:missing', groupId, detail: { reason: 'Genesis operation unavailable' } });
                 this.emit({ type: 'entry:rejected', groupId, detail: { reason: 'Expected genesis first', entryId: entry.entryId } });
                 return false;
             }
@@ -290,12 +327,12 @@ export class SyncManager {
         const result = validateEntry(entry, allEntries, emptyState);
 
         if (!result.valid) {
-            console.error('[SyncManager] Validation failed:', result.errors);
+            if (result.errors.some(({ field }) => field === 'previousHash')) {
+                this.emit({ type: 'history:missing', groupId, detail: { reason: 'Required ancestor unavailable' } });
+            }
             this.emit({ type: 'entry:rejected', groupId, detail: { errors: result.errors, entryId: entry.entryId } });
             return false;
         }
-
-        console.log(`[SyncManager] Applying validated entry: ${entry.entryType} (clock=${entry.lamportClock}) to group ${groupId.slice(0, 8)}`);
 
         // Append and update state
         await this.storage.appendEntry(groupId, entry);
@@ -345,6 +382,13 @@ function createMinimalGroupState(groupId: GroupId): GroupState {
         currentLamportClock: 0,
         balances: new Map(),
     };
+}
+
+function hasMissingHistory(entries: readonly LedgerEntry[]): boolean {
+    if (entries.length === 0) return false;
+    const ids = new Set(entries.map(({ entryId }) => entryId));
+    return !entries.some(({ entryType }) => entryType === EntryType.Genesis)
+        || entries.some(({ previousHash }) => previousHash !== null && !ids.has(previousHash));
 }
 
 function bytesToBase64(bytes: Uint8Array): string {

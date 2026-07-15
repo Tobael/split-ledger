@@ -35,12 +35,16 @@ export function Onboarding() {
     const handleCreate = () => {
         if (!name.trim()) return;
         setStep('creating');
-        setTimeout(() => {
-            createIdentity(name.trim());
-            if (location.pathname !== '/' && location.pathname !== '/dashboard') {
-                navigate(location.pathname + location.search);
-            } else {
-                navigate('/dashboard');
+        setTimeout(async () => {
+            try {
+                await createIdentity(name.trim());
+                if (location.pathname !== '/' && location.pathname !== '/dashboard') {
+                    navigate(location.pathname + location.search);
+                } else {
+                    navigate('/dashboard');
+                }
+            } catch {
+                setStep('name');
             }
         }, 800);
     };
@@ -112,9 +116,8 @@ export function Onboarding() {
                                                         const decryptedJson = await decryptIdentity(content, pwd);
                                                         const imported = JSON.parse(decryptedJson);
 
-                                                        // Validate it looks like our identity JSON
-                                                        if (imported && imported.rootKeyPair) {
-                                                            importIdentityFromJson(decryptedJson);
+                                                        if (imported?.format === 'fair-money-identity-transfer' && imported.version === 2) {
+                                                            await importIdentityFromJson(decryptedJson);
                                                             if (location.pathname !== '/' && location.pathname !== '/dashboard') {
                                                                 navigate(location.pathname + location.search);
                                                             } else {
@@ -123,7 +126,7 @@ export function Onboarding() {
                                                         } else {
                                                             throw new Error("Invalid identity file structure");
                                                         }
-                                                    } catch (err) {
+                                                    } catch {
                                                         alert(t.settings?.importError ?? "Invalid file or password");
                                                     }
                                                 }

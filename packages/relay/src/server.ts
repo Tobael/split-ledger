@@ -77,16 +77,35 @@ export function startRelay(configOverrides?: Partial<RelayConfig>): RelayServer 
     // WebSocket server on same HTTP server
     const wss = new WebSocketServer({ server: httpServer });
     const wsHandler = createWsHandler(db, config, rooms);
-    wss.on('connection', wsHandler);
+    const connectionsByIp = new Map<string, number>();
+    wss.on('connection', (ws, req) => {
+        const forwarded = req.headers['x-forwarded-for'];
+        const ip = config.trustProxy && typeof forwarded === 'string'
+            ? (forwarded.split(',')[0]?.trim() || req.socket.remoteAddress || 'unknown')
+            : (req.socket.remoteAddress ?? 'unknown');
+        const count = connectionsByIp.get(ip) ?? 0;
+        if (count >= config.maxConnectionsPerIp) {
+            ws.close(1013, 'Connection limit exceeded');
+            return;
+        }
+        connectionsByIp.set(ip, count + 1);
+        ws.once('close', () => {
+            const remaining = (connectionsByIp.get(ip) ?? 1) - 1;
+            if (remaining > 0) connectionsByIp.set(ip, remaining);
+            else connectionsByIp.delete(ip);
+        });
+        wsHandler(ws, req);
+    });
 
     // Start listening
     httpServer.listen(config.port, config.host);
 
     // Periodic maintenance
-    const pruneInterval = setInterval(() => {
-        db.pruneExpiredInvites();
-        db.pruneOldEntries(config.entryRetentionDays);
-    }, 60 * 60 * 1000); // hourly
+    const pruneInterval = config.operationRetentionDays > 0
+        ? setInterval(() => {
+            db.pruneOldOperations(config.operationRetentionDays);
+        }, 60 * 60 * 1000)
+        : null;
 
     return {
         config,
@@ -98,7 +117,7 @@ export function startRelay(configOverrides?: Partial<RelayConfig>): RelayServer 
             return { port: addr.port, host: addr.address };
         },
         async close() {
-            clearInterval(pruneInterval);
+            if (pruneInterval) clearInterval(pruneInterval);
             // Close all WebSocket connections
             for (const client of wss.clients) {
                 client.close(1000, 'Server shutting down');
@@ -118,9 +137,14 @@ if (isMain) {
     const relay = startRelay();
     const addr = relay.address();
     console.log(`SplitLedger Relay listening on ${addr.host}:${addr.port}`);
-    process.on('SIGINT', async () => {
-        console.log('\nShutting down...');
+    let shuttingDown = false;
+    const shutdown = async () => {
+        if (shuttingDown) return;
+        shuttingDown = true;
+        console.log('Shutting down...');
         await relay.close();
         process.exit(0);
-    });
+    };
+    process.on('SIGINT', shutdown);
+    process.on('SIGTERM', shutdown);
 }

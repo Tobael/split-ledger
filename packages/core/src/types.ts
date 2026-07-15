@@ -62,7 +62,6 @@ export enum EntryType {
     MemberRenamed = 'MemberRenamed',
     DeviceAuthorized = 'DeviceAuthorized',
     DeviceRevoked = 'DeviceRevoked',
-    RootKeyRotation = 'RootKeyRotation',
     SelfRootKeyRotation = 'SelfRootKeyRotation',
     GroupJoined = 'GroupJoined', // New: for personal device sync
     GroupLeft = 'GroupLeft',     // New: for personal device sync
@@ -152,24 +151,11 @@ export interface DeviceRevokedPayload {
     reason: string;
 }
 
-export interface RootKeyRotationPayload {
-    previousRootPubkey: PublicKey;
-    newRootPubkey: PublicKey;
-    /** Signatures from majority of active group members' root keys */
-    coSignatures: CoSignature[];
-}
-
 export interface SelfRootKeyRotationPayload {
     previousRootPubkey: PublicKey;
     newRootPubkey: PublicKey;
     /** Signature by the previous root secret key over the new root public key, proving ownership */
     authorizationSignature: Signature;
-}
-
-export interface CoSignature {
-    signerRootPubkey: PublicKey;
-    /** Signs { previousRootPubkey, newRootPubkey, groupId } */
-    signature: Signature;
 }
 
 // --- Group Sync Payloads (for Personal Group) -------------------------------
@@ -198,7 +184,6 @@ export type PayloadMap = {
     [EntryType.MemberRenamed]: MemberRenamedPayload;
     [EntryType.DeviceAuthorized]: DeviceAuthorizedPayload;
     [EntryType.DeviceRevoked]: DeviceRevokedPayload;
-    [EntryType.RootKeyRotation]: RootKeyRotationPayload;
     [EntryType.SelfRootKeyRotation]: SelfRootKeyRotationPayload;
     [EntryType.GroupJoined]: GroupJoinedPayload;
     [EntryType.GroupLeft]: GroupLeftPayload;
@@ -277,6 +262,7 @@ export interface StorageAdapter {
     getRootIdentity(): Promise<RootIdentity | null>;
     storeDeviceIdentity(identity: DeviceIdentity): Promise<void>;
     getDeviceIdentity(): Promise<DeviceIdentity | null>;
+    clearIdentity(): Promise<void>;
 
     // Group metadata
     getGroupIds(): Promise<GroupId[]>;

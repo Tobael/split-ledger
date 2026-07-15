@@ -8,6 +8,9 @@ import { InMemoryStorageAdapter } from '../storage.js';
 import { createRootIdentity, createDeviceIdentity, createInviteToken } from '../identity.js';
 import { serializeInviteLink } from '../invite-link.js';
 import { generateKeyPair } from '../crypto.js';
+import { buildEntry } from '../ledger.js';
+import { EntryType } from '../types.js';
+import { getEffectiveExpenses } from '../balance.js';
 import type { PublicKey, GroupId, Signature } from '../types.js';
 
 // ─── Test Helpers ───
@@ -317,6 +320,39 @@ describe('GroupManager', () => {
         await expect(
             noRootManager.authorizeDevice(groupId, newDevice.publicKey, 'iPad'),
         ).rejects.toThrow('Root key pair required');
+    });
+
+    it('corrects an expense with one immutable ledger entry', async () => {
+        const { groupId, genesisEntry } = await aliceManager.createGroup('Trip');
+        const aliceKey = alice.root.rootKeyPair.publicKey;
+        const expense = buildEntry(
+            EntryType.ExpenseCreated,
+            {
+                description: 'Dinner',
+                amountMinorUnits: 2000,
+                currency: 'EUR',
+                paidByRootPubkey: aliceKey,
+                splits: { [aliceKey]: 2000 },
+            },
+            genesisEntry.entryId,
+            1,
+            alice.device.deviceKeyPair.publicKey,
+            alice.device.deviceKeyPair.secretKey,
+        );
+        await storage.appendEntry(groupId, expense);
+
+        const correction = await aliceManager.correctExpense(groupId, expense.entryId, {
+            description: 'Dinner and tip',
+            amountMinorUnits: 2500,
+            currency: 'EUR',
+            paidByRootPubkey: aliceKey,
+            splits: { [aliceKey]: 2500 },
+        });
+
+        expect(correction.entryType).toBe(EntryType.ExpenseCorrection);
+        const entries = await storage.getAllEntries(groupId);
+        expect(entries).toHaveLength(3);
+        expect(getEffectiveExpenses(entries).get(expense.entryId)?.amountMinorUnits).toBe(2500);
     });
 
     // ═══════════════════════════════════════════════════════════════════════

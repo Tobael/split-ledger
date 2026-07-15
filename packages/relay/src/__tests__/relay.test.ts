@@ -1,368 +1,148 @@
-// =============================================================================
-// Relay Server Integration Tests
-// =============================================================================
-
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { WebSocket } from 'ws';
-import { startRelay, type RelayServer } from '../server.js';
-import { randomUUID } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { WebSocket } from 'ws';
+import { startRelay, type RelayServer } from '../server.js';
 
-// ─── Helpers ───
-
-function waitForOpen(ws: WebSocket): Promise<void> {
-    return new Promise((resolve, reject) => {
-        if (ws.readyState === WebSocket.OPEN) { resolve(); return; }
-        ws.once('open', resolve);
-        ws.once('error', reject);
-    });
+const capability = 'A'.repeat(43);
+const wrongCapability = 'B'.repeat(43);
+const groupId = () => randomUUID();
+const operationId = () => randomBytes(32).toString('hex');
+const encrypted = (value: string) => Buffer.from(value).toString('base64');
+function waitForOpen(ws: WebSocket): Promise<void> { return new Promise((resolve, reject) => { ws.once('open', resolve); ws.once('error', reject); }); }
+function waitForMessage<T>(ws: WebSocket): Promise<T> { return new Promise((resolve, reject) => { const timer = setTimeout(() => reject(new Error('Timeout')), 3000); ws.once('message', (data) => { clearTimeout(timer); resolve(JSON.parse(data.toString()) as T); }); }); }
+function waitForClose(ws: WebSocket): Promise<{ code: number; reason: string }> { return new Promise((resolve, reject) => { const timer = setTimeout(() => reject(new Error('Timeout')), 3000); ws.once('close', (code, reason) => { clearTimeout(timer); resolve({ code, reason: reason.toString() }); }); }); }
+function send(ws: WebSocket, message: unknown): void { ws.send(JSON.stringify(message)); }
+async function wsAddress(relay: RelayServer): Promise<string> {
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    const address = relay.address();
+    const host = address.host === '0.0.0.0' ? '127.0.0.1' : address.host;
+    return `ws://${host}:${address.port}`;
 }
 
-function waitForMessage<T = unknown>(ws: WebSocket, timeout = 5000): Promise<T> {
-    return new Promise((resolve, reject) => {
-        const timer = setTimeout(() => reject(new Error('Timeout waiting for message')), timeout);
-        ws.once('message', (data) => {
-            clearTimeout(timer);
-            resolve(JSON.parse(data.toString()) as T);
-        });
-    });
-}
-
-function sendJson(ws: WebSocket, msg: unknown): void {
-    ws.send(JSON.stringify(msg));
-}
-
-// ─── Tests ───
-
-describe('Relay Server', () => {
+describe('protocol v2 relay', () => {
     let relay: RelayServer;
     let baseUrl: string;
     let wsUrl: string;
-
     beforeAll(async () => {
-        const dbPath = join(tmpdir(), `relay-test-${randomUUID()}.db`);
-        relay = startRelay({ port: 0, dbPath }); // port 0 = random available port
-        // Wait a bit for server to start
-        await new Promise((r) => setTimeout(r, 500));
-        const addr = relay.address();
-        baseUrl = `http://${addr.host === '0.0.0.0' ? '127.0.0.1' : addr.host}:${addr.port}`;
-        wsUrl = `ws://${addr.host === '0.0.0.0' ? '127.0.0.1' : addr.host}:${addr.port}`;
+        relay = startRelay({ port: 0, dbPath: join(tmpdir(), `relay-${randomUUID()}.db`), pageSize: 2 });
+        await new Promise((resolve) => setTimeout(resolve, 300));
+        const address = relay.address();
+        const host = address.host === '0.0.0.0' ? '127.0.0.1' : address.host;
+        baseUrl = `http://${host}:${address.port}`; wsUrl = `ws://${host}:${address.port}`;
     });
+    afterAll(async () => relay.close());
 
-    afterAll(async () => {
-        await relay.close();
+    it('reports health', async () => { expect((await fetch(`${baseUrl}/api/v2/health`)).status).toBe(200); });
+    it('answers PING without group authorization', async () => {
+        const ws = new WebSocket(wsUrl); await waitForOpen(ws); const response = waitForMessage<{ type: string }>(ws); send(ws, { type: 'PING' }); expect((await response).type).toBe('PONG'); ws.close();
     });
-
-    describe('REST API', () => {
-        it('GET /api/v1/health returns OK', async () => {
-            const res = await fetch(`${baseUrl}/api/v1/health`);
-            expect(res.status).toBe(200);
-            const body = await res.json() as { status: string };
-            expect(body.status).toBe('ok');
-        });
-
-        it('invite CRUD lifecycle', async () => {
-            // Create
-            const res = await fetch(`${baseUrl}/api/v1/invites`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    groupId: randomUUID(),
-                    inviteData: Buffer.from('test-invite').toString('base64'),
-                    expiresAt: new Date(Date.now() + 86400000).toISOString(),
-                    creatorPubkey: 'abc123',
-                }),
-            });
-            expect(res.status).toBe(201);
-            const created = await res.json() as { inviteId: string };
-            expect(created.inviteId).toBeTruthy();
-
-            // Read
-            const getRes = await fetch(`${baseUrl}/api/v1/invites/${created.inviteId}`);
-            expect(getRes.status).toBe(200);
-            const invite = await getRes.json() as { inviteData: string };
-            expect(Buffer.from(invite.inviteData, 'base64').toString()).toBe('test-invite');
-
-            // Delete (unauthorized)
-            const delResFail = await fetch(`${baseUrl}/api/v1/invites/${created.inviteId}`, {
-                method: 'DELETE',
-                headers: { 'x-creator-pubkey': 'wrong-key' },
-            });
-            expect(delResFail.status).toBe(404);
-
-            // Delete (authorized)
-            const delRes = await fetch(`${baseUrl}/api/v1/invites/${created.inviteId}`, {
-                method: 'DELETE',
-                headers: { 'x-creator-pubkey': 'abc123' },
-            });
-            expect(delRes.status).toBe(200);
-
-            // Verify deleted
-            const gone = await fetch(`${baseUrl}/api/v1/invites/${created.inviteId}`);
-            expect(gone.status).toBe(404);
-        });
-
-        it('returns 410 for expired invite', async () => {
-            const res = await fetch(`${baseUrl}/api/v1/invites`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    groupId: randomUUID(),
-                    inviteData: Buffer.from('expired').toString('base64'),
-                    expiresAt: new Date(Date.now() - 1000).toISOString(), // already expired
-                    creatorPubkey: 'abc123',
-                }),
-            });
-            const created = await res.json() as { inviteId: string };
-
-            const getRes = await fetch(`${baseUrl}/api/v1/invites/${created.inviteId}`);
-            expect(getRes.status).toBe(410);
-        });
+    it('rejects subscription to an unknown group capability', async () => {
+        const ws = new WebSocket(wsUrl); await waitForOpen(ws); const response = waitForMessage<{ code: string }>(ws); send(ws, { type: 'SUBSCRIBE', groupId: groupId(), capability }); expect((await response).code).toBe('UNAUTHORIZED'); ws.close();
     });
-
-    describe('WebSocket Protocol', () => {
-        it('PING/PONG', async () => {
-            const groupId = randomUUID();
-            const ws = new WebSocket(`${wsUrl}?groupId=${groupId}`);
-            await waitForOpen(ws);
-
-            const pongPromise = waitForMessage(ws);
-            sendJson(ws, { type: 'PING' });
-            const pong = await pongPromise as { type: string };
-            expect(pong.type).toBe('PONG');
-
-            ws.close();
+    it('publishes and broadcasts authenticated operation envelopes', async () => {
+        const id = groupId(); const op = operationId(); const publisher = new WebSocket(wsUrl); const subscriber = new WebSocket(wsUrl);
+        await Promise.all([waitForOpen(publisher), waitForOpen(subscriber)]);
+        send(publisher, { type: 'PUBLISH_OPERATION', groupId: id, capability, operationId: op, encryptedOperation: encrypted('root') });
+        await new Promise((resolve) => setTimeout(resolve, 30)); send(subscriber, { type: 'SUBSCRIBE', groupId: id, capability });
+        await new Promise((resolve) => setTimeout(resolve, 30)); const incoming = waitForMessage<{ type: string; operationId: string }>(subscriber);
+        send(publisher, { type: 'PUBLISH_OPERATION', groupId: id, capability, operationId: operationId(), encryptedOperation: encrypted('next') });
+        expect((await incoming).type).toBe('OPERATION'); publisher.close(); subscriber.close();
+    });
+    it('deduplicates by operation ID and paginates by opaque cursor', async () => {
+        const id = groupId(); const ws = new WebSocket(wsUrl); await waitForOpen(ws); const ids = [operationId(), operationId(), operationId()];
+        for (const op of [...ids, ids[0]!]) send(ws, { type: 'PUBLISH_OPERATION', groupId: id, capability, operationId: op, encryptedOperation: encrypted(op) });
+        await new Promise((resolve) => setTimeout(resolve, 80));
+        const firstResponse = waitForMessage<{ operations: Array<{ cursor: number; operationId: string }>; nextCursor: number; hasMore: boolean }>(ws);
+        send(ws, { type: 'GET_OPERATIONS', groupId: id, capability, cursor: 0 }); const first = await firstResponse;
+        expect(first.operations).toHaveLength(2); expect(first.hasMore).toBe(true);
+        const secondResponse = waitForMessage<{ operations: unknown[]; hasMore: boolean }>(ws); send(ws, { type: 'GET_OPERATIONS', groupId: id, capability, cursor: first.nextCursor });
+        const second = await secondResponse; expect(second.operations).toHaveLength(1); expect(second.hasMore).toBe(false); ws.close();
+    });
+    it('rejects reads using the wrong capability', async () => {
+        const id = groupId(); const ws = new WebSocket(wsUrl); await waitForOpen(ws); send(ws, { type: 'PUBLISH_OPERATION', groupId: id, capability, operationId: operationId(), encryptedOperation: encrypted('root') });
+        await new Promise((resolve) => setTimeout(resolve, 30)); const response = waitForMessage<{ code: string }>(ws); send(ws, { type: 'GET_OPERATIONS', groupId: id, capability: wrongCapability, cursor: 0 }); expect((await response).code).toBe('UNAUTHORIZED'); ws.close();
+    });
+    it('enforces the configured connection limit per client IP', async () => {
+        const limited = startRelay({
+            port: 0,
+            dbPath: join(tmpdir(), `relay-${randomUUID()}.db`),
+            maxConnectionsPerIp: 1,
         });
-
-        it('PUBLISH_ENTRY + broadcast to subscriber', async () => {
-            const groupId = randomUUID();
-            const entryData = Buffer.from('encrypted-entry-data').toString('base64');
-
-            // Client A subscribes
-            const clientA = new WebSocket(`${wsUrl}?groupId=${groupId}`);
-            await waitForOpen(clientA);
-
-            // Client B subscribes
-            const clientB = new WebSocket(`${wsUrl}?groupId=${groupId}`);
-            await waitForOpen(clientB);
-
-            // Client A publishes
-            const entryPromise = waitForMessage(clientB);
-            sendJson(clientA, {
-                type: 'PUBLISH_ENTRY',
-                groupId,
-                lamportClock: 0,
-                senderPubkey: 'sender-abc',
-                encryptedEntry: entryData,
-            });
-
-            // Client B should receive NEW_ENTRY
-            const received = await entryPromise as { type: string; encryptedEntry: string; lamportClock: number };
-            expect(received.type).toBe('NEW_ENTRY');
-            expect(received.encryptedEntry).toBe(entryData);
-            expect(received.lamportClock).toBe(0);
-
-            clientA.close();
-            clientB.close();
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        const address = limited.address();
+        const host = address.host === '0.0.0.0' ? '127.0.0.1' : address.host;
+        const first = new WebSocket(`ws://${host}:${address.port}`);
+        await waitForOpen(first);
+        const second = new WebSocket(`ws://${host}:${address.port}`);
+        const closed = waitForClose(second);
+        await waitForOpen(second);
+        expect(await closed).toEqual({ code: 1013, reason: 'Connection limit exceeded' });
+        first.close();
+        await limited.close();
+    });
+    it('accepts idempotent republication after a group reaches its quota', async () => {
+        const quotaRelay = startRelay({
+            port: 0,
+            dbPath: join(tmpdir(), `relay-${randomUUID()}.db`),
+            maxOperationsPerGroup: 1,
         });
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        const address = quotaRelay.address();
+        const host = address.host === '0.0.0.0' ? '127.0.0.1' : address.host;
+        const ws = new WebSocket(`ws://${host}:${address.port}`);
+        await waitForOpen(ws);
+        const id = groupId();
+        const op = operationId();
+        send(ws, { type: 'PUBLISH_OPERATION', groupId: id, capability, operationId: op, encryptedOperation: encrypted('root') });
+        await new Promise((resolve) => setTimeout(resolve, 30));
+        send(ws, { type: 'PUBLISH_OPERATION', groupId: id, capability, operationId: op, encryptedOperation: encrypted('root') });
+        await new Promise((resolve) => setTimeout(resolve, 30));
+        const response = waitForMessage<{ operations: unknown[] }>(ws);
+        send(ws, { type: 'GET_OPERATIONS', groupId: id, capability, cursor: 0 });
+        expect((await response).operations).toHaveLength(1);
+        ws.close();
+        await quotaRelay.close();
+    });
+    it('recovers an empty replacement relay from one member durable operation set', async () => {
+        const id = groupId();
+        const localOperations = ['root', 'expense-a', 'expense-b'].map((value) => ({
+            operationId: operationId(),
+            encryptedOperation: encrypted(value),
+        }));
+        const original = startRelay({ port: 0, dbPath: join(tmpdir(), `relay-${randomUUID()}.db`) });
+        const originalMember = new WebSocket(await wsAddress(original));
+        await waitForOpen(originalMember);
+        for (const operation of localOperations) {
+            send(originalMember, { type: 'PUBLISH_OPERATION', groupId: id, capability, ...operation });
+        }
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        const originalClosed = waitForClose(originalMember);
+        originalMember.close();
+        await originalClosed;
+        await original.close();
 
-        it('GET_ENTRIES_AFTER returns stored entries', async () => {
-            const groupId = randomUUID();
-            const ws = new WebSocket(`${wsUrl}?groupId=${groupId}`);
-            await waitForOpen(ws);
+        const replacement = startRelay({ port: 0, dbPath: join(tmpdir(), `relay-${randomUUID()}.db`) });
+        const replacementUrl = await wsAddress(replacement);
+        const seedingMember = new WebSocket(replacementUrl);
+        const recoveringMember = new WebSocket(replacementUrl);
+        await Promise.all([waitForOpen(seedingMember), waitForOpen(recoveringMember)]);
+        for (const operation of localOperations) {
+            send(seedingMember, { type: 'PUBLISH_OPERATION', groupId: id, capability, ...operation });
+        }
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        const response = waitForMessage<{ operations: Array<{ operationId: string }> }>(recoveringMember);
+        send(recoveringMember, { type: 'GET_OPERATIONS', groupId: id, capability, cursor: 0 });
 
-            // Publish 3 entries
-            for (let i = 0; i < 3; i++) {
-                sendJson(ws, {
-                    type: 'PUBLISH_ENTRY',
-                    groupId,
-                    lamportClock: i,
-                    senderPubkey: 'sender',
-                    encryptedEntry: Buffer.from(`entry-${i}`).toString('base64'),
-                });
-            }
-
-            // Wait for entries to be stored
-            await new Promise((r) => setTimeout(r, 200));
-
-            // Request entries after clock 0
-            const responsePromise = waitForMessage(ws);
-            sendJson(ws, { type: 'GET_ENTRIES_AFTER', groupId, afterLamportClock: 0 });
-            const response = await responsePromise as { type: string; entries: Array<{ lamportClock: number }> };
-
-            expect(response.type).toBe('ENTRIES_RESPONSE');
-            expect(response.entries.length).toBe(2); // clocks 1 and 2
-            expect(response.entries.every((e) => e.lamportClock > 0)).toBe(true);
-
-            ws.close();
-        });
-
-        it('GET_FULL_LEDGER returns all entries', async () => {
-            const groupId = randomUUID();
-            const ws = new WebSocket(`${wsUrl}?groupId=${groupId}`);
-            await waitForOpen(ws);
-
-            // Publish entries
-            for (let i = 0; i < 3; i++) {
-                sendJson(ws, {
-                    type: 'PUBLISH_ENTRY',
-                    groupId,
-                    lamportClock: i,
-                    senderPubkey: 'sender',
-                    encryptedEntry: Buffer.from(`entry-${i}`).toString('base64'),
-                });
-            }
-            await new Promise((r) => setTimeout(r, 200));
-
-            const responsePromise = waitForMessage(ws);
-            sendJson(ws, { type: 'GET_FULL_LEDGER', groupId });
-            const response = await responsePromise as { type: string; entries: unknown[] };
-
-            expect(response.type).toBe('FULL_LEDGER');
-            expect(response.entries.length).toBe(3);
-
-            ws.close();
-        });
-
-        it('duplicate entries are ignored (idempotent)', async () => {
-            const groupId = randomUUID();
-            const ws = new WebSocket(`${wsUrl}?groupId=${groupId}`);
-            await waitForOpen(ws);
-
-            const entry = {
-                type: 'PUBLISH_ENTRY',
-                groupId,
-                lamportClock: 0,
-                senderPubkey: 'sender',
-                encryptedEntry: Buffer.from('same-entry').toString('base64'),
-            };
-
-            // Publish same entry twice
-            sendJson(ws, entry);
-            sendJson(ws, entry);
-            await new Promise((r) => setTimeout(r, 200));
-
-            const responsePromise = waitForMessage(ws);
-            sendJson(ws, { type: 'GET_FULL_LEDGER', groupId });
-            const response = await responsePromise as { type: string; entries: unknown[] };
-            expect(response.entries.length).toBe(1); // only stored once
-
-            ws.close();
-        });
-
-        it('peers endpoint shows connected count', async () => {
-            const groupId = randomUUID();
-            const ws1 = new WebSocket(`${wsUrl}?groupId=${groupId}`);
-            const ws2 = new WebSocket(`${wsUrl}?groupId=${groupId}`);
-            await waitForOpen(ws1);
-            await waitForOpen(ws2);
-
-            const res = await fetch(`${baseUrl}/api/v1/groups/${groupId}/peers`);
-            const body = await res.json() as { connectedPeers: number };
-            expect(body.connectedPeers).toBe(2);
-
-            ws1.close();
-            ws2.close();
-        });
-
-        it('SIGNAL_OFFER is forwarded to target peer', async () => {
-            const groupId = randomUUID();
-
-            // Both peers connect
-            const peerA = new WebSocket(`${wsUrl}?groupId=${groupId}`);
-            const peerB = new WebSocket(`${wsUrl}?groupId=${groupId}`);
-            await waitForOpen(peerA);
-            await waitForOpen(peerB);
-
-            // Peer B registers its identity by sending a signal first
-            // (any signal from B registers B's peerId)
-            sendJson(peerB, {
-                type: 'SIGNAL_OFFER',
-                groupId,
-                fromPeerId: 'peer-b-id',
-                toPeerId: 'nonexistent', // goes nowhere
-                sdp: 'dummy',
-            });
-            await new Promise((r) => setTimeout(r, 100));
-
-            // Peer A sends an offer to peer B
-            const msgPromise = waitForMessage(peerB);
-            sendJson(peerA, {
-                type: 'SIGNAL_OFFER',
-                groupId,
-                fromPeerId: 'peer-a-id',
-                toPeerId: 'peer-b-id',
-                sdp: 'offer-sdp-data',
-            });
-
-            const received = await msgPromise as { type: string; fromPeerId: string; sdp: string };
-            expect(received.type).toBe('SIGNAL_OFFER');
-            expect(received.fromPeerId).toBe('peer-a-id');
-            expect(received.sdp).toBe('offer-sdp-data');
-
-            peerA.close();
-            peerB.close();
-        });
-
-        it('SIGNAL_ANSWER is forwarded to target peer', async () => {
-            const groupId = randomUUID();
-
-            const peerA = new WebSocket(`${wsUrl}?groupId=${groupId}`);
-            const peerB = new WebSocket(`${wsUrl}?groupId=${groupId}`);
-            await waitForOpen(peerA);
-            await waitForOpen(peerB);
-
-            // Register peer A
-            sendJson(peerA, {
-                type: 'SIGNAL_OFFER',
-                groupId,
-                fromPeerId: 'peer-a-id',
-                toPeerId: 'nonexistent',
-                sdp: 'dummy',
-            });
-            await new Promise((r) => setTimeout(r, 100));
-
-            // Peer B sends answer to peer A
-            const msgPromise = waitForMessage(peerA);
-            sendJson(peerB, {
-                type: 'SIGNAL_ANSWER',
-                groupId,
-                fromPeerId: 'peer-b-id',
-                toPeerId: 'peer-a-id',
-                sdp: 'answer-sdp-data',
-            });
-
-            const received = await msgPromise as { type: string; fromPeerId: string; sdp: string };
-            expect(received.type).toBe('SIGNAL_ANSWER');
-            expect(received.fromPeerId).toBe('peer-b-id');
-            expect(received.sdp).toBe('answer-sdp-data');
-
-            peerA.close();
-            peerB.close();
-        });
-
-        it('signal to unknown peer is silently dropped', async () => {
-            const groupId = randomUUID();
-            const ws = new WebSocket(`${wsUrl}?groupId=${groupId}`);
-            await waitForOpen(ws);
-
-            // Should not throw or produce an error response
-            sendJson(ws, {
-                type: 'SIGNAL_OFFER',
-                groupId,
-                fromPeerId: 'peer-a',
-                toPeerId: 'unknown-peer',
-                sdp: 'test',
-            });
-
-            // PING/PONG to verify connection still works
-            const pongPromise = waitForMessage(ws);
-            sendJson(ws, { type: 'PING' });
-            const pong = await pongPromise as { type: string };
-            expect(pong.type).toBe('PONG');
-
-            ws.close();
-        });
+        expect((await response).operations.map(({ operationId: value }) => value)).toEqual(
+            localOperations.map(({ operationId: value }) => value),
+        );
+        const seedingClosed = waitForClose(seedingMember);
+        const recoveringClosed = waitForClose(recoveringMember);
+        seedingMember.close();
+        recoveringMember.close();
+        await Promise.all([seedingClosed, recoveringClosed]);
+        await replacement.close();
     });
 });

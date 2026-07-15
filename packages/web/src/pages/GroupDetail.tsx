@@ -7,6 +7,7 @@ import {
     type GroupState,
     type LedgerEntry,
     type GroupId,
+    type GroupStateV2,
     type PublicKey,
     EntryType,
     computeBalances,
@@ -17,23 +18,17 @@ import {
     getEffectiveExpenses,
 } from '@splitledger/core';
 
-interface ExpensePayload {
-    description: string;
-    amountMinorUnits: number;
-    currency: string;
-    paidByRootPubkey: string;
-    splits: Record<string, number>;
-}
-
 export function GroupDetail() {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
 
-    const { manager, getGroupState, getGroupEntries, identity, broadcastEntry, refreshGroups, storage, deleteGroup, lastUpdate } = useApp();
+    const { manager, getGroupState, getGroupStateV2, getGroupEntries, identity, broadcastEntry, refreshGroups, storage, deleteGroup, lastUpdate, groupsWaitingForHistory } = useApp();
     const { t } = useI18n();
     const groupId = id as GroupId;
+    const waitingForHistory = groupsWaitingForHistory.has(groupId);
 
     const [state, setState] = useState<GroupState | null>(null);
+    const [stateV2, setStateV2] = useState<GroupStateV2 | null>(null);
     const [entries, setEntries] = useState<LedgerEntry[]>([]);
     const [inviteLink, setInviteLink] = useState('');
     const [showInvite, setShowInvite] = useState(false);
@@ -44,6 +39,13 @@ export function GroupDetail() {
     const refresh = useCallback(async () => {
         if (!manager) return;
         try {
+            const v2 = await getGroupStateV2(groupId);
+            if (v2) {
+                setStateV2(v2);
+                setState(null);
+                setEntries([]);
+                return;
+            }
             const s = await getGroupState(groupId);
             const e = await getGroupEntries(groupId);
             setState(s);
@@ -51,7 +53,7 @@ export function GroupDetail() {
         } finally {
             setLoading(false);
         }
-    }, [groupId, getGroupState, getGroupEntries, manager]);
+    }, [groupId, getGroupState, getGroupStateV2, getGroupEntries, manager]);
 
     useEffect(() => {
         if (manager) {
@@ -62,7 +64,7 @@ export function GroupDetail() {
     const handleCreateInvite = () => {
         if (!manager) return;
         const token = manager.createInviteLink(groupId);
-        const link = `${window.location.origin}/join?token=${token}`;
+        const link = `${window.location.origin}/invite/${encodeURIComponent(token)}`;
         setInviteLink(link);
         setShowInvite(true);
     };
@@ -143,7 +145,21 @@ export function GroupDetail() {
         return <div style={{ padding: 'var(--space-8)', color: 'var(--text-secondary)' }}>{t.common.loading}</div>;
     }
 
+    if (stateV2) {
+        return <ProtocolV2GroupDetail state={stateV2} onDelete={handleDeleteGroup} />;
+    }
+
     if (!state) {
+        if (waitingForHistory) {
+            return (
+                <div className="empty-state animate-fade-in" role="status">
+                    <div className="empty-state__icon">⏳</div>
+                    <h2 className="empty-state__title">{t.groupDetail.waitingForMemberTitle}</h2>
+                    <p className="empty-state__text">{t.groupDetail.waitingForMemberText}</p>
+                    <Link to="/dashboard" className="btn btn--secondary">{t.groupDetail.backToGroups}</Link>
+                </div>
+            );
+        }
         return (
             <div className="empty-state animate-fade-in">
                 <div className="empty-state__icon">🚫</div>
@@ -164,11 +180,13 @@ export function GroupDetail() {
     }
 
     const activeMembers = [...state.members.values()].filter(m => m.isActive);
-    const expenses = entries.filter(e => e.entryType === EntryType.ExpenseCreated);
     const balances = computeBalances(entries);
     const myPubkey = identity?.rootKeyPair.publicKey;
 
     const effectiveExpenses = getEffectiveExpenses(entries);
+    const expenses = entries
+        .filter(e => e.entryType === EntryType.ExpenseCreated && effectiveExpenses.has(e.entryId))
+        .map(e => ({ entry: e, payload: effectiveExpenses.get(e.entryId)! }));
     const totalGroupExpenses = Array.from(effectiveExpenses.values())
         .filter(e => !e.isSettlement && e.description !== t.groupDetail.settlementDescription && e.description !== 'Settlement' && e.description !== 'Ausgleich' && e.description !== 'settlement')
         .reduce((sum, e) => sum + e.amountMinorUnits, 0);
@@ -176,6 +194,11 @@ export function GroupDetail() {
     return (
         <div className="animate-fade-in">
             {/* Header */}
+            {waitingForHistory && (
+                <div role="status" style={{ padding: 'var(--space-3) var(--space-4)', marginBottom: 'var(--space-4)', background: 'var(--warning-dim)', color: 'var(--warning)', borderRadius: 'var(--radius-md)' }}>
+                    <strong>{t.groupDetail.waitingForMemberTitle}</strong> {t.groupDetail.waitingForMemberText}
+                </div>
+            )}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', marginBottom: 'var(--space-8)' }}>
                 <div style={{ width: '100%' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', marginBottom: 'var(--space-1)' }}>
@@ -186,7 +209,6 @@ export function GroupDetail() {
                 </div>
                 <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
                     <button className="btn btn--ghost" onClick={() => setShowChain(v => !v)}>{showChain ? t.groupDetail.hideChain : t.groupDetail.viewChain}</button>
-                    <Link to={`/group/${groupId}/recovery`} className="btn btn--secondary">🛡️</Link>
                     <button className="btn btn--secondary" onClick={handleCreateInvite}>{t.groupDetail.invite}</button>
                     <Link to={`/group/${groupId}/expense`} className="btn btn--primary" style={{ flex: 1, minWidth: '140px' }}>{t.groupDetail.addExpense}</Link>
                 </div>
@@ -308,8 +330,7 @@ export function GroupDetail() {
                     </div>
                 ) : (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-                        {[...expenses].reverse().map((e, i) => {
-                            const p = e.payload as ExpensePayload;
+                        {[...expenses].reverse().map(({ entry: e, payload: p }, i) => {
                             const payer = state.members.get(p.paidByRootPubkey as PublicKey);
                             const isMyExpense = p.paidByRootPubkey === myPubkey;
                             return (
@@ -323,8 +344,11 @@ export function GroupDetail() {
                                                 {new Date(e.timestamp).toLocaleDateString()}
                                             </div>
                                         </div>
-                                        <div className="amount" style={{ fontSize: 'var(--font-size-lg)' }}>
-                                            {p.currency} {(p.amountMinorUnits / 100).toFixed(2)}
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+                                            <Link className="btn btn--ghost btn--sm" to={`/group/${groupId}/expense?edit=${e.entryId}`}>Edit</Link>
+                                            <div className="amount" style={{ fontSize: 'var(--font-size-lg)' }}>
+                                                {p.currency} {(p.amountMinorUnits / 100).toFixed(2)}
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -343,6 +367,255 @@ export function GroupDetail() {
                     {t.groupDetail.deleteGroup ?? 'Delete Group'}
                 </button>
             </div>
+        </div>
+    );
+}
+
+function ProtocolV2GroupDetail({ state, onDelete }: { state: GroupStateV2; onDelete: () => Promise<void> }) {
+    const { t } = useI18n();
+    const {
+        identity, createParticipantSlotV2, createOrReplaceInviteV2, createOrReplaceGenericInviteV2,
+        voidExpenseV2, createSettlementV2, renameParticipantV2, disableParticipantV2, resetParticipantV2,
+    } = useApp();
+    const [participantName, setParticipantName] = useState('');
+    const [inviteLinks, setInviteLinks] = useState<Record<string, string>>({});
+    const [copiedParticipantId, setCopiedParticipantId] = useState<string | null>(null);
+    const [busyParticipantId, setBusyParticipantId] = useState<string | null>(null);
+    const [genericInviteLink, setGenericInviteLink] = useState('');
+    const [settling, setSettling] = useState<string | null>(null);
+    const [settlementError, setSettlementError] = useState('');
+    const [editingParticipantId, setEditingParticipantId] = useState<string | null>(null);
+    const [editedParticipantName, setEditedParticipantName] = useState('');
+    const [participantError, setParticipantError] = useState('');
+    const participants = Object.values(state.participants).filter(({ status }) => status !== 'disabled');
+    const expenses = Object.values(state.expenses).filter((expense) => expense.status === 'effective');
+    const currencies = Object.keys(state.balances).sort();
+    const creator = state.participants[state.creatorParticipantId];
+    const isCreator = creator?.claimedRootPublicKey === identity?.rootKeyPair.publicKey;
+    const myParticipant = participants.find(
+        ({ claimedRootPublicKey }) => claimedRootPublicKey === identity?.rootKeyPair.publicKey,
+    );
+
+    const addParticipant = async () => {
+        if (!participantName.trim()) return;
+        setBusyParticipantId('new');
+        try {
+            await createParticipantSlotV2(state.groupId as GroupId, participantName);
+            setParticipantName('');
+        } finally {
+            setBusyParticipantId(null);
+        }
+    };
+
+    const replaceInvite = async (participantId: string) => {
+        setBusyParticipantId(participantId);
+        try {
+            const url = await createOrReplaceInviteV2(state.groupId as GroupId, participantId);
+            setInviteLinks((current) => ({ ...current, [participantId]: url }));
+            setCopiedParticipantId(null);
+        } finally {
+            setBusyParticipantId(null);
+        }
+    };
+
+    const copyInvite = async (participantId: string) => {
+        await navigator.clipboard.writeText(inviteLinks[participantId]);
+        setCopiedParticipantId(participantId);
+    };
+
+    const replaceGenericInvite = async () => {
+        setBusyParticipantId('generic');
+        try {
+            setGenericInviteLink(await createOrReplaceGenericInviteV2(state.groupId as GroupId));
+            setCopiedParticipantId(null);
+        } finally {
+            setBusyParticipantId(null);
+        }
+    };
+
+    const copyGenericInvite = async () => {
+        await navigator.clipboard.writeText(genericInviteLink);
+        setCopiedParticipantId('generic');
+    };
+
+    const settle = async (currency: string, from: string, to: string, amount: number) => {
+        if (!window.confirm(t.groupDetail.confirmSettleUp)) return;
+        const key = `${currency}:${from}:${to}`;
+        setSettling(key);
+        setSettlementError('');
+        try {
+            await createSettlementV2(state.groupId as GroupId, from, to, amount, currency);
+        } catch (error) {
+            setSettlementError(error instanceof Error ? error.message : 'Unable to record settlement');
+        } finally {
+            setSettling(null);
+        }
+    };
+
+    const saveParticipantName = async (participantId: string) => {
+        setBusyParticipantId(participantId);
+        setParticipantError('');
+        try {
+            await renameParticipantV2(state.groupId as GroupId, participantId, editedParticipantName);
+            setEditingParticipantId(null);
+        } catch (error) {
+            setParticipantError(error instanceof Error ? error.message : 'Unable to rename participant');
+        } finally {
+            setBusyParticipantId(null);
+        }
+    };
+
+    const disableParticipant = async (participantId: string) => {
+        if (!window.confirm(t.groupDetail.confirmDisableParticipant)) return;
+        setBusyParticipantId(participantId);
+        setParticipantError('');
+        try {
+            await disableParticipantV2(state.groupId as GroupId, participantId);
+        } catch (error) {
+            setParticipantError(error instanceof Error ? error.message : 'Unable to disable participant');
+        } finally {
+            setBusyParticipantId(null);
+        }
+    };
+
+    const resetParticipant = async (participantId: string) => {
+        if (!window.confirm(t.groupDetail.confirmResetParticipant)) return;
+        setBusyParticipantId(participantId);
+        setParticipantError('');
+        try {
+            await resetParticipantV2(state.groupId as GroupId, participantId);
+        } catch (error) {
+            setParticipantError(error instanceof Error ? error.message : 'Unable to reset participant');
+        } finally {
+            setBusyParticipantId(null);
+        }
+    };
+    return (
+        <div className="animate-fade-in">
+            <div className="page-header">
+                <Link to="/dashboard" style={{ color: 'var(--text-tertiary)', fontSize: 'var(--font-size-sm)' }}>{t.groupDetail.backToGroups}</Link>
+                <h1 className="page-header__title">{state.groupName}</h1>
+                <p className="page-header__subtitle">{participants.length} {participants.length === 1 ? t.common.member : t.common.members}</p>
+                <Link className="btn btn--primary" to={`/group/${state.groupId}/expense`}>{t.groupDetail.addExpense}</Link>
+            </div>
+            <div className="grid-responsive-cards" style={{ marginBottom: 'var(--space-6)' }}>
+                <section className="glass-card glass-card--static" style={{ padding: 'var(--space-5)' }}>
+                    <h3>{t.groupDetail.membersTitle}</h3>
+                    {participants.map((participant) => (
+                        <div key={participant.participantId} style={{ marginTop: 'var(--space-3)' }}>
+                            {editingParticipantId === participant.participantId ? (
+                                <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+                                    <input className="input" value={editedParticipantName} onChange={(event) => setEditedParticipantName(event.target.value)} />
+                                    <button className="btn btn--primary btn--sm" disabled={!editedParticipantName.trim() || busyParticipantId !== null} onClick={() => void saveParticipantName(participant.participantId)}>{t.groupDetail.saveParticipantName}</button>
+                                </div>
+                            ) : <div>{participant.displayName} <span className="badge badge--accent">{participant.status}</span></div>}
+                            {isCreator && editingParticipantId !== participant.participantId && (
+                                <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-2)', flexWrap: 'wrap' }}>
+                                    <button className="btn btn--ghost btn--sm" onClick={() => {
+                                        setEditingParticipantId(participant.participantId);
+                                        setEditedParticipantName(participant.displayName);
+                                    }}>{t.groupDetail.renameParticipant}</button>
+                                    {participant.participantId !== state.creatorParticipantId && participant.status === 'claimed' && (
+                                        <button className="btn btn--secondary btn--sm" disabled={busyParticipantId !== null} onClick={() => void resetParticipant(participant.participantId)}>{t.groupDetail.resetParticipant}</button>
+                                    )}
+                                    {participant.participantId !== state.creatorParticipantId && (
+                                        <button className="btn btn--danger btn--sm" disabled={busyParticipantId !== null} onClick={() => void disableParticipant(participant.participantId)}>{t.groupDetail.disableParticipant}</button>
+                                    )}
+                                </div>
+                            )}
+                            {isCreator && participant.status === 'unclaimed' && (
+                                <div style={{ marginTop: 'var(--space-2)', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+                                    <button className="btn btn--secondary btn--sm" disabled={busyParticipantId !== null} onClick={() => void replaceInvite(participant.participantId)}>
+                                        {inviteLinks[participant.participantId] ? t.groupDetail.replaceInviteForParticipant : t.groupDetail.createInviteForParticipant}
+                                    </button>
+                                    {inviteLinks[participant.participantId] && (
+                                        <>
+                                            <input className="input" readOnly value={inviteLinks[participant.participantId]} aria-label={t.groupDetail.inviteLinkTitle} />
+                                            <button className="btn btn--ghost btn--sm" onClick={() => void copyInvite(participant.participantId)}>
+                                                {copiedParticipantId === participant.participantId ? t.groupDetail.inviteCopied : t.groupDetail.copyInvite}
+                                            </button>
+                                        </>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    ))}
+                    {participantError && <p style={{ color: 'var(--danger)' }}>{participantError}</p>}
+                    {isCreator && (
+                        <div style={{ marginTop: 'var(--space-4)', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+                            <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+                                <input className="input" value={participantName} placeholder={t.groupDetail.participantNamePlaceholder} onChange={(event) => setParticipantName(event.target.value)} />
+                                <button className="btn btn--primary" disabled={!participantName.trim() || busyParticipantId !== null} onClick={() => void addParticipant()}>{t.groupDetail.addParticipant}</button>
+                            </div>
+                            {participants.some(({ status }) => status === 'unclaimed') && (
+                                <>
+                                    <p style={{ color: 'var(--text-secondary)', margin: 0 }}>{t.groupDetail.genericInviteHelp}</p>
+                                    <button className="btn btn--secondary" disabled={busyParticipantId !== null} onClick={() => void replaceGenericInvite()}>
+                                        {genericInviteLink ? t.groupDetail.replaceGenericInvite : t.groupDetail.createGenericInvite}
+                                    </button>
+                                    {genericInviteLink && (
+                                        <>
+                                            <input className="input" readOnly value={genericInviteLink} aria-label={t.groupDetail.inviteLinkTitle} />
+                                            <button className="btn btn--ghost btn--sm" onClick={() => void copyGenericInvite()}>
+                                                {copiedParticipantId === 'generic' ? t.groupDetail.inviteCopied : t.groupDetail.copyInvite}
+                                            </button>
+                                        </>
+                                    )}
+                                </>
+                            )}
+                        </div>
+                    )}
+                </section>
+                <section className="glass-card glass-card--static" style={{ padding: 'var(--space-5)' }}>
+                    <h3>{t.groupDetail.balancesTitle}</h3>
+                    {currencies.length === 0 ? <p>{t.groupDetail.allSettled}</p> : currencies.map((currency) => (
+                        <div key={currency} style={{ marginTop: 'var(--space-3)' }}>
+                            <strong>{currency}</strong>
+                            {Object.entries(state.balances[currency] ?? {}).map(([participantId, amount]) => (
+                                <div key={participantId}>{state.participants[participantId]?.displayName ?? participantId}: {(amount / 100).toFixed(2)}</div>
+                            ))}
+                            <div style={{ marginTop: 'var(--space-3)', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+                                {computeSettlements(new Map(
+                                    Object.entries(state.balances[currency] ?? {})
+                                        .map(([participantId, amount]) => [participantId as PublicKey, amount]),
+                                )).map((suggestion) => {
+                                    const key = `${currency}:${suggestion.from}:${suggestion.to}`;
+                                    const canRecord = myParticipant?.participantId === suggestion.from;
+                                    return (
+                                        <div key={key} style={{ fontSize: 'var(--font-size-sm)' }}>
+                                            {state.participants[suggestion.from]?.displayName} → {state.participants[suggestion.to]?.displayName}: {currency} {(suggestion.amount / 100).toFixed(2)}
+                                            {canRecord ? (
+                                                <button className="btn btn--secondary btn--sm" disabled={settling !== null} style={{ marginLeft: 'var(--space-2)' }} onClick={() => void settle(currency, suggestion.from, suggestion.to, suggestion.amount)}>
+                                                    {settling === key ? t.groupDetail.settling : t.groupDetail.markAsPaid}
+                                                </button>
+                                            ) : <div style={{ color: 'var(--text-tertiary)' }}>{t.groupDetail.payerMustSettle}</div>}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    ))}
+                    {settlementError && <p style={{ color: 'var(--danger)' }}>{settlementError}</p>}
+                </section>
+            </div>
+            <section className="glass-card glass-card--static" style={{ padding: 'var(--space-5)', marginBottom: 'var(--space-6)' }}>
+                <h3>{t.groupDetail.expensesTitle}</h3>
+                {expenses.length === 0 ? <p>{t.groupDetail.noExpenses}</p> : expenses.map((expense) => (
+                    <div key={expense.expenseId} style={{ marginTop: 'var(--space-3)', display: 'flex', justifyContent: 'space-between', gap: 'var(--space-3)' }}>
+                        <div>
+                            <strong>{String(expense.expense.description)}</strong>
+                            <div style={{ color: 'var(--text-secondary)' }}>
+                                {String(expense.expense.currency)} {(Number(expense.expense.amountMinorUnits) / 100).toFixed(2)} · {t.groupDetail.paidBy} {state.participants[String(expense.expense.paidBy)]?.displayName}
+                            </div>
+                        </div>
+                        <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+                            <Link className="btn btn--ghost btn--sm" to={`/group/${state.groupId}/expense?edit=${expense.expenseId}`}>Edit</Link>
+                            <button className="btn btn--danger btn--sm" onClick={() => void voidExpenseV2(state.groupId as GroupId, expense.expenseId, 'Expense removed')}>{t.groupDetail.voidExpense}</button>
+                        </div>
+                    </div>
+                ))}
+            </section>
+            <button className="btn btn--danger" onClick={() => void onDelete()}>{t.groupDetail.deleteGroup}</button>
         </div>
     );
 }
@@ -401,5 +674,3 @@ function getCurrency(entries: LedgerEntry[]): string {
     }
     return 'EUR';
 }
-
-

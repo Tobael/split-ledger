@@ -14,7 +14,7 @@ import {
 import {
     verifyDeviceAuthorization,
     verifyInviteSignature,
-    verifyRecoveryCoSignature,
+    verifyRootRotationAuthorization,
 } from './identity.js';
 import { computeBalances } from './balance.js';
 import type {
@@ -35,7 +35,6 @@ import type {
     GroupJoinedPayload, // New
     GroupLeftPayload,   // New
     PublicKey,
-    RootKeyRotationPayload,
     SelfRootKeyRotationPayload,
     SecretKey,
     UnsignedEntryFields,
@@ -188,17 +187,14 @@ function validateCreatorAuthorization(
     }
 
     if (entry.entryType === EntryType.DeviceAuthorized) {
-        console.log(`[Ledger] Validating DeviceAuthorized. creator: ${entry.creatorDevicePubkey}, payload.devicePublicKey: ${(entry.payload as any).devicePublicKey}`);
         if (entry.creatorDevicePubkey === (entry.payload as any).devicePublicKey) {
             // DeviceAuthorized is self-authorizing if the device is authorizing itself
-            console.log(`[Ledger] Device is self-authorizing, skipping owner check.`);
             return;
         }
     }
 
     const owner = findDeviceOwner(entry.creatorDevicePubkey, groupState);
     if (!owner) {
-        console.error(`[Ledger] Authorization failed for ${entry.entryType}. Creator: ${entry.creatorDevicePubkey}. Active members:`, Array.from(groupState.members.values()).filter(m => m.isActive).map(m => ({ root: m.rootPubkey, devices: Array.from(m.authorizedDevices) })));
         errors.push({
             field: 'creatorDevicePubkey',
             message: 'Device key not authorized by any active member',
@@ -251,9 +247,6 @@ function validatePayload(
             break;
         case EntryType.DeviceRevoked:
             validateDeviceRevokedPayload(entry.payload, groupState, errors);
-            break;
-        case EntryType.RootKeyRotation:
-            validateRootKeyRotationPayload(entry.payload, groupState, errors);
             break;
         case EntryType.SelfRootKeyRotation:
             validateSelfRootKeyRotationPayload(entry.payload, groupState, errors);
@@ -443,53 +436,6 @@ function validateDeviceRevokedPayload(
     }
 }
 
-function validateRootKeyRotationPayload(
-    payload: RootKeyRotationPayload,
-    state: GroupState,
-    errors: ValidationError[],
-): void {
-    if (!isActiveMember(payload.previousRootPubkey, state)) {
-        errors.push({ field: 'payload.previousRootPubkey', message: 'Previous root key is not an active member' });
-    }
-
-    // Count active members excluding the rotating member
-    let activeCount = 0;
-    for (const member of state.members.values()) {
-        if (member.isActive && member.rootPubkey !== payload.previousRootPubkey) {
-            activeCount++;
-        }
-    }
-    const threshold = Math.floor(activeCount / 2) + 1;
-
-    // Verify co-signatures
-    let validSigs = 0;
-    const seenSigners = new Set<PublicKey>();
-
-    for (const cs of payload.coSignatures) {
-        if (seenSigners.has(cs.signerRootPubkey)) continue; // no double-counting
-        if (!isActiveMember(cs.signerRootPubkey, state)) continue;
-        if (cs.signerRootPubkey === payload.previousRootPubkey) continue; // can't co-sign own recovery
-
-        if (verifyRecoveryCoSignature(
-            payload.previousRootPubkey,
-            payload.newRootPubkey,
-            state.groupId,
-            cs.signerRootPubkey,
-            cs.signature,
-        )) {
-            validSigs++;
-            seenSigners.add(cs.signerRootPubkey);
-        }
-    }
-
-    if (validSigs < threshold) {
-        errors.push({
-            field: 'payload.coSignatures',
-            message: `Insufficient co-signatures: ${validSigs}/${threshold} required`,
-        });
-    }
-}
-
 function validateSelfRootKeyRotationPayload(
     payload: SelfRootKeyRotationPayload,
     state: GroupState,
@@ -500,11 +446,10 @@ function validateSelfRootKeyRotationPayload(
     }
 
     // Verify self-signature: Signed by the OLD root key over the NEW root key
-    if (!verifyRecoveryCoSignature(
+    if (!verifyRootRotationAuthorization(
         payload.previousRootPubkey,
         payload.newRootPubkey,
         state.groupId,
-        payload.previousRootPubkey,
         payload.authorizationSignature,
     )) {
         errors.push({
@@ -555,11 +500,8 @@ export function applyEntry(entry: LedgerEntry, state: GroupState): void {
         case EntryType.DeviceRevoked:
             applyDeviceRevoked(entry.payload, state);
             break;
-        case EntryType.RootKeyRotation:
-            applyRootKeyRotation(entry.payload as RootKeyRotationPayload, entry, state);
-            break;
         case EntryType.SelfRootKeyRotation:
-            applyRootKeyRotation(entry.payload as SelfRootKeyRotationPayload, entry, state);
+            applyRootKeyRotation(entry.payload, entry, state);
             break;
         case EntryType.GroupJoined:
         case EntryType.GroupLeft:
@@ -630,7 +572,7 @@ function applyDeviceRevoked(payload: DeviceRevokedPayload, state: GroupState): v
     }
 }
 
-function applyRootKeyRotation(payload: RootKeyRotationPayload | SelfRootKeyRotationPayload, entry: LedgerEntry, state: GroupState): void {
+function applyRootKeyRotation(payload: SelfRootKeyRotationPayload, entry: LedgerEntry, state: GroupState): void {
     const oldMember = state.members.get(payload.previousRootPubkey);
     if (!oldMember) return;
 

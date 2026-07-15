@@ -17,23 +17,18 @@ import type {
 // ─── Server Message Types (matching ws-handler.ts) ───
 
 interface ServerNewEntry {
-    type: 'NEW_ENTRY';
+    type: 'OPERATION';
     groupId: string;
-    encryptedEntry: string;
-    lamportClock: number;
-    senderPubkey: string;
+    operationId: string;
+    encryptedOperation: string;
 }
 
 interface ServerEntriesResponse {
-    type: 'ENTRIES_RESPONSE';
+    type: 'OPERATIONS_RESPONSE';
     groupId: string;
-    entries: Array<{ encryptedEntry: string; lamportClock: number; senderPubkey: string }>;
-}
-
-interface ServerFullLedger {
-    type: 'FULL_LEDGER';
-    groupId: string;
-    entries: Array<{ encryptedEntry: string; lamportClock: number; senderPubkey: string }>;
+    operations: Array<{ cursor: number; operationId: string; encryptedOperation: string }>;
+    nextCursor: number;
+    hasMore: boolean;
 }
 
 interface ServerPong {
@@ -46,7 +41,7 @@ interface ServerError {
     message: string;
 }
 
-type ServerMessage = ServerNewEntry | ServerEntriesResponse | ServerFullLedger | ServerPong | ServerError;
+type ServerMessage = ServerNewEntry | ServerEntriesResponse | ServerPong | ServerError;
 
 // ─── Pending Request Tracker ───
 
@@ -56,10 +51,17 @@ interface PendingRequest<T> {
     timeout: ReturnType<typeof setTimeout>;
 }
 
+interface RelayPage {
+    entries: TransportEntry[];
+    nextCursor: number;
+    hasMore: boolean;
+}
+
 // ─── RelayTransport ───
 
 export interface RelayTransportOptions {
     url: string;
+    groupCapabilities?: Record<string, string>;
     reconnectIntervalMs?: number;
     pingIntervalMs?: number;
     requestTimeoutMs?: number;
@@ -71,6 +73,7 @@ export class RelayTransport implements Transport {
     private readonly reconnectIntervalMs: number;
     private readonly pingIntervalMs: number;
     private readonly requestTimeoutMs: number;
+    private readonly groupCapabilities = new Map<string, string>();
 
     private entryHandlers: OnEntryHandler[] = [];
     private connectionStateHandlers: OnConnectionStateHandler[] = [];
@@ -81,14 +84,16 @@ export class RelayTransport implements Transport {
     private pingTimer: ReturnType<typeof setInterval> | null = null;
 
     // Pending request/response tracking
-    private pendingGetEntries = new Map<string, PendingRequest<TransportEntry[]>>();
-    private pendingGetFull = new Map<string, PendingRequest<TransportEntry[]>>();
+    private pendingGetEntries = new Map<string, PendingRequest<RelayPage>>();
 
     constructor(options: RelayTransportOptions) {
         this.url = options.url;
         this.reconnectIntervalMs = options.reconnectIntervalMs ?? 5000;
         this.pingIntervalMs = options.pingIntervalMs ?? 30000;
         this.requestTimeoutMs = options.requestTimeoutMs ?? 10000;
+        for (const [groupId, capability] of Object.entries(options.groupCapabilities ?? {})) {
+            this.groupCapabilities.set(groupId, capability);
+        }
     }
 
     get connected(): boolean {
@@ -97,6 +102,16 @@ export class RelayTransport implements Transport {
 
     getConnectedGroups(): GroupId[] {
         return Array.from(this.connectedGroups);
+    }
+
+    setGroupCapability(groupId: GroupId, capability: string): void {
+        this.groupCapabilities.set(groupId, capability);
+    }
+
+    private capability(groupId: GroupId): string {
+        const capability = this.groupCapabilities.get(groupId);
+        if (!capability) throw new Error(`Missing relay group capability for ${groupId}`);
+        return capability;
     }
 
     // ─── Connection Management ───
@@ -111,6 +126,7 @@ export class RelayTransport implements Transport {
             this.send({
                 type: 'SUBSCRIBE',
                 groupId,
+                capability: this.capability(groupId),
             });
         }
     }
@@ -133,15 +149,27 @@ export class RelayTransport implements Transport {
 
     async publishEntry(groupId: GroupId, entry: TransportEntry): Promise<void> {
         this.send({
-            type: 'PUBLISH_ENTRY',
+            type: 'PUBLISH_OPERATION',
             groupId,
-            lamportClock: entry.lamportClock,
-            senderPubkey: entry.senderPubkey,
-            encryptedEntry: entry.encryptedEntry,
+            capability: this.capability(groupId),
+            operationId: entry.operationId,
+            encryptedOperation: entry.encryptedOperation,
         });
     }
 
-    async getEntriesAfter(groupId: GroupId, afterLamportClock: number): Promise<TransportEntry[]> {
+    async getOperations(groupId: GroupId): Promise<TransportEntry[]> {
+        const entries: TransportEntry[] = [];
+        let cursor = 0;
+        do {
+            const page = await this.requestPage(groupId, cursor);
+            entries.push(...page.entries);
+            cursor = page.nextCursor;
+            if (!page.hasMore) break;
+        } while (true);
+        return entries;
+    }
+
+    private requestPage(groupId: GroupId, cursor: number): Promise<RelayPage> {
         return new Promise((resolve, reject) => {
             const timeout = setTimeout(() => {
                 this.pendingGetEntries.delete(groupId);
@@ -151,25 +179,10 @@ export class RelayTransport implements Transport {
             this.pendingGetEntries.set(groupId, { resolve, reject, timeout });
 
             this.send({
-                type: 'GET_ENTRIES_AFTER',
+                type: 'GET_OPERATIONS',
                 groupId,
-                afterLamportClock,
-            });
-        });
-    }
-
-    async getFullLedger(groupId: GroupId): Promise<TransportEntry[]> {
-        return new Promise((resolve, reject) => {
-            const timeout = setTimeout(() => {
-                this.pendingGetFull.delete(groupId);
-                reject(new Error('Timeout waiting for FULL_LEDGER'));
-            }, this.requestTimeoutMs);
-
-            this.pendingGetFull.set(groupId, { resolve, reject, timeout });
-
-            this.send({
-                type: 'GET_FULL_LEDGER',
-                groupId,
+                capability: this.capability(groupId),
+                cursor,
             });
         });
     }
@@ -186,9 +199,9 @@ export class RelayTransport implements Transport {
 
     // ─── Internal ───
 
-    private async ensureConnection(groupId: GroupId): Promise<void> {
+    private async ensureConnection(_groupId: GroupId): Promise<void> {
         return new Promise((resolve, reject) => {
-            const wsUrl = `${this.url}?groupId=${encodeURIComponent(groupId)}`;
+            const wsUrl = this.url;
 
             try {
                 this.ws = new WebSocket(wsUrl);
@@ -234,6 +247,7 @@ export class RelayTransport implements Transport {
             this.send({
                 type: 'SUBSCRIBE',
                 groupId,
+                capability: this.capability(groupId),
             });
         }
     }
@@ -243,7 +257,7 @@ export class RelayTransport implements Transport {
         try {
             msg = JSON.parse(raw) as ServerMessage;
         } catch {
-            console.warn('[RelayTransport] Failed to parse message', raw);
+            console.warn('[RelayTransport] Rejected malformed server message');
             return;
         }
 
@@ -252,12 +266,10 @@ export class RelayTransport implements Transport {
                 // keepalive acknowledged
                 break;
 
-            case 'NEW_ENTRY': {
-                console.log(`[RelayTransport] Received NEW_ENTRY for group ${msg.groupId}, clock=${msg.lamportClock}, sender=${msg.senderPubkey.slice(0, 8)}`);
+            case 'OPERATION': {
                 const entry: TransportEntry = {
-                    encryptedEntry: msg.encryptedEntry,
-                    lamportClock: msg.lamportClock,
-                    senderPubkey: msg.senderPubkey,
+                    operationId: msg.operationId,
+                    encryptedOperation: msg.encryptedOperation,
                 };
                 for (const handler of this.entryHandlers) {
                     handler(msg.groupId as GroupId, entry);
@@ -265,40 +277,32 @@ export class RelayTransport implements Transport {
                 break;
             }
 
-            case 'ENTRIES_RESPONSE': {
-                console.log(`[RelayTransport] Received ENTRIES_RESPONSE for group ${msg.groupId}, count=${msg.entries.length}`);
+            case 'OPERATIONS_RESPONSE': {
                 const pending = this.pendingGetEntries.get(msg.groupId);
                 if (pending) {
                     clearTimeout(pending.timeout);
                     this.pendingGetEntries.delete(msg.groupId);
-                    pending.resolve(msg.entries);
-                }
-                break;
-            }
-
-            case 'FULL_LEDGER': {
-                console.log(`[RelayTransport] Received FULL_LEDGER for group ${msg.groupId}, count=${msg.entries.length}`);
-                const pending = this.pendingGetFull.get(msg.groupId);
-                if (pending) {
-                    clearTimeout(pending.timeout);
-                    this.pendingGetFull.delete(msg.groupId);
-                    pending.resolve(msg.entries);
+                    pending.resolve({
+                        entries: msg.operations.map((operation) => ({
+                            operationId: operation.operationId,
+                            encryptedOperation: operation.encryptedOperation,
+                            cursor: operation.cursor,
+                        })),
+                        nextCursor: msg.nextCursor,
+                        hasMore: msg.hasMore,
+                    });
                 }
                 break;
             }
 
             case 'ERROR':
-                console.error(`[RelayTransport] Server error: ${msg.code} — ${msg.message}`);
+                console.error(`[RelayTransport] Server error: ${msg.code}`);
                 break;
         }
     }
 
     private send(msg: unknown): void {
         if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-            const m = msg as { type: string; groupId?: string };
-            if (m.type !== 'PING') {
-                console.log(`[RelayTransport] Sending ${m.type} for ${m.groupId ?? 'unknown'}`);
-            }
             this.ws.send(JSON.stringify(msg));
         }
     }
@@ -347,11 +351,6 @@ export class RelayTransport implements Transport {
             pending.reject(new Error('Connection closed'));
         }
         this.pendingGetEntries.clear();
-        for (const [, pending] of this.pendingGetFull) {
-            clearTimeout(pending.timeout);
-            pending.reject(new Error('Connection closed'));
-        }
-        this.pendingGetFull.clear();
     }
 
     private emitConnectionState(state: 'connected' | 'disconnected' | 'reconnecting'): void {

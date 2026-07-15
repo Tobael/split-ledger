@@ -4,6 +4,7 @@
 
 import { z } from 'zod';
 import { EntryType } from './types.js';
+import type { LedgerEntry } from './types.js';
 
 // --- Branded string schemas -------------------------------------------------
 
@@ -29,6 +30,7 @@ export const expenseCreatedPayloadSchema = z.object({
     splits: z.record(publicKeySchema, z.number().int().nonnegative()),
     category: z.string().max(100).optional(),
     receiptHash: hashSchema.optional(),
+    isSettlement: z.boolean().optional(),
 });
 
 export const expenseVoidedPayloadSchema = z.object({
@@ -78,17 +80,6 @@ export const deviceRevokedPayloadSchema = z.object({
     reason: z.string().min(1).max(500),
 });
 
-const coSignatureSchema = z.object({
-    signerRootPubkey: publicKeySchema,
-    signature: signatureSchema,
-});
-
-export const rootKeyRotationPayloadSchema = z.object({
-    previousRootPubkey: publicKeySchema,
-    newRootPubkey: publicKeySchema,
-    coSignatures: z.array(coSignatureSchema).min(1),
-});
-
 export const selfRootKeyRotationPayloadSchema = z.object({
     previousRootPubkey: publicKeySchema,
     newRootPubkey: publicKeySchema,
@@ -131,7 +122,6 @@ export const payloadSchemas: Record<EntryType, z.ZodType> = {
     [EntryType.MemberRenamed]: memberRenamedPayloadSchema,
     [EntryType.DeviceAuthorized]: deviceAuthorizedPayloadSchema,
     [EntryType.DeviceRevoked]: deviceRevokedPayloadSchema,
-    [EntryType.RootKeyRotation]: rootKeyRotationPayloadSchema,
     [EntryType.SelfRootKeyRotation]: selfRootKeyRotationPayloadSchema,
     [EntryType.GroupJoined]: groupJoinedPayloadSchema,
     [EntryType.GroupLeft]: groupLeftPayloadSchema,
@@ -148,4 +138,10 @@ export function validateEntryStructure(entry: unknown): z.infer<typeof ledgerEnt
         base.payload = payloadSchema.parse(base.payload);
     }
     return base as z.infer<typeof ledgerEntryBaseSchema> & { payload: unknown };
+}
+
+/** Parse untrusted JSON bytes and validate the complete v1 entry structure. */
+export function parseLedgerEntry(bytes: Uint8Array): LedgerEntry {
+    const decoded: unknown = JSON.parse(new TextDecoder().decode(bytes));
+    return validateEntryStructure(decoded) as LedgerEntry;
 }

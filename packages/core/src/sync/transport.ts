@@ -3,19 +3,19 @@
 // =============================================================================
 //
 // Abstract interface for peer communication.
-// Implementations: RelayTransport (WebSocket), P2PTransport (libp2p, future)
+// Implemented by the authenticated WebSocket relay transport.
 //
 
 import type { GroupId } from '../types.js';
 
-/** A single encrypted entry as exchanged over the network */
+/** A single opaque encrypted operation as exchanged over the network. */
 export interface TransportEntry {
-    encryptedEntry: string; // base64-encoded encrypted data
-    lamportClock: number;
-    senderPubkey: string;
+    operationId: string;
+    encryptedOperation: string;
+    cursor?: number;
 }
 
-/** Handler for incoming entries */
+/** Handler for incoming operations. */
 export type OnEntryHandler = (groupId: GroupId, entry: TransportEntry) => void;
 
 /** Handler for connection state changes */
@@ -23,7 +23,7 @@ export type OnConnectionStateHandler = (state: 'connected' | 'disconnected' | 'r
 
 /**
  * Transport interface — abstraction over the communication channel.
- * All methods are async to accommodate both WebSocket and P2P transports.
+ * The implementation uses the authenticated WebSocket relay protocol.
  */
 export interface Transport {
     /** Connect to the transport for a specific group */
@@ -35,16 +35,13 @@ export interface Transport {
     /** Disconnect from all groups */
     disconnectAll(): Promise<void>;
 
-    /** Publish an encrypted entry to a group */
+    /** Publish an encrypted operation to a group. */
     publishEntry(groupId: GroupId, entry: TransportEntry): Promise<void>;
 
-    /** Fetch entries after a given Lamport clock */
-    getEntriesAfter(groupId: GroupId, afterLamportClock: number): Promise<TransportEntry[]>;
+    /** Fetch every currently available operation through cursor pagination. */
+    getOperations(groupId: GroupId): Promise<TransportEntry[]>;
 
-    /** Fetch the full ledger for initial sync */
-    getFullLedger(groupId: GroupId): Promise<TransportEntry[]>;
-
-    /** Register handler for incoming entries */
+    /** Register a handler for incoming operations. */
     onEntry(handler: OnEntryHandler): void;
 
     /** Register handler for connection state changes */

@@ -44,6 +44,11 @@ export function generateKeyPair(): Ed25519KeyPair {
     };
 }
 
+/** Generate cryptographically secure random bytes on every supported host. */
+export function generateRandomBytes(length: number): Uint8Array {
+    return etc.randomBytes(length);
+}
+
 // =============================================================================
 // Signing & Verification
 // =============================================================================

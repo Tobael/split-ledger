@@ -69,7 +69,7 @@ export function IdentityImport({ onCancel }: { onCancel: () => void }) {
 
         startScanning();
 
-        function onScanSuccess(decodedText: string) {
+        async function onScanSuccess(decodedText: string) {
             if (!isScanningRef.current) return;
 
             try {
@@ -79,7 +79,7 @@ export function IdentityImport({ onCancel }: { onCancel: () => void }) {
                     return;
                 }
 
-                importIdentity(decodedText);
+                await importIdentity(decodedText);
 
                 // Stop scanning immediately on success
                 isScanningRef.current = false;
@@ -107,7 +107,7 @@ export function IdentityImport({ onCancel }: { onCancel: () => void }) {
                 scanner.clear();
             }
         };
-    }, [importIdentity, navigate, t]);
+    }, [importIdentity, navigate, t, location.pathname, location.search]);
 
     return (
         <div className="glass-card glass-card--static animate-fade-in" style={{ padding: 'var(--space-6)', width: '100%', maxWidth: '400px' }}>

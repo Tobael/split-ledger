@@ -1,13 +1,13 @@
 # Fair Money
 
-**Cryptographically secure, peer-to-peer expense splitting (Split Ledger).**
+**Private, offline-first expense splitting with a signed operation history.**
 
-Fair Money is a privacy-first application for managing shared expenses. It uses end-to-end encryption and a tamper-evident hash chain to ensure that your financial data remains yours. No accounts, no central servers reading your data, just math.
+Fair Money is a privacy-first application for managing shared expenses. It uses end-to-end encryption and signed, tamper-evident operations so relay servers cannot read group contents or forge valid changes.
 
 ## Features
 
 -   **🔒 End-to-End Encrypted**: Data is encrypted on your device before it ever touches the network.
--   **🛡️ Tamper-Evident**: Uses a blockchain-like hash chain to prevent history rewriting.
+-   **🛡️ Tamper-Evident**: Uses signed, content-addressed operations to detect unauthorized history changes.
 -   **👤 No Accounts**: Identity is a cryptographic key pair generated locally.
 -   **⚡ Real-Time Sync**: Syncs instantly across devices via a relay server (WebSocket).
 -   **📱 Offline First**: Works fully offline; syncs when you reconnect.
@@ -16,11 +16,15 @@ Fair Money is a privacy-first application for managing shared expenses. It uses 
 
 We believe in transparency. Here is exactly how the security and synchronization work:
 
+-   [**Product & Re-architecture Plan**](docs/design/14-product-rearchitecture-plan.md) - Current handoff for the web, Tauri, invitation, participant-slot, relay, and recovery direction.
+-   [**Protocol v2 Specification**](docs/protocol/v2/README.md) - Normative signed-operation format, authorization rules, and compatibility vectors.
 -   [**Architecture & Design**](docs/design/01-architecture.md)
 -   [**User Flow: Group Creation**](docs/flows/01-group-creation.md) - How keys and groups are securely born.
 -   [**User Flow: Invitation & Join**](docs/flows/02-invitation-join.md) - How we securely invite others without exposing keys.
 -   [**User Flow: Adding Expenses**](docs/flows/03-adding-expense.md) - How the ledger ensures integrity and ordering.
 -   [**User Flow: Synchronization**](docs/flows/04-synchronization.md) - How devices stay in sync via an untrusted relay.
+-   [**Self-hosting a Relay**](docs/relay-self-hosting.md) - Reference Compose deployment, configuration, backups, retention, and upgrades.
+-   [**Manual Web Release Test Plan**](docs/manual-web-test-plan.md) - Cross-device, invitation, relay-recovery, transfer, and iOS checks required before Tauri work.
 
 ## Quick Start (Development)
 

@@ -29,13 +29,3 @@ export {
     type SyncEventType,
     type SyncEventHandler,
 } from './sync-manager.js';
-
-export {
-    P2PTransport,
-    type P2PTransportOptions,
-} from './p2p-transport.js';
-
-export {
-    CompositeTransport,
-    type CompositeTransportOptions,
-} from './composite-transport.js';

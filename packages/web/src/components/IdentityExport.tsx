@@ -1,21 +1,20 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { useApp } from '../context/AppContext';
 import { useI18n } from '../i18n';
 
 export function IdentityExport() {
-    const { identity } = useApp();
+    const { identity, exportIdentityTransferV2 } = useApp();
     const { t } = useI18n();
     const [showSecret, setShowSecret] = useState(false);
+    const [payload, setPayload] = useState('');
+
+    useEffect(() => {
+        if (!showSecret) return;
+        void exportIdentityTransferV2().then(setPayload);
+    }, [exportIdentityTransferV2, showSecret]);
 
     if (!identity) return null;
-
-    // Export payload: { rootSecretKey, rootPublicKey, displayName }
-    const payload = JSON.stringify({
-        rootSecretKey: identity.rootKeyPair.secretKey,
-        rootPublicKey: identity.rootKeyPair.publicKey,
-        displayName: identity.displayName,
-    });
 
     return (
         <div className="glass-card glass-card--static" style={{ padding: 'var(--space-6)', textAlign: 'center' }}>
@@ -36,7 +35,7 @@ export function IdentityExport() {
                         {t.settings?.revealQr ?? 'Reveal QR Code'}
                     </button>
                 </div>
-            ) : (
+            ) : payload ? (
                 <div className="animate-fade-in">
                     <div style={{
                         padding: 'var(--space-4)',
@@ -56,7 +55,7 @@ export function IdentityExport() {
                         {t.settings?.keepPrivate ?? 'Keep this screen private!'}
                     </p>
                 </div>
-            )}
+            ) : <p>{t.common.loading}</p>}
         </div>
     );
 }

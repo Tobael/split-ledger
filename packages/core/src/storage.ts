@@ -73,6 +73,11 @@ export class InMemoryStorageAdapter implements StorageAdapter {
         return this.deviceIdentity;
     }
 
+    async clearIdentity(): Promise<void> {
+        this.rootIdentity = null;
+        this.deviceIdentity = null;
+    }
+
     // --- Group metadata ---
 
     async getGroupIds(): Promise<GroupId[]> {

@@ -1,0 +1,108 @@
+{
+  "protocolVersion": 2,
+  "description": "Deterministic projection vectors over operations that have already passed structural, cryptographic, causal, and authorization validation.",
+  "cases": [
+    {
+      "name": "concurrent slot claims choose the lowest operation tuple",
+      "projection": "participantClaim",
+      "operations": [
+        {
+          "operationId": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "lamportClock": 3,
+          "payload": {
+            "type": "ParticipantSlotClaimed",
+            "participantId": "018cc251-f400-7000-8000-000000000003",
+            "claimantRootPublicKey": "2222222222222222222222222222222222222222222222222222222222222222"
+          }
+        },
+        {
+          "operationId": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "lamportClock": 3,
+          "payload": {
+            "type": "ParticipantSlotClaimed",
+            "participantId": "018cc251-f400-7000-8000-000000000003",
+            "claimantRootPublicKey": "1111111111111111111111111111111111111111111111111111111111111111"
+          }
+        }
+      ],
+      "expected": {
+        "participantId": "018cc251-f400-7000-8000-000000000003",
+        "claimedRootPublicKey": "1111111111111111111111111111111111111111111111111111111111111111",
+        "winningOperationId": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    },
+    {
+      "name": "greatest correction tuple determines effective expense",
+      "projection": "expense",
+      "operations": [
+        {
+          "operationId": "1000000000000000000000000000000000000000000000000000000000000000",
+          "lamportClock": 4,
+          "payload": {
+            "type": "ExpenseCreated",
+            "expenseId": "018cc251-f400-7000-8000-000000000010",
+            "expense": { "description": "Dinner", "amountMinorUnits": 6000, "currency": "EUR", "paidBy": "018cc251-f400-7000-8000-000000000002", "splits": { "018cc251-f400-7000-8000-000000000002": 3000, "018cc251-f400-7000-8000-000000000003": 3000 } }
+          }
+        },
+        {
+          "operationId": "2000000000000000000000000000000000000000000000000000000000000000",
+          "lamportClock": 5,
+          "payload": {
+            "type": "ExpenseCorrected",
+            "expenseId": "018cc251-f400-7000-8000-000000000010",
+            "expense": { "description": "Dinner and tip", "amountMinorUnits": 6600, "currency": "EUR", "paidBy": "018cc251-f400-7000-8000-000000000002", "splits": { "018cc251-f400-7000-8000-000000000002": 3300, "018cc251-f400-7000-8000-000000000003": 3300 } }
+          }
+        },
+        {
+          "operationId": "3000000000000000000000000000000000000000000000000000000000000000",
+          "lamportClock": 5,
+          "payload": {
+            "type": "ExpenseCorrected",
+            "expenseId": "018cc251-f400-7000-8000-000000000010",
+            "expense": { "description": "Dinner corrected", "amountMinorUnits": 6400, "currency": "EUR", "paidBy": "018cc251-f400-7000-8000-000000000002", "splits": { "018cc251-f400-7000-8000-000000000002": 3200, "018cc251-f400-7000-8000-000000000003": 3200 } }
+          }
+        }
+      ],
+      "expected": {
+        "expenseId": "018cc251-f400-7000-8000-000000000010",
+        "status": "effective",
+        "effectiveOperationId": "3000000000000000000000000000000000000000000000000000000000000000",
+        "expense": { "description": "Dinner corrected", "amountMinorUnits": 6400, "currency": "EUR", "paidBy": "018cc251-f400-7000-8000-000000000002", "splits": { "018cc251-f400-7000-8000-000000000002": 3200, "018cc251-f400-7000-8000-000000000003": 3200 } }
+      }
+    },
+    {
+      "name": "an accepted void permanently dominates corrections",
+      "projection": "expense",
+      "operations": [
+        {
+          "operationId": "4000000000000000000000000000000000000000000000000000000000000000",
+          "lamportClock": 8,
+          "payload": {
+            "type": "ExpenseCreated",
+            "expenseId": "018cc251-f400-7000-8000-000000000011",
+            "expense": { "description": "Taxi", "amountMinorUnits": 2500, "currency": "EUR", "paidBy": "018cc251-f400-7000-8000-000000000002", "splits": { "018cc251-f400-7000-8000-000000000002": 1250, "018cc251-f400-7000-8000-000000000003": 1250 } }
+          }
+        },
+        {
+          "operationId": "5000000000000000000000000000000000000000000000000000000000000000",
+          "lamportClock": 9,
+          "payload": {
+            "type": "ExpenseCorrected",
+            "expenseId": "018cc251-f400-7000-8000-000000000011",
+            "expense": { "description": "Taxi corrected", "amountMinorUnits": 2600, "currency": "EUR", "paidBy": "018cc251-f400-7000-8000-000000000002", "splits": { "018cc251-f400-7000-8000-000000000002": 1300, "018cc251-f400-7000-8000-000000000003": 1300 } }
+          }
+        },
+        {
+          "operationId": "6000000000000000000000000000000000000000000000000000000000000000",
+          "lamportClock": 9,
+          "payload": { "type": "ExpenseVoided", "expenseId": "018cc251-f400-7000-8000-000000000011" }
+        }
+      ],
+      "expected": {
+        "expenseId": "018cc251-f400-7000-8000-000000000011",
+        "status": "void",
+        "voidOperationId": "6000000000000000000000000000000000000000000000000000000000000000"
+      }
+    }
+  ]
+}

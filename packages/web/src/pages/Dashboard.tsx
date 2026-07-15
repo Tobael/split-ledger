@@ -46,13 +46,13 @@ export function Dashboard() {
                                                     const decryptedJson = await decryptIdentity(content, pwd);
                                                     const imported = JSON.parse(decryptedJson);
 
-                                                    if (imported && imported.rootKeyPair) {
-                                                        importIdentityFromJson(decryptedJson);
+                                                    if (imported?.format === 'fair-money-identity-transfer' && imported.version === 2) {
+                                                        await importIdentityFromJson(decryptedJson);
                                                         // Page will likely reload or refresh AppContext state implicitly
                                                     } else {
                                                         throw new Error("Invalid identity file structure");
                                                     }
-                                                } catch (err) {
+                                                } catch {
                                                     alert(t.settings?.importError ?? "Invalid file or password");
                                                 }
                                             }

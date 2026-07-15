@@ -1,84 +1,35 @@
-# 9. Recommended Libraries
+# Library decisions
 
-## Core Platform
+Dependencies are implementation tools, not protocol definitions. Signed bytes and validation behavior must be specified independently and covered by test vectors.
 
-| Library | Purpose | Why |
-|---------|---------|-----|
-| [Expo SDK 52+](https://expo.dev) | Cross-platform framework | Unified build for iOS/Android/Web; managed workflow reduces native config |
-| [React Native 0.76+](https://reactnative.dev) | UI runtime | Expo's underlying engine |
-| [TypeScript 5.5+](https://typescriptlang.org) | Type safety | Strict mode catches data model errors at compile time |
+## Current baseline
 
-## Cryptography
+| Area | Choice | Reason |
+|---|---|---|
+| Shared UI | React, React Router, Vite | Existing working web application and reusable Tauri frontend |
+| Language | TypeScript | Shared browser, core, and relay implementation |
+| Validation | Zod | Strict runtime validation at trust boundaries |
+| Cryptography | Noble packages and Web Crypto | Auditable primitives with browser support |
+| Tests | Vitest and fast-check | Unit, integration, and property testing |
+| Relay HTTP | Hono | Small cross-runtime HTTP layer |
+| Relay realtime | `ws` | WebSocket transport |
+| Relay database | `better-sqlite3` | Simple self-hosted single-instance persistence |
 
-| Library | Purpose | Why |
-|---------|---------|-----|
-| [@noble/ed25519](https://github.com/paulmillr/noble-ed25519) | Ed25519 sign/verify | Pure JS, audited, zero dependencies, works in all environments |
-| [@noble/hashes](https://github.com/paulmillr/noble-hashes) | SHA-256, HKDF | Same author, same audit, consistent API |
-| [@noble/curves](https://github.com/paulmillr/noble-curves) | X25519 ECDH key exchange | For encrypting entries for relay storage |
+## Target additions
 
-> [!IMPORTANT]
-> The `noble` family is chosen over `tweetnacl` or `libsodium` because it is **pure TypeScript**, **audited**, and requires **no WASM or native modules** — critical for React Native + Web portability. It also has active maintenance and comprehensive test vectors.
+| Area | Preferred choice | Notes |
+|---|---|---|
+| Native host | Tauri 2 | Wrap the same Vite/React frontend |
+| Native links | Tauri deep-link plugin | iOS Universal Links and Android App Links |
+| Native ledger | Tauri SQL plugin with SQLite | Must pass storage contract tests |
+| Native secrets | OS-backed store through a reviewed Tauri plugin | Keep root secrets out of normal SQL/preferences |
+| Web operation set | IndexedDB through `OperationStorageV2` | Clean v2-only database; projection state is derived rather than authoritative |
+| Browser E2E | Playwright | Web join, persistence, offline, and sync flows |
 
-## Storage
+## Selection rules
 
-| Library | Purpose | Why |
-|---------|---------|-----|
-| [expo-sqlite](https://docs.expo.dev/versions/latest/sdk/sqlite/) | SQLite on native | Expo-managed, synchronous API, WAL mode support |
-| [idb](https://github.com/nicedoc/idb) | IndexedDB wrapper (web) | Promise-based, tiny, well-maintained |
-
-## Networking
-
-| Library | Purpose | Why |
-|---------|---------|-----|
-| [@libp2p/webrtc](https://github.com/libp2p/js-libp2p) | P2P data channels | Battle-tested WebRTC transport with NAT traversal; works in browser |
-| [js-libp2p](https://github.com/libp2p/js-libp2p) | P2P framework | Modular: use only WebRTC transport + peer discovery |
-| [ws](https://github.com/websockets/ws) (server) | WebSocket server | Fastest Node.js WebSocket implementation |
-| [react-native-url-polyfill](https://github.com/nicedoc/react-native-url-polyfill) | URL parsing | Polyfill for consistent URL handling across platforms |
-
-## Serialization & Validation
-
-| Library | Purpose | Why |
-|---------|---------|-----|
-| [zod](https://github.com/colinhacks/zod) | Runtime schema validation | Validates entry payloads at trust boundaries; TypeScript-first |
-| [canonicalize](https://www.npmjs.com/package/canonicalize) | RFC 8785 JSON canonicalization | Deterministic serialization for hashing/signing |
-
-## State Management
-
-| Library | Purpose | Why |
-|---------|---------|-----|
-| [zustand](https://github.com/pmndrs/zustand) | Client state management | Lightweight, React-compatible, no boilerplate |
-| [react-query / TanStack Query](https://tanstack.com/query) | Async state (sync status, relay connection) | Caching, retry logic, background refetch |
-
-## UI Components
-
-| Library | Purpose | Why |
-|---------|---------|-----|
-| [react-native-paper](https://callstack.github.io/react-native-paper/) or [tamagui](https://tamagui.dev) | Cross-platform UI kit | Material Design 3 compliance; works on Web + native |
-| [expo-camera](https://docs.expo.dev/versions/latest/sdk/camera/) | Receipt capture | Native camera integration |
-| [expo-secure-store](https://docs.expo.dev/versions/latest/sdk/securestore/) | Key storage (native) | Hardware-backed Keychain/Keystore |
-| [react-native-qrcode-svg](https://github.com/nicedoc/react-native-qrcode-svg) | QR codes for device auth | Render QR codes for key exchange |
-| [expo-barcode-scanner](https://docs.expo.dev/versions/latest/sdk/bar-code-scanner/) | QR scanning | Scan device auth QR codes |
-
-## Relay Server
-
-| Library | Purpose | Why |
-|---------|---------|-----|
-| [Hono](https://hono.dev) | HTTP framework | Ultra-fast, works with Node/Bun/Deno, tiny bundle |
-| [Drizzle ORM](https://orm.drizzle.team) | PostgreSQL ORM | TypeScript-first, SQL-like, excellent migrations |
-| [ioredis](https://github.com/redis/ioredis) | Redis client | Pub/sub for real-time message forwarding |
-
-## Testing
-
-| Library | Purpose | Why |
-|---------|---------|-----|
-| [vitest](https://vitest.dev) | Unit & integration tests | Fast, native TypeScript, compatible with Jest API |
-| [fast-check](https://github.com/dubzzz/fast-check) | Property-based testing | Critical for testing ledger validation edge cases |
-| [Detox](https://wix.github.io/Detox/) | E2E testing (native) | gray-box testing for React Native |
-| [Playwright](https://playwright.dev) | E2E testing (web) | Cross-browser testing |
-
-## Development
-
-| Library | Purpose | Why |
-|---------|---------|-----|
-| [turborepo](https://turbo.build) | Monorepo management | Fast builds, workspace-aware caching |
-| [changesets](https://github.com/changesets/changesets) | Versioning | If publishing shared packages |
+- Prefer maintained packages supporting the project's declared Node and browser versions.
+- Pin native dependencies deliberately and allow required install scripts explicitly.
+- libp2p, WebRTC, and the composite transport were deleted. Do not reintroduce them until a measured requirement justifies the complexity.
+- Do not move protocol correctness into an ORM, UI framework, or platform plugin.
+- Review licenses and security posture before adoption.

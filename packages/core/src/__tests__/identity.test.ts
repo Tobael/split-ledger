@@ -10,8 +10,8 @@ import {
     verifyDeviceAuthorization,
     createInviteToken,
     verifyInviteSignature,
-    createRecoveryCoSignature,
-    verifyRecoveryCoSignature,
+    createRootRotationAuthorization,
+    verifyRootRotationAuthorization,
     generateGroupId,
 } from '../identity.js';
 import { generateKeyPair } from '../crypto.js';
@@ -107,56 +107,49 @@ describe('IdentityManager', () => {
         });
     });
 
-    describe('RecoveryCoSignature', () => {
-        it('creates and verifies co-signature', () => {
+    describe('RootRotationAuthorization', () => {
+        it('creates and verifies self-owned authorization', () => {
             const old = generateKeyPair();
             const newKey = generateKeyPair();
-            const signer = generateKeyPair();
             const groupId = generateGroupId();
 
-            const coSig = createRecoveryCoSignature(
+            const authorization = createRootRotationAuthorization(
                 old.publicKey,
                 newKey.publicKey,
                 groupId,
-                signer.secretKey,
-                signer.publicKey,
+                old.secretKey,
             );
 
-            expect(coSig.signerRootPubkey).toBe(signer.publicKey);
             expect(
-                verifyRecoveryCoSignature(
+                verifyRootRotationAuthorization(
                     old.publicKey,
                     newKey.publicKey,
                     groupId,
-                    coSig.signerRootPubkey,
-                    coSig.signature,
+                    authorization,
                 ),
             ).toBe(true);
         });
 
-        it('rejects tampered co-signature', () => {
+        it('rejects a tampered target key', () => {
             const old = generateKeyPair();
             const newKey = generateKeyPair();
             const fakeNew = generateKeyPair();
-            const signer = generateKeyPair();
             const groupId = generateGroupId();
 
-            const coSig = createRecoveryCoSignature(
+            const authorization = createRootRotationAuthorization(
                 old.publicKey,
                 newKey.publicKey,
                 groupId,
-                signer.secretKey,
-                signer.publicKey,
+                old.secretKey,
             );
 
             // Verify with wrong newRootPubkey
             expect(
-                verifyRecoveryCoSignature(
+                verifyRootRotationAuthorization(
                     old.publicKey,
                     fakeNew.publicKey,
                     groupId,
-                    coSig.signerRootPubkey,
-                    coSig.signature,
+                    authorization,
                 ),
             ).toBe(false);
         });

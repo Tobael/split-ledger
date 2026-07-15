@@ -1,0 +1,23 @@
+{
+  "protocolVersion": 2,
+  "description": "Canonicalization, operation ID, and Ed25519 signature vector using RFC 8032 test key 1",
+  "secretKey": "9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60",
+  "unsignedOperation": {
+    "actorPublicKey": "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a",
+    "createdAt": 1767225600000,
+    "groupId": "018cc251-f400-7000-8000-000000000001",
+    "lamportClock": 0,
+    "parents": [],
+    "payload": {
+      "creatorDisplayName": "Alice",
+      "creatorParticipantId": "018cc251-f400-7000-8000-000000000002",
+      "groupName": "Ski Trip",
+      "type": "GroupCreated"
+    },
+    "protocolVersion": 2
+  },
+  "canonicalUtf8": "{\"actorPublicKey\":\"d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a\",\"createdAt\":1767225600000,\"groupId\":\"018cc251-f400-7000-8000-000000000001\",\"lamportClock\":0,\"parents\":[],\"payload\":{\"creatorDisplayName\":\"Alice\",\"creatorParticipantId\":\"018cc251-f400-7000-8000-000000000002\",\"groupName\":\"Ski Trip\",\"type\":\"GroupCreated\"},\"protocolVersion\":2}",
+  "operationId": "71a698dcccca876126656f70ab2549f555c1515436a1eb249d2c3ababe30298d",
+  "signingMessage": "fair-money:v2:operation:71a698dcccca876126656f70ab2549f555c1515436a1eb249d2c3ababe30298d",
+  "signature": "08f67ca7af54f40783b2a035ceea291493088704bc8282162d87a07516828ea23673eb0fdf358147b3326f4c507be5993fd654fd86c8d82aac758dd5be1e890f"
+}

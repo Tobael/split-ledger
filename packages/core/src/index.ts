@@ -5,7 +5,6 @@
 // Types
 export type {
     ChainValidationResult,
-    CoSignature,
     DeviceAuthorizedPayload,
     DeviceIdentity,
     DeviceKeyAuthorization,
@@ -28,7 +27,6 @@ export type {
     PayloadMap,
     PublicKey,
     RootIdentity,
-    RootKeyRotationPayload,
     SecretKey,
     Signature,
     StorageAdapter,
@@ -44,6 +42,7 @@ export {
     canonicalize,
     computeEntryId,
     generateKeyPair,
+    generateRandomBytes,
     hash,
     sign,
     signEntryId,
@@ -56,12 +55,12 @@ export {
     createDeviceAuthorization,
     createDeviceIdentity,
     createInviteToken,
-    createRecoveryCoSignature,
+    createRootRotationAuthorization,
     createRootIdentity,
     generateGroupId,
     verifyDeviceAuthorization,
     verifyInviteSignature,
-    verifyRecoveryCoSignature,
+    verifyRootRotationAuthorization,
 } from './identity.js';
 
 // Ledger
@@ -87,6 +86,7 @@ export { InMemoryStorageAdapter } from './storage.js';
 
 // Schemas
 export {
+    parseLedgerEntry,
     validateEntryStructure,
     genesisPayloadSchema,
     expenseCreatedPayloadSchema,
@@ -95,7 +95,7 @@ export {
     memberRemovedPayloadSchema,
     deviceAuthorizedPayloadSchema,
     deviceRevokedPayloadSchema,
-    rootKeyRotationPayloadSchema,
+    selfRootKeyRotationPayloadSchema,
     ledgerEntryBaseSchema,
 } from './schemas.js';
 
@@ -108,8 +108,6 @@ export {
     deserializeEntry,
     RelayTransport,
     SyncManager,
-    P2PTransport,
-    CompositeTransport,
 } from './sync/index.js';
 
 export type {
@@ -122,8 +120,6 @@ export type {
     SyncEvent,
     SyncEventType,
     SyncEventHandler,
-    P2PTransportOptions,
-    CompositeTransportOptions,
 } from './sync/index.js';
 
 // Group Manager
@@ -147,12 +143,5 @@ export type {
     InviteLinkData,
 } from './invite-link.js';
 
-// Recovery
-export {
-    RecoveryManager,
-} from './recovery-manager.js';
-
-export type {
-    RecoveryRequest,
-    RecoveryManagerOptions,
-} from './recovery-manager.js';
+// Protocol v2
+export * from './protocol-v2/index.js';

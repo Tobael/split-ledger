@@ -1,13 +1,18 @@
 name: deploy
 on:
-  push:
+  workflow_run:
+    workflows:
+      - ci
+    types:
+      - completed
     branches:
       - main
 jobs:
   deploy:
+    if: github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     steps:
-      - run: sudo apt install wireguard
+      - run: sudo apt-get update && sudo apt-get install --yes wireguard
       - run: echo "${{ secrets.WIREGUARD_CONF }}" > wireguard.conf
       - run: sudo ln -s /usr/bin/resolvectl /usr/local/bin/resolvconf
       - run: sudo wg-quick up ./wireguard.conf
@@ -24,17 +29,10 @@ jobs:
         run: ssh-keyscan -T 20 -H ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts
       - name: Checkout project
         uses: actions/checkout@v4
-      - name: Deploy with rsync
-        run: rsync -avz ./ ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/home/${{ secrets.SSH_USER }}/splitledger/
-      - name: Build and start services
-        uses: appleboy/ssh-action@master
         with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.DEPLOY_SECRET_KEY }}
-          port: 22
-          script: |
-            cd splitledger
-            echo "SPLITLEDGER_DOMAIN=${{ secrets.SPLITLEDGER_DOMAIN }}" > .env
-            echo "SPLITLEDGER_RELAY_DOMAIN=${{ secrets.SPLITLEDGER_RELAY_DOMAIN }}" >> .env
-            docker compose up -d --build --remove-orphans
+          ref: ${{ github.event.workflow_run.head_sha }}
+      - name: Deploy with rsync
+        run: rsync -avz --delete --exclude .git --exclude .env --exclude node_modules --exclude dist ./ ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/home/${{ secrets.SSH_USER }}/splitledger/
+      - name: Build and start services
+        run: |
+          ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "cd splitledger && printf '%s\n' 'SPLITLEDGER_DOMAIN=${{ secrets.SPLITLEDGER_DOMAIN }}' 'SPLITLEDGER_RELAY_DOMAIN=${{ secrets.SPLITLEDGER_RELAY_DOMAIN }}' > .env && docker compose up -d --build --remove-orphans && docker compose ps"

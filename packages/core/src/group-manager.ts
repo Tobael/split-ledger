@@ -7,9 +7,9 @@
 //
 
 import type {
-    CoSignature,
     DeviceIdentity,
     Ed25519KeyPair,
+    ExpenseCreatedPayload,
     GroupId,
     GroupState,
     Hash,
@@ -29,10 +29,9 @@ import {
     verifyInviteSignature,
     generateGroupId,
     createDeviceAuthorization,
-    createRecoveryCoSignature,
+    createRootRotationAuthorization,
 } from './identity.js';
 import { serializeInviteLink, parseInviteLink, type InviteLinkData } from './invite-link.js';
-import { RecoveryManager, type RecoveryRequest } from './recovery-manager.js';
 
 // ─── Types ───
 
@@ -428,50 +427,6 @@ export class GroupManager {
         }
     }
 
-    // ═══════════════════════════════════════════════════════════════════════
-    // Recovery (delegates to RecoveryManager)
-    // ═══════════════════════════════════════════════════════════════════════
-
-    /**
-     * Initiate a root key recovery ceremony.
-     * Returns a RecoveryRequest to share with group members.
-     */
-    initiateRecovery(groupId: GroupId, previousRootPubkey?: PublicKey): RecoveryRequest {
-        return this.getRecoveryManager().initiateRecovery(groupId, previousRootPubkey);
-    }
-
-    /**
-     * Create a co-signature to help another member recover their root key.
-     */
-    contributeRecoverySignature(request: RecoveryRequest): CoSignature {
-        return this.getRecoveryManager().createCoSignature(request);
-    }
-
-    /**
-     * Complete a recovery ceremony with collected co-signatures.
-     */
-    async completeRecovery(
-        request: RecoveryRequest,
-        coSignatures: CoSignature[],
-    ): Promise<LedgerEntry> {
-        return this.getRecoveryManager().completeRecovery(request, coSignatures);
-    }
-
-    /**
-     * Get the recovery threshold for a group.
-     */
-    async getRecoveryThreshold(groupId: GroupId, recoveringMember: PublicKey): Promise<number> {
-        return this.getRecoveryManager().getRecoveryThreshold(groupId, recoveringMember);
-    }
-
-    private getRecoveryManager(): RecoveryManager {
-        return new RecoveryManager({
-            storage: this.storage,
-            deviceIdentity: this.device,
-            rootKeyPair: this.rootKeyPair ?? undefined,
-        });
-    }
-
     /**
      * Self-rotate the root key. This is used when a JSON backup is imported,
      * to immediately invalidate the old root key and switch to a new one.
@@ -493,12 +448,11 @@ export class GroupManager {
             throw new Error(`Cannot rotate root key: Member not active in group ${groupId}`);
         }
 
-        const { signature: authorizationSignature } = createRecoveryCoSignature(
+        const authorizationSignature = createRootRotationAuthorization(
             this.rootKeyPair.publicKey,
             newRootKeyPair.publicKey,
             groupId,
             oldRootSecretKey,
-            this.rootKeyPair.publicKey
         );
 
         const entry = buildEntry(
@@ -533,6 +487,46 @@ export class GroupManager {
             {
                 voidedEntryId: entryId,
                 reason,
+            },
+            latestEntry.entryId,
+            state.currentLamportClock + 1,
+            this.device.deviceKeyPair.publicKey,
+            this.device.deviceKeyPair.secretKey,
+        );
+
+        await this.storage.appendEntry(groupId, entry);
+        return entry;
+    }
+
+    /**
+     * Replace an expense's effective data with one atomic, immutable correction.
+     */
+    async correctExpense(
+        groupId: GroupId,
+        entryId: Hash,
+        correctedExpense: ExpenseCreatedPayload,
+        reason = 'Edited',
+    ): Promise<LedgerEntry> {
+        const entries = await this.storage.getAllEntries(groupId);
+        const ordered = orderEntries([...entries]);
+        const latestEntry = ordered[ordered.length - 1];
+        if (!latestEntry) throw new Error(`No entries found for group ${groupId}`);
+
+        const referencedEntry = entries.find((entry) => entry.entryId === entryId);
+        if (!referencedEntry || (
+            referencedEntry.entryType !== EntryType.ExpenseCreated &&
+            referencedEntry.entryType !== EntryType.ExpenseCorrection
+        )) {
+            throw new Error('Cannot correct: expense entry not found');
+        }
+
+        const state = await this.deriveGroupState(groupId);
+        const entry = buildEntry(
+            EntryType.ExpenseCorrection,
+            {
+                referencedEntryId: entryId,
+                correctionReason: reason,
+                correctedExpense,
             },
             latestEntry.entryId,
             state.currentLamportClock + 1,

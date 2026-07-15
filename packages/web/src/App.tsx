@@ -10,7 +10,6 @@ import { JoinGroup } from './pages/JoinGroup';
 import { GroupDetail } from './pages/GroupDetail';
 import { AddExpense } from './pages/AddExpense';
 import { Settings } from './pages/Settings';
-import { GroupRecovery } from './pages/GroupRecovery';
 import { Impressum } from './pages/Impressum';
 import { PrivacyPolicy } from './pages/PrivacyPolicy';
 
@@ -22,7 +21,11 @@ const PublicLayout = ({ children }: { children: React.ReactNode }) => (
 );
 
 function AppRoutes() {
-  const { isOnboarded } = useApp();
+  const { isOnboarded, identityReady } = useApp();
+
+  if (!identityReady) {
+    return <div style={{ padding: '2rem', textAlign: 'center' }}>Loading secure identity storage…</div>;
+  }
 
   if (!isOnboarded) {
     return (
@@ -40,9 +43,9 @@ function AppRoutes() {
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/create-group" element={<CreateGroup />} />
         <Route path="/join" element={<JoinGroup />} />
+        <Route path="/invite/:token" element={<JoinGroup />} />
         <Route path="/group/:id" element={<GroupDetail />} />
         <Route path="/group/:id/expense" element={<AddExpense />} />
-        <Route path="/group/:id/recovery" element={<GroupRecovery />} />
         <Route path="/settings" element={<Settings />} />
         <Route path="/impressum" element={<Impressum />} />
         <Route path="/privacy" element={<PrivacyPolicy />} />

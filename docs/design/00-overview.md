@@ -1,31 +1,35 @@
-# SplitLedger — Decentralized Group Expense Tracking System
+# Design overview
 
-> Production-ready system design document
+Fair Money is an offline-first, end-to-end encrypted expense tracker. The browser remains a complete client; Tauri adds native mobile and desktop hosts for durable storage, secure secret handling, and operating-system link routing.
 
-## Table of Contents
+## Design principles
 
-| # | Document | Description |
-|---|----------|-------------|
-| 1 | [Architecture](01-architecture.md) | Full architecture diagram, component breakdown |
-| 2 | [Data Models](02-data-models.md) | TypeScript interfaces for all domain types |
-| 3 | [Cryptographic Flows](03-crypto-flows.md) | Identity, device auth, invites, expenses, recovery |
-| 4 | [Ledger Validation](04-ledger-validation.md) | Validation pseudocode for all entry types |
-| 5 | [Sync Protocol](05-sync-protocol.md) | Peer sync and relay exchange protocol |
-| 6 | [Relay Server](06-relay-server.md) | Minimal relay server specification |
-| 7 | [Threat Model](07-threat-model.md) | Accidental tampering + compromised relay analysis |
-| 8 | [Implementation Roadmap](08-roadmap.md) | MVP → production phased plan |
-| 9 | [Libraries](09-libraries.md) | Recommended libraries with rationale |
-| 10 | [Key Management UX](10-key-management-ux.md) | Key lifecycle UX design |
-| 11 | [Multi-Device Sync](11-multi-device-sync.md) | Multi-device synchronization design |
-| 12 | [Scalability](12-scalability.md) | Scalability analysis and mitigations |
-| 13 | [Testing Strategy](13-testing-strategy.md) | Comprehensive testing plan |
+1. Signed, tamper-evident operations are immutable; corrections and voids reference earlier operations.
+2. Stable participant IDs exist independently of cryptographic identities.
+3. Relays are untrusted, replaceable, self-hostable, and disposable; they are rendezvous caches rather than durable group authorities.
+4. All clients deterministically derive the same state from the same valid operation set.
+5. Offline concurrent writes are expected and explicitly represented.
+6. Protocol and UI behavior are platform-independent; storage and link delivery use adapters.
+7. The web experience remains functional without installing an application.
+8. Social recovery is not part of the target product.
+9. Any member retaining the required history can repopulate a relay by coming online; missing-history clients explain that dependency to the user.
 
-## Design Principles
+## Document map
 
-1. **Immutability** — Ledger entries are never deleted or mutated; corrections reference originals.
-2. **Cryptographic integrity** — Every entry is hash-linked, signed, and locally validated.
-3. **Decentralization** — No single authority; the ledger is the source of truth.
-4. **Determinism** — Balances are computed identically by every participant via ordered replay.
-5. **Privacy** — The relay server stores only encrypted blobs; it cannot read or forge entries.
-6. **Recoverability** — Social recovery via group co-signing prevents permanent lockout.
-7. **Cross-platform** — Single TypeScript codebase targets web, iOS, and Android via Expo.
+| Document | Purpose |
+|---|---|
+| [Architecture](01-architecture.md) | Components, trust boundaries, and platform hosts |
+| [Data models](02-data-models.md) | Protocol-v2 entities and operations |
+| [Cryptographic flows](03-crypto-flows.md) | Keys, encryption, claims, and signing |
+| [Validation](04-ledger-validation.md) | Structural, cryptographic, and authorization rules |
+| [Synchronization](05-sync-protocol.md) | Convergent operation exchange |
+| [Relay](06-relay-server.md) | Self-hostable ciphertext service |
+| [Threat model](07-threat-model.md) | Assets, attackers, guarantees, and limits |
+| [Roadmap](08-roadmap.md) | Delivery sequence |
+| [Libraries](09-libraries.md) | Current technology choices |
+| [Key UX](10-key-management-ux.md) | Identity and device experience |
+| [Multi-device](11-multi-device-sync.md) | Device enrollment and revocation |
+| [Scalability](12-scalability.md) | Limits and growth strategy |
+| [Testing](13-testing-strategy.md) | Test layers and compatibility gates |
+| [Re-architecture plan](14-product-rearchitecture-plan.md) | Migration handoff and status |
+| [Protocol v2 specification](../protocol/v2/README.md) | Normative encoding, graph, authorization, and conflict rules |

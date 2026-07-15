@@ -5,6 +5,9 @@
 # Stage 1: Build
 FROM node:20-alpine AS builder
 
+ARG VITE_RELAY_URL
+ENV VITE_RELAY_URL=$VITE_RELAY_URL
+
 WORKDIR /build
 
 # Copy root workspace config

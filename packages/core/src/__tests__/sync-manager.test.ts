@@ -2,11 +2,11 @@
 // Sync Manager Unit Tests (Mock Transport)
 // =============================================================================
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { SyncManager, type SyncEvent } from '../sync/sync-manager.js';
 import type { Transport, TransportEntry, OnEntryHandler, OnConnectionStateHandler } from '../sync/transport.js';
 import { InMemoryStorageAdapter } from '../storage.js';
-import { buildEntry, validateFullChain } from '../ledger.js';
+import { buildEntry } from '../ledger.js';
 import { createRootIdentity, createDeviceIdentity, generateGroupId } from '../identity.js';
 import { encryptForRelay, deriveGroupKey, serializeEntry } from '../sync/group-cipher.js';
 import { EntryType } from '../types.js';
@@ -38,12 +38,7 @@ class MockTransport implements Transport {
         this.publishedEntries.push({ groupId, entry });
     }
 
-    async getEntriesAfter(groupId: GroupId, afterLamportClock: number): Promise<TransportEntry[]> {
-        const entries = this.storedEntries.get(groupId) ?? [];
-        return entries.filter((e) => e.lamportClock > afterLamportClock);
-    }
-
-    async getFullLedger(groupId: GroupId): Promise<TransportEntry[]> {
+    async getOperations(groupId: GroupId): Promise<TransportEntry[]> {
         return this.storedEntries.get(groupId) ?? [];
     }
 
@@ -68,6 +63,11 @@ class MockTransport implements Transport {
 function encryptEntry(entry: LedgerEntry, groupKey: Uint8Array): string {
     const plaintext = serializeEntry(entry);
     const encrypted = encryptForRelay(plaintext, groupKey);
+    return Buffer.from(encrypted).toString('base64');
+}
+
+function encryptUnknown(value: unknown, groupKey: Uint8Array): string {
+    const encrypted = encryptForRelay(serializeEntry(value), groupKey);
     return Buffer.from(encrypted).toString('base64');
 }
 
@@ -113,10 +113,8 @@ describe('SyncManager', () => {
 
             expect(transport.publishedEntries).toHaveLength(1);
             expect(transport.publishedEntries[0]!.groupId).toBe(groupId);
-            expect(transport.publishedEntries[0]!.entry.lamportClock).toBe(0);
-            expect(transport.publishedEntries[0]!.entry.senderPubkey).toBe(device.deviceKeyPair.publicKey);
-            // The encrypted entry should be non-empty base64
-            expect(transport.publishedEntries[0]!.entry.encryptedEntry.length).toBeGreaterThan(0);
+            expect(transport.publishedEntries[0]!.entry.operationId).toBe(genesis.entryId);
+            expect(transport.publishedEntries[0]!.entry.encryptedOperation.length).toBeGreaterThan(0);
         });
     });
 
@@ -142,9 +140,8 @@ describe('SyncManager', () => {
             // Put encrypted entries in mock transport
             transport.storedEntries.set(groupId, [
                 {
-                    encryptedEntry: encryptEntry(genesis, groupKey),
-                    lamportClock: genesis.lamportClock,
-                    senderPubkey: genesis.creatorDevicePubkey,
+                    operationId: genesis.entryId,
+                    encryptedOperation: encryptEntry(genesis, groupKey),
                 },
             ]);
 
@@ -172,7 +169,7 @@ describe('SyncManager', () => {
 
             // Same entry comes from relay
             transport.storedEntries.set(groupId, [
-                { encryptedEntry: encryptEntry(genesis, groupKey), lamportClock: 0, senderPubkey: genesis.creatorDevicePubkey },
+                { operationId: genesis.entryId, encryptedOperation: encryptEntry(genesis, groupKey) },
             ]);
 
             const accepted = await syncManager.syncWithRelay(groupId);
@@ -180,6 +177,82 @@ describe('SyncManager', () => {
 
             const entries = await storage.getAllEntries(groupId);
             expect(entries).toHaveLength(1); // still just one
+        });
+
+        it('repopulates an empty relay from durable local history', async () => {
+            const root = createRootIdentity('Alice');
+            const device = createDeviceIdentity(root.rootKeyPair, 'iPhone');
+            const genesis = buildEntry(
+                EntryType.Genesis,
+                { groupId, groupName: 'Test', creatorRootPubkey: root.rootKeyPair.publicKey, creatorDisplayName: 'Alice' },
+                null, 0, device.deviceKeyPair.publicKey, device.deviceKeyPair.secretKey, 1000,
+            );
+            await storage.appendEntry(groupId, genesis);
+            transport.storedEntries.set(groupId, []);
+
+            const accepted = await syncManager.syncWithRelay(groupId);
+
+            expect(accepted).toBe(0);
+            expect(transport.publishedEntries).toHaveLength(1);
+            expect(transport.publishedEntries[0]!.entry.operationId).toBe(genesis.entryId);
+        });
+
+        it('rejects decrypted data that is not a structurally valid entry', async () => {
+            const events: SyncEvent[] = [];
+            syncManager.on((event) => events.push(event));
+            transport.storedEntries.set(groupId, [{
+                operationId: '0'.repeat(64),
+                encryptedOperation: encryptUnknown({ entryType: EntryType.Genesis }, groupKey),
+            }]);
+
+            const accepted = await syncManager.syncWithRelay(groupId);
+
+            expect(accepted).toBe(0);
+            expect(await storage.getAllEntries(groupId)).toHaveLength(0);
+            expect(events.some((event) => event.type === 'entry:rejected')).toBe(true);
+        });
+    });
+
+    describe('history availability', () => {
+        it('reports that an invited group needs an online member when the relay is empty', async () => {
+            const events: SyncEvent[] = [];
+            syncManager.on((event) => events.push(event));
+            transport.storedEntries.set(groupId, []);
+
+            expect(await syncManager.initialSync(groupId, { expectHistory: true })).toBeNull();
+            expect(events.some((event) => event.type === 'history:missing')).toBe(true);
+        });
+
+        it('does not report missing history for a new local group before genesis is created', async () => {
+            const events: SyncEvent[] = [];
+            syncManager.on((event) => events.push(event));
+            transport.storedEntries.set(groupId, []);
+
+            expect(await syncManager.initialSync(groupId)).toBeNull();
+            expect(events.some((event) => event.type === 'history:missing')).toBe(false);
+        });
+
+        it('reports history available after an online member seeds the relay', async () => {
+            const root = createRootIdentity('Alice');
+            const device = createDeviceIdentity(root.rootKeyPair, 'iPhone');
+            const genesis = buildEntry(
+                EntryType.Genesis,
+                { groupId, groupName: 'Test', creatorRootPubkey: root.rootKeyPair.publicKey, creatorDisplayName: 'Alice' },
+                null, 0, device.deviceKeyPair.publicKey, device.deviceKeyPair.secretKey, 1000,
+            );
+            const events: SyncEvent[] = [];
+            syncManager.on((event) => events.push(event));
+            transport.storedEntries.set(groupId, []);
+            await syncManager.initialSync(groupId, { expectHistory: true });
+            transport.storedEntries.set(groupId, [{
+                operationId: genesis.entryId,
+                encryptedOperation: encryptEntry(genesis, groupKey),
+            }]);
+
+            await syncManager.syncWithRelay(groupId);
+
+            expect(events.some((event) => event.type === 'history:missing')).toBe(true);
+            expect(events.some((event) => event.type === 'history:available')).toBe(true);
         });
     });
 
@@ -224,9 +297,8 @@ describe('SyncManager', () => {
 
             // Simulate incoming entry from transport
             transport.simulateIncomingEntry(groupId, {
-                encryptedEntry: encryptEntry(genesis, groupKey),
-                lamportClock: 0,
-                senderPubkey: genesis.creatorDevicePubkey,
+                operationId: genesis.entryId,
+                encryptedOperation: encryptEntry(genesis, groupKey),
             });
 
             // Wait for async processing

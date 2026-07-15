@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://fair-money.example/schemas/protocol/v2/invite.schema.json",
+  "title": "Fair Money protocol v2 decrypted invite payload",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["protocolVersion", "groupId", "relayUrl", "relayGroupCapability", "groupSecret", "scope", "capabilityId", "claimSecret", "issueOperationId"],
+  "properties": {
+    "protocolVersion": { "const": 2 },
+    "groupId": { "$ref": "#/$defs/id" },
+    "relayUrl": { "type": "string", "pattern": "^(https|wss)://" },
+    "relayGroupCapability": { "$ref": "#/$defs/secret" },
+    "groupSecret": { "$ref": "#/$defs/secret" },
+    "scope": { "enum": ["targeted", "any-unclaimed-slot"] },
+    "participantId": { "$ref": "#/$defs/id" },
+    "capabilityId": { "$ref": "#/$defs/id" },
+    "claimSecret": { "$ref": "#/$defs/secret" },
+    "issueOperationId": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "displayExpiresAt": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 }
+  },
+  "allOf": [
+    { "if": { "properties": { "scope": { "const": "targeted" } } }, "then": { "required": ["participantId"] } },
+    { "if": { "properties": { "scope": { "const": "any-unclaimed-slot" } } }, "then": { "not": { "required": ["participantId"] } } }
+  ],
+  "$defs": {
+    "id": { "type": "string", "format": "uuid", "pattern": "^[0-9a-f-]+$" },
+    "secret": { "type": "string", "pattern": "^[A-Za-z0-9_-]{43}$" }
+  }
+}

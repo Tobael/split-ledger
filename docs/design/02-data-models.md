@@ -1,227 +1,96 @@
-# 2. TypeScript Data Models
+# Protocol-v2 data models
 
-## Core Cryptographic Types
+These are the target models replacing the pre-release v1 implementation. No v1 compatibility layer or data migration is required.
 
-```typescript
-/** 32-byte Ed25519 public key, hex-encoded */
-type PublicKey = string & { readonly __brand: 'PublicKey' };
+Protocol-v2 persistence stores only validated signed operations. `GroupServiceV2` validates a complete local/remote operation union before persistence and derives `GroupStateV2` on demand; projected group state is not an authoritative stored record.
 
-/** 64-byte Ed25519 secret key, hex-encoded (never leaves device) */
-type SecretKey = string & { readonly __brand: 'SecretKey' };
+```ts
+type GroupId = string;
+type OperationId = string;
+type ParticipantId = string;
+type CapabilityId = string;
+type PublicKey = string;
+type Signature = string;
 
-/** 64-byte Ed25519 signature, hex-encoded */
-type Signature = string & { readonly __brand: 'Signature' };
-
-/** SHA-256 hash, hex-encoded */
-type Hash = string & { readonly __brand: 'Hash' };
-
-/** UUID v4 */
-type GroupId = string & { readonly __brand: 'GroupId' };
-
-interface Ed25519KeyPair {
-  publicKey: PublicKey;
-  secretKey: SecretKey;
-}
-```
-
-## Identity Types
-
-```typescript
-interface RootIdentity {
-  rootKeyPair: Ed25519KeyPair;
-  displayName: string;
-  createdAt: number; // Unix ms
-}
-
-interface DeviceKeyAuthorization {
-  devicePublicKey: PublicKey;
-  rootPublicKey: PublicKey;
-  deviceName: string;
-  authorizedAt: number;
-  /** Signature of (devicePublicKey ‖ rootPublicKey ‖ authorizedAt) by root secret key */
-  authorizationSignature: Signature;
-}
-
-interface DeviceIdentity {
-  deviceKeyPair: Ed25519KeyPair;
-  rootPublicKey: PublicKey;
-  deviceName: string;
-  authorization: DeviceKeyAuthorization;
-}
-```
-
-## Ledger Entry Types
-
-```typescript
-enum EntryType {
-  Genesis              = 'Genesis',
-  ExpenseCreated       = 'ExpenseCreated',
-  ExpenseCorrection    = 'ExpenseCorrection',
-  MemberAdded          = 'MemberAdded',
-  MemberRemoved        = 'MemberRemoved',
-  DeviceAuthorized     = 'DeviceAuthorized',
-  DeviceRevoked        = 'DeviceRevoked',
-  RootKeyRotation      = 'RootKeyRotation',
-}
-
-interface LedgerEntryBase {
-  /** SHA-256 hash of the canonical serialization of all fields except entry_id and signature */
-  entryId: Hash;
-
-  /** Hash of the immediately preceding entry (null only for Genesis) */
-  previousHash: Hash | null;
-
-  /** Monotonically increasing logical clock */
+interface SignedOperation<T extends OperationPayload> {
+  protocolVersion: 2;
+  operationId: OperationId;
+  groupId: GroupId;
+  parents: OperationId[];
   lamportClock: number;
-
-  /** Unix millisecond timestamp (wallclock, advisory only) */
-  timestamp: number;
-
-  entryType: EntryType;
-
-  /** Public key of the device that created this entry */
-  creatorDevicePubkey: PublicKey;
-
-  /** Ed25519 signature over the entry_id by creator device key */
+  createdAt: number;
+  actorPublicKey: PublicKey;
+  payload: T;
   signature: Signature;
 }
-
-// --- Payloads ---
-
-interface GenesisPayload {
-  groupId: GroupId;
-  groupName: string;
-  creatorRootPubkey: PublicKey;
-  creatorDisplayName: string;
-}
-
-interface ExpenseCreatedPayload {
-  description: string;
-  /** Amount in smallest currency unit (e.g., cents) to avoid floating point */
-  amountMinorUnits: number;
-  currency: string; // ISO 4217
-  paidByRootPubkey: PublicKey;
-  /** Map of root public key → share in minor units (must sum to amountMinorUnits) */
-  splits: Record<PublicKey, number>;
-  category?: string;
-  receiptHash?: Hash; // optional SHA-256 of receipt image
-}
-
-interface ExpenseCorrectionPayload {
-  /** entry_id of the original ExpenseCreated (or prior ExpenseCorrection) being corrected */
-  referencedEntryId: Hash;
-  correctionReason: string;
-  /** Full replacement expense data */
-  correctedExpense: ExpenseCreatedPayload;
-}
-
-interface MemberAddedPayload {
-  memberRootPubkey: PublicKey;
-  memberDisplayName: string;
-  /** Signed invite token that authorized this join */
-  inviteToken: InviteToken;
-}
-
-interface MemberRemovedPayload {
-  memberRootPubkey: PublicKey;
-  reason: string;
-}
-
-interface DeviceAuthorizedPayload {
-  ownerRootPubkey: PublicKey;
-  devicePublicKey: PublicKey;
-  deviceName: string;
-  /** Root key's signature over (devicePublicKey ‖ ownerRootPubkey ‖ timestamp) */
-  authorizationSignature: Signature;
-}
-
-interface DeviceRevokedPayload {
-  ownerRootPubkey: PublicKey;
-  devicePublicKey: PublicKey;
-  reason: string;
-}
-
-interface RootKeyRotationPayload {
-  previousRootPubkey: PublicKey;
-  newRootPubkey: PublicKey;
-  /** Required: signatures from majority of active group members' root keys */
-  coSignatures: Array<{
-    signerRootPubkey: PublicKey;
-    signature: Signature; // signs (previousRootPubkey ‖ newRootPubkey ‖ groupId)
-  }>;
-}
-
-// --- Typed Entry Union ---
-
-type LedgerEntry =
-  | (LedgerEntryBase & { entryType: EntryType.Genesis;            payload: GenesisPayload })
-  | (LedgerEntryBase & { entryType: EntryType.ExpenseCreated;     payload: ExpenseCreatedPayload })
-  | (LedgerEntryBase & { entryType: EntryType.ExpenseCorrection;  payload: ExpenseCorrectionPayload })
-  | (LedgerEntryBase & { entryType: EntryType.MemberAdded;        payload: MemberAddedPayload })
-  | (LedgerEntryBase & { entryType: EntryType.MemberRemoved;      payload: MemberRemovedPayload })
-  | (LedgerEntryBase & { entryType: EntryType.DeviceAuthorized;   payload: DeviceAuthorizedPayload })
-  | (LedgerEntryBase & { entryType: EntryType.DeviceRevoked;      payload: DeviceRevokedPayload })
-  | (LedgerEntryBase & { entryType: EntryType.RootKeyRotation;    payload: RootKeyRotationPayload });
 ```
 
-## Invite Token
+`operationId` is the hash of canonical unsigned content. `parents` describe the known frontier and allow concurrent branches.
 
-```typescript
-interface InviteToken {
-  groupId: GroupId;
-  inviterRootPubkey: PublicKey;
-  expiresAt: number; // Unix ms
-  /** Signature of (groupId ‖ inviterRootPubkey ‖ expiresAt) by inviter's root key */
-  inviteSignature: Signature;
-}
+## Participants
 
-/** Serialized as URL-safe base64 for deep-link sharing */
-type InviteLink = string & { readonly __brand: 'InviteLink' };
-```
-
-## Group State (Derived)
-
-```typescript
-interface GroupMember {
-  rootPubkey: PublicKey;
+```ts
+interface ParticipantSlot {
+  participantId: ParticipantId;
   displayName: string;
-  joinedAt: number;
-  isActive: boolean;
-  removedAt?: number;
-  authorizedDevices: Set<PublicKey>;
-}
-
-interface GroupState {
-  groupId: GroupId;
-  groupName: string;
-  members: Map<PublicKey, GroupMember>;
-  latestEntryHash: Hash;
-  currentLamportClock: number;
-  /** Net balances per member: positive = owed money, negative = owes money */
-  balances: Map<PublicKey, number>;
+  status: 'unclaimed' | 'claimed' | 'disabled';
+  claimedRootPublicKey?: PublicKey;
+  createdBy: ParticipantId;
 }
 ```
 
-## Storage Adapter Interface
+Balances and expenses reference `ParticipantId`, never identity keys.
 
-```typescript
-interface StorageAdapter {
-  // Ledger operations
-  appendEntry(groupId: GroupId, entry: LedgerEntry): Promise<void>;
-  getEntry(entryId: Hash): Promise<LedgerEntry | null>;
-  getEntriesAfter(groupId: GroupId, afterLamportClock: number): Promise<LedgerEntry[]>;
-  getLatestEntry(groupId: GroupId): Promise<LedgerEntry | null>;
-  getAllEntries(groupId: GroupId): Promise<LedgerEntry[]>;
+## Claim capabilities
 
-  // Identity operations
-  storeRootIdentity(identity: RootIdentity): Promise<void>;
-  getRootIdentity(): Promise<RootIdentity | null>;
-  storeDeviceIdentity(identity: DeviceIdentity): Promise<void>;
-  getDeviceIdentity(): Promise<DeviceIdentity | null>;
-
-  // Group metadata
-  getGroupIds(): Promise<GroupId[]>;
-  getGroupState(groupId: GroupId): Promise<GroupState | null>;
-  saveGroupState(state: GroupState): Promise<void>;
+```ts
+interface ClaimCapability {
+  capabilityId: CapabilityId;
+  participantId: ParticipantId;
+  displayExpiresAt?: number;
+  secretCommitment: string;
+  status: 'active' | 'consumed' | 'revoked';
 }
 ```
+
+The link contains the secret; group history contains only its commitment. A successful claim binds a newly generated root public key to the slot and consumes the capability. `displayExpiresAt` is advisory UI and relay-retention metadata, not a ledger authorization input; deterministic invalidation uses a signed revocation.
+
+## Expenses
+
+```ts
+interface ExpenseData {
+  description: string;
+  amountMinorUnits: number;
+  currency: string;
+  paidBy: ParticipantId;
+  splits: Record<ParticipantId, number>;
+  category?: string;
+}
+```
+
+Amounts are positive safe integers in minor units. Splits are non-negative and sum exactly to the amount.
+
+## Operations
+
+| Operation | Purpose |
+|---|---|
+| `GroupCreated` | Establish group metadata and creator slot |
+| `ParticipantSlotCreated` | Add an unclaimed participant |
+| `ParticipantSlotRenamed` | Change participant display name |
+| `ClaimCapabilityIssued` | Authorize one targeted claim or one choice among any unclaimed slot |
+| `ClaimCapabilityRevoked` | Invalidate an unused capability |
+| `ParticipantSlotClaimed` | Bind a key and consume a capability |
+| `ParticipantSlotReset` | Auditable administrative reassignment |
+| `ParticipantSlotDisabled` | Remove future participation without rewriting history |
+| `ExpenseCreated` | Add an expense |
+| `ExpenseCorrected` | Replace effective expense data |
+| `ExpenseVoided` | Tombstone an expense |
+| `SettlementCreated` | Record a settlement transfer |
+| `DeviceAuthorized` | Add a device key for an identity |
+| `DeviceRevoked` | Revoke a device key |
+
+## Derived state
+
+Group state is a projection and is never synchronized as authority. Cached projections may be discarded and rebuilt from validated operations.
+
+The TypeScript v2 implementation exposes a complete derived state containing group metadata, participant slots, claim capabilities, devices, effective expenses, settlements, per-currency balances, and the current DAG frontier. Resetting a slot invalidates capabilities issued before that reset; revoked device keys cannot be enrolled again.

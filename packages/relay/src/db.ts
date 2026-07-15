@@ -4,22 +4,12 @@
 
 import Database from 'better-sqlite3';
 
-export interface StoredEntry {
-    id: number;
+export interface StoredOperation {
+    cursor: number;
     groupId: string;
-    lamportClock: number;
+    operationId: string;
     encryptedData: Buffer;
     receivedAt: string;
-    senderPubkey: string;
-}
-
-export interface StoredInvite {
-    inviteId: string;
-    groupId: string;
-    inviteData: Buffer;
-    creatorPubkey: string;
-    expiresAt: string;
-    createdAt: string;
 }
 
 export class RelayDatabase {
@@ -36,118 +26,87 @@ export class RelayDatabase {
 
     private migrate(): void {
         this.db.exec(`
-      CREATE TABLE IF NOT EXISTS encrypted_entries (
-        id              INTEGER PRIMARY KEY AUTOINCREMENT,
+      CREATE TABLE IF NOT EXISTS operations (
+        cursor          INTEGER PRIMARY KEY AUTOINCREMENT,
         group_id        TEXT NOT NULL,
-        lamport_clock   INTEGER NOT NULL,
+        operation_id    TEXT NOT NULL,
         encrypted_data  BLOB NOT NULL,
         received_at     TEXT NOT NULL DEFAULT (datetime('now')),
-        sender_pubkey   TEXT NOT NULL,
-        UNIQUE(group_id, lamport_clock, sender_pubkey)
+        UNIQUE(group_id, operation_id)
       );
 
-      CREATE INDEX IF NOT EXISTS idx_entries_group_lamport
-        ON encrypted_entries(group_id, lamport_clock);
+      CREATE INDEX IF NOT EXISTS idx_operations_group_cursor
+        ON operations(group_id, cursor);
 
-      CREATE TABLE IF NOT EXISTS invites (
-        invite_id       TEXT PRIMARY KEY,
-        group_id        TEXT NOT NULL,
-        invite_data     BLOB NOT NULL,
-        creator_pubkey  TEXT NOT NULL,
-        expires_at      TEXT NOT NULL,
-        created_at      TEXT NOT NULL DEFAULT (datetime('now'))
+      CREATE TABLE IF NOT EXISTS relay_groups (
+        group_id        TEXT PRIMARY KEY,
+        capability_hash TEXT NOT NULL
       );
 
-      CREATE INDEX IF NOT EXISTS idx_invites_expiry ON invites(expires_at);
     `);
     }
 
-    // ─── Entry Operations ───
+    // ─── Operation Storage ───
 
-    storeEntry(
+    storeOperation(
         groupId: string,
-        lamportClock: number,
+        operationId: string,
         encryptedData: Buffer,
-        senderPubkey: string,
     ): boolean {
         const stmt = this.db.prepare(`
-      INSERT OR IGNORE INTO encrypted_entries (group_id, lamport_clock, encrypted_data, sender_pubkey)
-      VALUES (?, ?, ?, ?)
+      INSERT OR IGNORE INTO operations (group_id, operation_id, encrypted_data)
+      VALUES (?, ?, ?)
     `);
-        const result = stmt.run(groupId, lamportClock, encryptedData, senderPubkey);
+        const result = stmt.run(groupId, operationId, encryptedData);
         return result.changes > 0;
     }
 
-    getEntriesAfter(groupId: string, afterLamportClock: number): StoredEntry[] {
-        const stmt = this.db.prepare(`
-      SELECT id, group_id AS groupId, lamport_clock AS lamportClock,
-             encrypted_data AS encryptedData, received_at AS receivedAt,
-             sender_pubkey AS senderPubkey
-      FROM encrypted_entries
-      WHERE group_id = ? AND lamport_clock > ?
-      ORDER BY lamport_clock ASC
-    `);
-        return stmt.all(groupId, afterLamportClock) as StoredEntry[];
+    hasOperation(groupId: string, operationId: string): boolean {
+        return this.db.prepare(
+            'SELECT 1 FROM operations WHERE group_id = ? AND operation_id = ?',
+        ).get(groupId, operationId) !== undefined;
     }
 
-    getFullLedger(groupId: string): StoredEntry[] {
+    getOperationsAfter(groupId: string, cursor: number, limit: number): StoredOperation[] {
         const stmt = this.db.prepare(`
-      SELECT id, group_id AS groupId, lamport_clock AS lamportClock,
-             encrypted_data AS encryptedData, received_at AS receivedAt,
-             sender_pubkey AS senderPubkey
-      FROM encrypted_entries
-      WHERE group_id = ?
-      ORDER BY lamport_clock ASC
+      SELECT cursor, group_id AS groupId, operation_id AS operationId,
+             encrypted_data AS encryptedData, received_at AS receivedAt
+      FROM operations
+      WHERE group_id = ? AND cursor > ?
+      ORDER BY cursor ASC LIMIT ?
     `);
-        return stmt.all(groupId) as StoredEntry[];
+        return stmt.all(groupId, cursor, limit) as StoredOperation[];
     }
 
-    getEntryCount(groupId: string): number {
-        const stmt = this.db.prepare('SELECT COUNT(*) AS count FROM encrypted_entries WHERE group_id = ?');
+    registerGroup(groupId: string, capabilityHash: string): boolean {
+        this.db.prepare('INSERT OR IGNORE INTO relay_groups (group_id, capability_hash) VALUES (?, ?)')
+            .run(groupId, capabilityHash);
+        return this.authorizeGroup(groupId, capabilityHash);
+    }
+
+    authorizeGroup(groupId: string, capabilityHash: string): boolean {
+        const row = this.db.prepare('SELECT capability_hash AS capabilityHash FROM relay_groups WHERE group_id = ?')
+            .get(groupId) as { capabilityHash: string } | undefined;
+        return row?.capabilityHash === capabilityHash;
+    }
+
+    getOperationCount(groupId: string): number {
+        const stmt = this.db.prepare('SELECT COUNT(*) AS count FROM operations WHERE group_id = ?');
         const row = stmt.get(groupId) as { count: number } | undefined;
         return row?.count ?? 0;
     }
 
     getGroupCount(): number {
-        const stmt = this.db.prepare('SELECT COUNT(DISTINCT group_id) AS count FROM encrypted_entries');
+        const stmt = this.db.prepare('SELECT COUNT(DISTINCT group_id) AS count FROM operations');
         const row = stmt.get() as { count: number } | undefined;
         return row?.count ?? 0;
     }
 
-    // ─── Invite Operations ───
-
-    storeInvite(inviteId: string, groupId: string, inviteData: Buffer, creatorPubkey: string, expiresAt: Date): void {
-        const stmt = this.db.prepare(`
-      INSERT INTO invites (invite_id, group_id, invite_data, creator_pubkey, expires_at)
-      VALUES (?, ?, ?, ?, ?)
-    `);
-        stmt.run(inviteId, groupId, inviteData, creatorPubkey, expiresAt.toISOString());
-    }
-
-    getInvite(inviteId: string): StoredInvite | null {
-        const stmt = this.db.prepare(`
-      SELECT invite_id AS inviteId, group_id AS groupId, invite_data AS inviteData,
-             creator_pubkey AS creatorPubkey, expires_at AS expiresAt, created_at AS createdAt
-      FROM invites WHERE invite_id = ?
-    `);
-        return (stmt.get(inviteId) as StoredInvite | undefined) ?? null;
-    }
-
-    deleteInvite(inviteId: string, creatorPubkey: string): boolean {
-        const stmt = this.db.prepare('DELETE FROM invites WHERE invite_id = ? AND creator_pubkey = ?');
-        return stmt.run(inviteId, creatorPubkey).changes > 0;
-    }
-
     // ─── Maintenance ───
 
-    pruneExpiredInvites(): number {
-        const stmt = this.db.prepare("DELETE FROM invites WHERE expires_at < datetime('now')");
-        return stmt.run().changes;
-    }
-
-    pruneOldEntries(retentionDays: number): number {
+    pruneOldOperations(retentionDays: number): number {
         const stmt = this.db.prepare(
-            `DELETE FROM encrypted_entries WHERE received_at < datetime('now', '-' || ? || ' days')`,
+            `DELETE FROM operations WHERE received_at < datetime('now', '-' || ? || ' days')`,
         );
         return stmt.run(retentionDays).changes;
     }

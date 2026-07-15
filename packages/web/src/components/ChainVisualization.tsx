@@ -15,7 +15,7 @@ const ENTRY_COLORS: Record<string, { bg: string; border: string; icon: string }>
     [EntryType.MemberRemoved]: { bg: 'rgba(239, 68, 68, 0.12)', border: '#ef4444', icon: '🚫' },
     [EntryType.DeviceAuthorized]: { bg: 'rgba(99, 102, 241, 0.08)', border: '#818cf8', icon: '📱' },
     [EntryType.DeviceRevoked]: { bg: 'rgba(239, 68, 68, 0.08)', border: '#f87171', icon: '🔒' },
-    [EntryType.RootKeyRotation]: { bg: 'rgba(168, 85, 247, 0.12)', border: '#a855f7', icon: '🔑' },
+    [EntryType.SelfRootKeyRotation]: { bg: 'rgba(168, 85, 247, 0.12)', border: '#a855f7', icon: '🔑' },
 };
 
 function getEntryLabel(type: string, t: ReturnType<typeof useI18n>['t']): string {
@@ -27,7 +27,7 @@ function getEntryLabel(type: string, t: ReturnType<typeof useI18n>['t']): string
         [EntryType.MemberRemoved]: t.chain.memberRemoved,
         [EntryType.DeviceAuthorized]: t.chain.deviceAuthorized,
         [EntryType.DeviceRevoked]: t.chain.deviceRevoked,
-        [EntryType.RootKeyRotation]: t.chain.rootKeyRotation,
+        [EntryType.SelfRootKeyRotation]: t.chain.rootKeyRotation,
     };
     return map[type] ?? type;
 }

@@ -1,133 +1,67 @@
-# 1. Architecture
+# Architecture
 
-## System Architecture Diagram
+## System context
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                          CLIENT APPLICATION                                 │
-│                    (React Native + Expo — Web / iOS / Android)              │
-│                                                                             │
-│  ┌───────────────────────────────────────────────────────────────────────┐  │
-│  │                         UI LAYER (React Native)                       │  │
-│  │  ┌──────────┐ ┌──────────┐ ┌───────────┐ ┌──────────┐ ┌──────────┐  │  │
-│  │  │  Groups   │ │ Expenses │ │  Balances  │ │ Members  │ │ Settings │  │  │
-│  │  └────┬─────┘ └────┬─────┘ └─────┬─────┘ └────┬─────┘ └────┬─────┘  │  │
-│  └───────┼──────────── ┼────────────┼────────────┼────────────┼─────────┘  │
-│          │             │            │            │            │             │
-│  ┌───────▼─────────────▼────────────▼────────────▼────────────▼─────────┐  │
-│  │                     BUSINESS LOGIC LAYER                              │  │
-│  │  ┌──────────────┐ ┌──────────────┐ ┌──────────────┐                  │  │
-│  │  │ LedgerEngine │ │   Identity   │ │   Balance    │                  │  │
-│  │  │  - append    │ │   Manager    │ │   Computer   │                  │  │
-│  │  │  - validate  │ │  - keys      │ │  - replay    │                  │  │
-│  │  │  - order     │ │  - devices   │ │  - settle    │                  │  │
-│  │  └──────┬───────┘ └──────┬───────┘ └──────┬───────┘                  │  │
-│  │         │                │                 │                          │  │
-│  │  ┌──────▼────────────────▼─────────────────▼──────┐                  │  │
-│  │  │              CryptoService                      │                  │  │
-│  │  │  - Ed25519 sign / verify                        │                  │  │
-│  │  │  - SHA-256 hashing                              │                  │  │
-│  │  │  - X25519 key exchange (relay encryption)       │                  │  │
-│  │  └────────────────────────────────────────────────┘                  │  │
-│  └──────────────────────────┬────────────────────────────────────────────┘  │
-│                             │                                               │
-│  ┌──────────────────────────▼────────────────────────────────────────────┐  │
-│  │                      NETWORKING LAYER                                 │  │
-│  │  ┌──────────────────┐          ┌──────────────────┐                  │  │
-│  │  │  P2P Transport   │          │  Relay Transport │                  │  │
-│  │  │  (libp2p/WebRTC) │◄────────►│  (WebSocket)     │                  │  │
-│  │  └────────┬─────────┘          └────────┬─────────┘                  │  │
-│  │           │                              │                            │  │
-│  │  ┌────────▼──────────────────────────────▼─────┐                     │  │
-│  │  │              SyncManager                     │                     │  │
-│  │  │  - peer discovery                            │                     │  │
-│  │  │  - entry exchange                            │                     │  │
-│  │  │  - conflict-free merge                       │                     │  │
-│  │  └────────────────────────────────────────────┘                     │  │
-│  └──────────────────────────┬────────────────────────────────────────────┘  │
-│                             │                                               │
-│  ┌──────────────────────────▼────────────────────────────────────────────┐  │
-│  │                      STORAGE LAYER                                    │  │
-│  │  ┌──────────────────────────────────────────────┐                    │  │
-│  │  │            StorageAdapter (interface)          │                    │  │
-│  │  ├──────────────────┬───────────────────────────┤                    │  │
-│  │  │  IndexedDB (web) │    SQLite (iOS/Android)    │                    │  │
-│  │  └──────────────────┴───────────────────────────┘                    │  │
-│  └───────────────────────────────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────────────────────────────┘
-
-                    ▲                             ▲
-                    │ WebRTC (P2P direct)          │ WSS (relay fallback)
-                    ▼                             ▼
-
-          ┌─────────────┐              ┌──────────────────────┐
-          │  Other Peer  │              │    RELAY SERVER       │
-          │  (Client)    │              │                      │
-          └─────────────┘              │  ┌────────────────┐  │
-                                       │  │  Message Broker │  │
-                                       │  │  (pub/sub)      │  │
-                                       │  └───────┬────────┘  │
-                                       │          │           │
-                                       │  ┌───────▼────────┐  │
-                                       │  │  Entry Cache    │  │
-                                       │  │  (encrypted)    │  │
-                                       │  └───────┬────────┘  │
-                                       │          │           │
-                                       │  ┌───────▼────────┐  │
-                                       │  │  Invite Links   │  │
-                                       │  │  (public meta)  │  │
-                                       │  └────────────────┘  │
-                                       └──────────────────────┘
+```mermaid
+flowchart LR
+    Messenger[Messenger or shared link] --> Link[HTTPS invite]
+    Link -->|app installed| Native[Tauri client]
+    Link -->|no app| Web[Web client]
+    Native --> Core[Shared TypeScript core]
+    Web --> Core
+    Core --> Relay[Selected self-hosted relay]
+    Relay --> Cipher[(Encrypted operations)]
+    Core --> Service[v2 group service]
+    Service --> WebStore[(v2 operation-set IndexedDB)]
+    Core --> NativeStore[(SQLite and secure store)]
 ```
 
-## Component Responsibilities
+The HTTPS invite domain routes into the installed app through Universal Links or App Links and falls back to the web join page. It does not have to operate the selected relay.
 
-### UI Layer
-Standard React Native screens. Stateless; reads from the balance/ledger stores via hooks. All mutations go through the Business Logic Layer.
+## Client layers
 
-### Business Logic Layer
+| Layer | Responsibility |
+|---|---|
+| React UI | Groups, participants, expenses, balances, settings, and join flows |
+| Application services | Commands, projections, authorization decisions, and sync orchestration |
+| Protocol | Versioned schemas, canonical encoding, signatures, operation IDs, and validation |
+| Platform adapters | Identity storage, ledger storage, link reception, sharing, and lifecycle |
+| Transport | WebSocket relay protocol and reconnect behavior |
 
-| Component | Responsibility |
-|-----------|---------------|
-| `LedgerEngine` | Append entries, validate chain integrity, maintain deterministic ordering |
-| `IdentityManager` | Create/store root keypairs, authorize devices, handle social recovery ceremonies |
-| `BalanceComputer` | Replay ordered ledger to derive current balances per member per group |
-| `CryptoService` | Pure cryptographic primitives — signing, verification, hashing, encryption |
-
-### Networking Layer
-
-| Component | Responsibility |
-|-----------|---------------|
-| `P2PTransport` | Direct peer connections via libp2p over WebRTC data channels |
-| `RelayTransport` | WebSocket connection to relay server for NAT-traversal fallback |
-| `SyncManager` | Orchestrates sync: compares Lamport clocks, requests/sends missing entries |
-
-### Storage Layer
-
-| Component | Responsibility |
-|-----------|---------------|
-| `StorageAdapter` | Unified interface for persistence |
-| `IndexedDBAdapter` | Web implementation using IndexedDB |
-| `SQLiteAdapter` | Native implementation using expo-sqlite |
-
-## Data Flow (Expense Creation)
-
+```mermaid
+flowchart TD
+    UI[Shared React UI] --> App[Application services]
+    App --> Protocol[Protocol v2]
+    App --> Storage[Storage interfaces]
+    App --> Transport[Transport interface]
+    Storage --> IndexedDB[Web IndexedDB]
+    Storage --> TauriDB[Tauri SQLite and secure store]
+    Transport --> WebSocket[Relay WebSocket]
 ```
-User taps "Add Expense"
-       │
-       ▼
-  UI dispatches action
-       │
-       ▼
-  LedgerEngine.createExpense()
-       ├── build ExpenseCreated payload
-       ├── CryptoService.hash(entry)       → entry_id
-       ├── CryptoService.sign(entry)        → signature
-       ├── LedgerEngine.validate(entry)     → self-check
-       ├── StorageAdapter.appendEntry(entry)
-       │
-       ▼
-  SyncManager.broadcast(entry)
-       ├── P2PTransport.send(entry)         → direct to online peers
-       └── RelayTransport.send(encrypted)   → relay for offline peers
+
+## Trust boundaries
+
+- Clients trust locally verified signatures and deterministic authorization rules.
+- Relays are availability helpers, not authorities.
+- Invite landing pages are routing helpers, not membership authorities.
+- Imported files, deep links, relay envelopes, and persisted records are untrusted until validated.
+- Native secure storage improves secret protection but does not make a compromised device trustworthy.
+
+## Command lifecycle
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant UI
+    participant Core
+    participant Store
+    participant Relay
+    User->>UI: Submit command
+    UI->>Core: Validate intent and authorization
+    Core->>Core: Build and sign operation
+    Core->>Store: Persist locally
+    Core-->>UI: Project updated state
+    Core->>Relay: Publish encrypted operation
 ```
+
+Local success does not depend on relay availability. Synchronization retries later.
