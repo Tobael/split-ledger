@@ -6,6 +6,7 @@ import { useI18n, supportedLocales, localeLabels } from '../i18n';
 import { BrandLogo } from './Logo';
 import { Footer } from './Footer';
 import { ConnectionStatus } from './ConnectionStatus';
+import { Alert } from '@/components/ui/alert';
 
 export function Layout({ children }: { children: ReactNode }) {
     const { isOnboarded, identity, persistenceWarning, syncStatus } = useApp();
@@ -31,9 +32,9 @@ export function Layout({ children }: { children: ReactNode }) {
     ) : null;
     const relayUnavailable = syncStatus === 'disconnected' || syncStatus === 'reconnecting';
     const connectionWarning = !online || relayUnavailable ? (
-        <div role="status" style={{ padding: '10px 16px', background: 'var(--warning-dim, rgba(245, 158, 11, 0.14))', color: 'var(--text-primary)', textAlign: 'center', fontSize: 'var(--font-size-sm)' }}>
+        <Alert role="status">
             {!online ? t.connection.offline : t.connection.relayUnavailable}
-        </div>
+        </Alert>
     ) : null;
 
     if (!isOnboarded) return <>{storageWarning}{children}</>;

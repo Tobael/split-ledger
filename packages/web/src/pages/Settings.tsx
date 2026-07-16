@@ -9,6 +9,10 @@ import {
 } from '../utils/identity-export';
 import { IdentityExport } from '../components/IdentityExport';
 import type { GroupId, PublicKey } from '@splitledger/core';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 
 export function Settings() {
     const {
@@ -250,16 +254,16 @@ export function Settings() {
                 </div>
             </div>
 
-            <div className="glass-card glass-card--static animate-fade-in stagger-1" style={cardStyle}>
-                <h3 style={sectionHeading}>{t.settings.relayTitle}</h3>
-                <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', marginBottom: 'var(--space-4)' }}>
-                    {t.settings.relayDescription}
-                </p>
-                <label className="form-label" htmlFor="relay-url">{t.settings.relayUrlLabel}</label>
-                <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
-                    <input
+            <Card className="mb-4 animate-fade-in">
+                <CardHeader>
+                    <CardTitle>{t.settings.relayTitle}</CardTitle>
+                    <CardDescription>{t.settings.relayDescription}</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <Label htmlFor="relay-url">{t.settings.relayUrlLabel}</Label>
+                    <div className="flex items-center gap-2">
+                    <Input
                         id="relay-url"
-                        className="form-input"
                         type="url"
                         inputMode="url"
                         value={relayUrl}
@@ -269,11 +273,12 @@ export function Settings() {
                         autoCorrect="off"
                         spellCheck={false}
                     />
-                    <button className="btn btn--primary" type="button" onClick={handleSaveRelay}>
+                    <Button type="button" onClick={handleSaveRelay}>
                         {t.common.save}
-                    </button>
-                </div>
-            </div>
+                    </Button>
+                    </div>
+                </CardContent>
+            </Card>
 
             {/* Device */}
             <div className="glass-card glass-card--static animate-fade-in stagger-1" style={cardStyle}>

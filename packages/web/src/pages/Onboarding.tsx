@@ -4,6 +4,7 @@ import { useApp } from '../context/AppContext';
 import { useI18n } from '../i18n';
 import { Footer } from '../components/Footer';
 import { IdentityImport } from '../components/IdentityImport';
+import { postAuthRoute } from '../utils/post-auth-route';
 
 export function Onboarding() {
     const { createIdentity, importIdentityFromJson } = useApp();
@@ -38,11 +39,7 @@ export function Onboarding() {
         setTimeout(async () => {
             try {
                 await createIdentity(name.trim());
-                if (location.pathname !== '/' && location.pathname !== '/dashboard') {
-                    navigate(location.pathname + location.search);
-                } else {
-                    navigate('/dashboard');
-                }
+                navigate(postAuthRoute(location.pathname, location.search));
             } catch {
                 setStep('name');
             }
@@ -118,11 +115,7 @@ export function Onboarding() {
 
                                                         if (imported?.format === 'fair-money-identity-transfer' && imported.version === 2) {
                                                             await importIdentityFromJson(decryptedJson);
-                                                            if (location.pathname !== '/' && location.pathname !== '/dashboard') {
-                                                                navigate(location.pathname + location.search);
-                                                            } else {
-                                                                navigate('/dashboard');
-                                                            }
+                                                            navigate(postAuthRoute(location.pathname, location.search));
                                                         } else {
                                                             throw new Error("Invalid identity file structure");
                                                         }

@@ -377,6 +377,7 @@ Exit criterion: web clients on separate devices can use either the project relay
 Before beginning this phase, deploy the v2 web application and complete [the manual web release test plan](../manual-web-test-plan.md) on separate browser profiles and physical devices.
 
 - [x] Prepare the pre-Tauri web deployment: external relay build configuration, standalone web image, v2 container health check, gated deployment workflow, release builds, and manual test checklist.
+- [x] Establish shadcn/ui and Tailwind CSS as the shared component foundation; migrate pages incrementally while keeping the web build deployable.
 - Deploy the reviewed commit to the test environment and record the physical-device results.
 
 - Initialize Tauri 2 around the existing Vite/React build.

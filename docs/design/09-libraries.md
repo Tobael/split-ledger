@@ -6,7 +6,7 @@ Dependencies are implementation tools, not protocol definitions. Signed bytes an
 
 | Area | Choice | Reason |
 |---|---|---|
-| Shared UI | React, React Router, Vite | Existing working web application and reusable Tauri frontend |
+| Shared UI | React, React Router, Vite, shadcn/ui, Tailwind CSS | Reusable accessible primitives and one responsive frontend for web and Tauri hosts |
 | Language | TypeScript | Shared browser, core, and relay implementation |
 | Validation | Zod | Strict runtime validation at trust boundaries |
 | Cryptography | Noble packages and Web Crypto | Auditable primitives with browser support |
@@ -33,3 +33,4 @@ Dependencies are implementation tools, not protocol definitions. Signed bytes an
 - libp2p, WebRTC, and the composite transport were deleted. Do not reintroduce them until a measured requirement justifies the complexity.
 - Do not move protocol correctness into an ORM, UI framework, or platform plugin.
 - Review licenses and security posture before adoption.
+- Keep shadcn/ui components in the repository under `packages/web/src/components/ui`; migrate feature pages incrementally and delete superseded global component classes once their final consumer is gone.

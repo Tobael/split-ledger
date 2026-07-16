@@ -38,8 +38,12 @@ describe('protocol v2 relay', () => {
     it('answers PING without group authorization', async () => {
         const ws = new WebSocket(wsUrl); await waitForOpen(ws); const response = waitForMessage<{ type: string }>(ws); send(ws, { type: 'PING' }); expect((await response).type).toBe('PONG'); ws.close();
     });
-    it('rejects subscription to an unknown group capability', async () => {
-        const ws = new WebSocket(wsUrl); await waitForOpen(ws); const response = waitForMessage<{ code: string }>(ws); send(ws, { type: 'SUBSCRIBE', groupId: groupId(), capability }); expect((await response).code).toBe('UNAUTHORIZED'); ws.close();
+    it('registers an empty group on first capability use and rejects a different capability', async () => {
+        const id = groupId(); const ws = new WebSocket(wsUrl); await waitForOpen(ws);
+        const registered = waitForMessage<{ type: string; operations: unknown[] }>(ws); send(ws, { type: 'GET_OPERATIONS', groupId: id, capability, cursor: 0 });
+        expect((await registered).operations).toEqual([]);
+        const rejected = waitForMessage<{ code: string }>(ws); send(ws, { type: 'SUBSCRIBE', groupId: id, capability: wrongCapability });
+        expect((await rejected).code).toBe('UNAUTHORIZED'); ws.close();
     });
     it('publishes and broadcasts authenticated operation envelopes', async () => {
         const id = groupId(); const op = operationId(); const publisher = new WebSocket(wsUrl); const subscriber = new WebSocket(wsUrl);

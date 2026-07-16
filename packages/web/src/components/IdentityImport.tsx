@@ -3,6 +3,7 @@ import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
 import { useApp } from '../context/AppContext';
 import { useI18n } from '../i18n';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { postAuthRoute } from '../utils/post-auth-route';
 export function IdentityImport({ onCancel }: { onCancel: () => void }) {
     const { importIdentity } = useApp();
     const { t } = useI18n();
@@ -85,11 +86,7 @@ export function IdentityImport({ onCancel }: { onCancel: () => void }) {
                 isScanningRef.current = false;
                 scanner.stop().then(() => {
                     scanner.clear();
-                    if (location.pathname !== '/' && location.pathname !== '/dashboard') {
-                        navigate(location.pathname + location.search);
-                    } else {
-                        navigate('/dashboard');
-                    }
+                    navigate(postAuthRoute(location.pathname, location.search));
                 }).catch(console.error);
 
             } catch (err) {

@@ -65,7 +65,10 @@ export function createWsHandler(db: RelayDatabase, config: RelayConfig, rooms: R
                 && (!operationPattern.test(msg.operationId) || typeof msg.encryptedOperation !== 'string')) {
                 error(ws, 'INVALID_PARAMS', 'Invalid operation envelope'); return;
             }
-            if (!('groupId' in msg) || !authorized(msg, db, msg.type === 'PUBLISH_OPERATION')) { error(ws, 'UNAUTHORIZED', 'Invalid group capability'); return; }
+            // The first holder of an unguessable group capability establishes the
+            // opaque relay namespace. Requiring a publish first deadlocks new groups:
+            // clients fetch before advertising their local operation set.
+            if (!('groupId' in msg) || !authorized(msg, db, true)) { error(ws, 'UNAUTHORIZED', 'Invalid group capability'); return; }
             if (msg.type === 'SUBSCRIBE') { rooms.subscribe(msg.groupId, ws); return; }
             if (msg.type === 'PUBLISH_OPERATION') {
                 const bytes = Buffer.from(msg.encryptedOperation, 'base64');
