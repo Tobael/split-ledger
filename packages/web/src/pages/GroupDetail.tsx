@@ -17,6 +17,10 @@ import {
     validateFullChain,
     getEffectiveExpenses,
 } from '@splitledger/core';
+import { Check, Copy, Link2, Pencil, RotateCcw, UserMinus, UserPlus } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 
 export function GroupDetail() {
     const { id } = useParams<{ id: string }>();
@@ -496,45 +500,41 @@ function ProtocolV2GroupDetail({ state, onDelete }: { state: GroupStateV2; onDel
                 <Link to="/dashboard" style={{ color: 'var(--text-tertiary)', fontSize: 'var(--font-size-sm)' }}>{t.groupDetail.backToGroups}</Link>
                 <h1 className="page-header__title">{state.groupName}</h1>
                 <p className="page-header__subtitle">{participants.length} {participants.length === 1 ? t.common.member : t.common.members}</p>
-                <Link className="btn btn--primary" to={`/group/${state.groupId}/expense`}>{t.groupDetail.addExpense}</Link>
+                <Button asChild><Link to={`/group/${state.groupId}/expense`}>{t.groupDetail.addExpense}</Link></Button>
             </div>
             <div className="grid-responsive-cards" style={{ marginBottom: 'var(--space-6)' }}>
-                <section className="glass-card glass-card--static" style={{ padding: 'var(--space-5)' }}>
-                    <h3>{t.groupDetail.membersTitle}</h3>
+                <Card>
+                    <CardHeader><CardTitle>{t.groupDetail.membersTitle}</CardTitle></CardHeader>
+                    <CardContent className="space-y-3">
                     {participants.map((participant) => (
-                        <div key={participant.participantId} style={{ marginTop: 'var(--space-3)' }}>
+                        <div key={participant.participantId} className="rounded-lg border border-[#004502]/10 p-3">
                             {editingParticipantId === participant.participantId ? (
-                                <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
-                                    <input className="input" value={editedParticipantName} onChange={(event) => setEditedParticipantName(event.target.value)} />
-                                    <button className="btn btn--primary btn--sm" disabled={!editedParticipantName.trim() || busyParticipantId !== null} onClick={() => void saveParticipantName(participant.participantId)}>{t.groupDetail.saveParticipantName}</button>
+                                <div className="flex gap-2">
+                                    <Input value={editedParticipantName} onChange={(event) => setEditedParticipantName(event.target.value)} />
+                                    <Button size="icon" title={t.groupDetail.saveParticipantName} aria-label={t.groupDetail.saveParticipantName} disabled={!editedParticipantName.trim() || busyParticipantId !== null} onClick={() => void saveParticipantName(participant.participantId)}><Check className="size-4" /></Button>
                                 </div>
-                            ) : <div>{participant.displayName} <span className="badge badge--accent">{participant.status}</span></div>}
+                            ) : <div className="flex items-center justify-between gap-2"><strong className="min-w-0 truncate">{participant.displayName}</strong><span className="badge badge--accent shrink-0">{participant.status}</span></div>}
                             {isCreator && editingParticipantId !== participant.participantId && (
-                                <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-2)', flexWrap: 'wrap' }}>
-                                    <button className="btn btn--ghost btn--sm" onClick={() => {
+                                <div className="mt-2 flex flex-wrap gap-1">
+                                    <Button variant="ghost" size="icon" title={t.groupDetail.renameParticipant} aria-label={t.groupDetail.renameParticipant} onClick={() => {
                                         setEditingParticipantId(participant.participantId);
                                         setEditedParticipantName(participant.displayName);
-                                    }}>{t.groupDetail.renameParticipant}</button>
+                                    }}><Pencil className="size-4" /></Button>
                                     {participant.participantId !== state.creatorParticipantId && participant.status === 'claimed' && (
-                                        <button className="btn btn--secondary btn--sm" disabled={busyParticipantId !== null} onClick={() => void resetParticipant(participant.participantId)}>{t.groupDetail.resetParticipant}</button>
+                                        <Button variant="secondary" size="icon" title={t.groupDetail.resetParticipant} aria-label={t.groupDetail.resetParticipant} disabled={busyParticipantId !== null} onClick={() => void resetParticipant(participant.participantId)}><RotateCcw className="size-4" /></Button>
                                     )}
                                     {participant.participantId !== state.creatorParticipantId && (
-                                        <button className="btn btn--danger btn--sm" disabled={busyParticipantId !== null} onClick={() => void disableParticipant(participant.participantId)}>{t.groupDetail.disableParticipant}</button>
+                                        <Button variant="destructive" size="icon" title={t.groupDetail.disableParticipant} aria-label={t.groupDetail.disableParticipant} disabled={busyParticipantId !== null} onClick={() => void disableParticipant(participant.participantId)}><UserMinus className="size-4" /></Button>
                                     )}
                                 </div>
                             )}
                             {isCreator && participant.status === 'unclaimed' && (
-                                <div style={{ marginTop: 'var(--space-2)', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-                                    <button className="btn btn--secondary btn--sm" disabled={busyParticipantId !== null} onClick={() => void replaceInvite(participant.participantId)}>
-                                        {inviteLinks[participant.participantId] ? t.groupDetail.replaceInviteForParticipant : t.groupDetail.createInviteForParticipant}
-                                    </button>
+                                <div className="mt-2 flex flex-col gap-2">
+                                    <Button variant="secondary" size="sm" className="w-full sm:w-auto" disabled={busyParticipantId !== null} onClick={() => void replaceInvite(participant.participantId)}>
+                                        <Link2 className="size-4" /><span className="hidden sm:inline">{inviteLinks[participant.participantId] ? t.groupDetail.replaceInviteForParticipant : t.groupDetail.createInviteForParticipant}</span><span className="sm:hidden">{t.groupDetail.invite}</span>
+                                    </Button>
                                     {inviteLinks[participant.participantId] && (
-                                        <>
-                                            <input className="input" readOnly value={inviteLinks[participant.participantId]} aria-label={t.groupDetail.inviteLinkTitle} />
-                                            <button className="btn btn--ghost btn--sm" onClick={() => void copyInvite(participant.participantId)}>
-                                                {copiedParticipantId === participant.participantId ? t.groupDetail.inviteCopied : t.groupDetail.copyInvite}
-                                            </button>
-                                        </>
+                                        <div className="flex gap-2"><Input className="min-w-0" readOnly value={inviteLinks[participant.participantId]} aria-label={t.groupDetail.inviteLinkTitle} /><Button variant="ghost" size="icon" title={t.groupDetail.copyInvite} aria-label={t.groupDetail.copyInvite} onClick={() => void copyInvite(participant.participantId)}>{copiedParticipantId === participant.participantId ? <Check className="size-4" /> : <Copy className="size-4" />}</Button></div>
                                     )}
                                 </div>
                             )}
@@ -542,30 +542,29 @@ function ProtocolV2GroupDetail({ state, onDelete }: { state: GroupStateV2; onDel
                     ))}
                     {participantError && <p style={{ color: 'var(--danger)' }}>{participantError}</p>}
                     {isCreator && (
-                        <div style={{ marginTop: 'var(--space-4)', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-                            <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
-                                <input className="input" value={participantName} placeholder={t.groupDetail.participantNamePlaceholder} onChange={(event) => setParticipantName(event.target.value)} />
-                                <button className="btn btn--primary" disabled={!participantName.trim() || busyParticipantId !== null} onClick={() => void addParticipant()}>{t.groupDetail.addParticipant}</button>
+                        <div className="border-t border-[#004502]/10 pt-3">
+                            <div className="flex gap-2">
+                                <Input value={participantName} placeholder={t.groupDetail.participantNamePlaceholder} onChange={(event) => setParticipantName(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') void addParticipant(); }} />
+                                <Button className="shrink-0" disabled={!participantName.trim() || busyParticipantId !== null} onClick={() => void addParticipant()} title={t.groupDetail.addParticipant}>
+                                    <UserPlus className="size-4" /><span className="hidden sm:inline">{t.groupDetail.addParticipant}</span>
+                                </Button>
                             </div>
                             {participants.some(({ status }) => status === 'unclaimed') && (
-                                <>
-                                    <p style={{ color: 'var(--text-secondary)', margin: 0 }}>{t.groupDetail.genericInviteHelp}</p>
-                                    <button className="btn btn--secondary" disabled={busyParticipantId !== null} onClick={() => void replaceGenericInvite()}>
+                                <div className="mt-3 space-y-2">
+                                    <p className="text-sm text-[#716969]">{t.groupDetail.genericInviteHelp}</p>
+                                    <Button variant="secondary" size="sm" className="w-full sm:w-auto" disabled={busyParticipantId !== null} onClick={() => void replaceGenericInvite()}>
+                                        <Link2 className="size-4" />
                                         {genericInviteLink ? t.groupDetail.replaceGenericInvite : t.groupDetail.createGenericInvite}
-                                    </button>
+                                    </Button>
                                     {genericInviteLink && (
-                                        <>
-                                            <input className="input" readOnly value={genericInviteLink} aria-label={t.groupDetail.inviteLinkTitle} />
-                                            <button className="btn btn--ghost btn--sm" onClick={() => void copyGenericInvite()}>
-                                                {copiedParticipantId === 'generic' ? t.groupDetail.inviteCopied : t.groupDetail.copyInvite}
-                                            </button>
-                                        </>
+                                        <div className="flex gap-2"><Input className="min-w-0" readOnly value={genericInviteLink} aria-label={t.groupDetail.inviteLinkTitle} /><Button variant="ghost" size="icon" title={t.groupDetail.copyInvite} aria-label={t.groupDetail.copyInvite} onClick={() => void copyGenericInvite()}>{copiedParticipantId === 'generic' ? <Check className="size-4" /> : <Copy className="size-4" />}</Button></div>
                                     )}
-                                </>
+                                </div>
                             )}
                         </div>
                     )}
-                </section>
+                    </CardContent>
+                </Card>
                 <section className="glass-card glass-card--static" style={{ padding: 'var(--space-5)' }}>
                     <h3>{t.groupDetail.balancesTitle}</h3>
                     {currencies.length === 0 ? <p>{t.groupDetail.allSettled}</p> : currencies.map((currency) => (
