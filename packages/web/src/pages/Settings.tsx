@@ -14,7 +14,7 @@ export function Settings() {
     const {
         identity, restoreIdentity, deleteIdentity, groups, getGroupState, manager, broadcastEntry,
         refreshGroups, personalGroupId, getAuthorizedDevicesV2, revokeDeviceV2,
-        exportIdentityTransferV2, importIdentityFromJson,
+        exportIdentityTransferV2, importIdentityFromJson, preferredRelayUrl, setPreferredRelayUrl,
     } = useApp();
     const { t, locale, setLocale } = useI18n();
 
@@ -28,6 +28,7 @@ export function Settings() {
     const [importFile, setImportFile] = useState<File | null>(null);
     const [status, setStatus] = useState<{ type: 'success' | 'error'; msg: string } | null>(null);
     const [busy, setBusy] = useState(false);
+    const [relayUrl, setRelayUrl] = useState(preferredRelayUrl);
     const [authorizedDevices, setAuthorizedDevices] = useState<Map<string, { name: string; groups: GroupId[] }>>(new Map());
     const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -173,6 +174,16 @@ export function Settings() {
         }
     };
 
+    const handleSaveRelay = () => {
+        setStatus(null);
+        try {
+            setPreferredRelayUrl(relayUrl);
+            setStatus({ type: 'success', msg: t.settings.relaySaved });
+        } catch {
+            setStatus({ type: 'error', msg: t.settings.relayInvalid });
+        }
+    };
+
     const sectionHeading = { fontSize: 'var(--font-size-sm)', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 'var(--space-4)', textTransform: 'uppercase' as const, letterSpacing: '0.05em' };
     const cardStyle = { padding: 'var(--space-6)', marginBottom: 'var(--space-4)' };
 
@@ -236,6 +247,31 @@ export function Settings() {
                             {pubkeyShort}
                         </code>
                     </div>
+                </div>
+            </div>
+
+            <div className="glass-card glass-card--static animate-fade-in stagger-1" style={cardStyle}>
+                <h3 style={sectionHeading}>{t.settings.relayTitle}</h3>
+                <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', marginBottom: 'var(--space-4)' }}>
+                    {t.settings.relayDescription}
+                </p>
+                <label className="form-label" htmlFor="relay-url">{t.settings.relayUrlLabel}</label>
+                <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
+                    <input
+                        id="relay-url"
+                        className="form-input"
+                        type="url"
+                        inputMode="url"
+                        value={relayUrl}
+                        onChange={(event) => setRelayUrl(event.target.value)}
+                        placeholder="wss://relay.example.org/ws"
+                        autoCapitalize="none"
+                        autoCorrect="off"
+                        spellCheck={false}
+                    />
+                    <button className="btn btn--primary" type="button" onClick={handleSaveRelay}>
+                        {t.common.save}
+                    </button>
                 </div>
             </div>
 

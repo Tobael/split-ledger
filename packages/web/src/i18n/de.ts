@@ -187,6 +187,11 @@ const de: Translations = {
         securitySigned: 'Alle Einträge sind signiert und hash-verkettet',
         securityRelay: 'Austauschbare verschlüsselte Relays; der vollständige Verlauf bleibt auf den Geräten der Mitglieder',
         languageTitle: 'Sprache',
+        relayTitle: 'Relay-Server',
+        relayDescription: 'Neue Gruppen verwenden diesen Relay zur verschlüsselten Synchronisierung. Bestehende Gruppen behalten den Relay aus ihren Gruppenzugangsdaten.',
+        relayUrlLabel: 'WebSocket-Relay-URL',
+        relaySaved: 'Relay-Einstellung gespeichert',
+        relayInvalid: 'Gib eine gültige sichere Relay-URL ein, zum Beispiel wss://relay.example.org/ws',
         exportIdentityTitle: 'Identität exportieren',
         exportIdentitySubtitle: 'Scanne diesen QR-Code auf einem anderen Gerät, um dich dort anzumelden.',
         exportWarning: 'Zeige diesen QR-Code niemandem! Er enthält deinen privaten Schlüssel.',
@@ -199,6 +204,10 @@ const de: Translations = {
     },
     nav: {
         groups: 'Gruppen',
+    },
+    connection: {
+        offline: 'Du bist offline. Änderungen bleiben auf diesem Gerät gespeichert und werden synchronisiert, sobald die Verbindung zurückkehrt.',
+        relayUnavailable: 'Der Relay-Server ist nicht erreichbar. Du kannst lokal weiterarbeiten, aber Synchronisierung und Einladungen funktionieren möglicherweise erst nach der Wiederverbindung.',
     },
     footer: {
         impressum: 'Impressum',

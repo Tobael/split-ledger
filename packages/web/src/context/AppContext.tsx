@@ -39,6 +39,7 @@ import {
 import { IndexedDbStorageAdapter } from '../storage/IndexedDbStorageAdapter';
 import { IndexedDbOperationStorageV2 } from '../storage/IndexedDbOperationStorageV2';
 import { isDeviceExplicitlyRevoked } from '../utils/device-authorization';
+import { isPersonalSystemGroup, personalGroupIdFor } from '../utils/personal-group';
 
 // ─── Types ───
 
@@ -119,6 +120,8 @@ interface AppContextValue {
     lastUpdate: number;
     personalGroupId: GroupId | null;
     persistenceWarning: string | null;
+    preferredRelayUrl: string;
+    setPreferredRelayUrl: (url: string) => void;
     deleteIdentity: () => Promise<void>;
 }
 
@@ -139,6 +142,23 @@ function getRelayWsUrl(): string {
 
 function normalizedRelayUrl(): string {
     return getRelayWsUrl();
+}
+
+const RELAY_PREFERENCE_KEY = 'fair-money-preferred-relay';
+
+function preferredRelayUrlFromStorage(): string {
+    return localStorage.getItem(RELAY_PREFERENCE_KEY) ?? normalizedRelayUrl();
+}
+
+function validateRelayUrl(value: string): string {
+    const url = new URL(value.trim());
+    const loopback = url.hostname === 'localhost' || url.hostname === '127.0.0.1' || url.hostname === '::1';
+    if (url.protocol !== 'wss:' && url.protocol !== 'https:' && !(loopback && (url.protocol === 'ws:' || url.protocol === 'http:'))) {
+        throw new Error('Relay URL must use wss:// or https://');
+    }
+    url.protocol = url.protocol === 'https:' ? 'wss:' : url.protocol === 'http:' ? 'ws:' : url.protocol;
+    if (url.pathname === '/' || url.pathname === '') url.pathname = '/ws';
+    return url.toString();
 }
 
 function relayCapability(bytes: Uint8Array): string {
@@ -179,6 +199,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const [syncStatus, setSyncStatus] = useState<SyncStatus>('disconnected');
     const [groupsWaitingForHistory, setGroupsWaitingForHistory] = useState<Set<GroupId>>(() => new Set());
     const [storageReady, setStorageReady] = useState(false);
+    const [preferredRelayUrl, setPreferredRelayUrlState] = useState(preferredRelayUrlFromStorage);
 
     const storage = useMemo<StorageAdapter>(() => new IndexedDbStorageAdapter(), []);
     const operationStorageV2 = useMemo(() => new IndexedDbOperationStorageV2(), []);
@@ -275,9 +296,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
     // ─── Personal Sync Group ───
     const personalGroupId = useMemo(() => {
         if (!identity) return null;
-        const p = identity.rootKeyPair.publicKey;
-        return `${p.slice(0, 8)}-${p.slice(8, 12)}-${p.slice(12, 16)}-${p.slice(16, 20)}-${p.slice(20, 32)}` as GroupId;
+        return personalGroupIdFor(identity.rootKeyPair.publicKey);
     }, [identity]);
+
+    const setPreferredRelayUrl = useCallback((value: string) => {
+        const normalized = validateRelayUrl(value);
+        localStorage.setItem(RELAY_PREFERENCE_KEY, normalized);
+        setPreferredRelayUrlState(normalized);
+    }, []);
 
     // Ensure Personal Group exists and sync it
     useEffect(() => {
@@ -507,6 +533,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
             if (!state) continue;
 
             const entries = await storage.getAllEntries(groupId);
+            if (isPersonalSystemGroup(groupId, entries)) {
+                continue;
+            }
             const ordered = orderEntries([...entries]);
             const balances = computeBalances(ordered);
             const myBalance = balances.get(identity.rootKeyPair.publicKey) ?? 0;
@@ -635,7 +664,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
                 identity.device.deviceKeyPair.publicKey,
                 identity.device.deviceName,
             );
-            const access = createGroupAccessV2(groupId, normalizedRelayUrl());
+            const access = createGroupAccessV2(groupId, preferredRelayUrl);
             await operationStorageV2.storeGroupAccess(access);
             void syncGroupV2(access).catch(() => {
                 // The group remains fully usable offline and will be republished later.
@@ -659,7 +688,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
             console.error("Failed to create group", e);
             throw e;
         }
-    }, [identity, refreshGroups, groupServiceV2, operationStorageV2, syncGroupV2]);
+    }, [identity, preferredRelayUrl, refreshGroups, groupServiceV2, operationStorageV2, syncGroupV2]);
 
 
 
@@ -1240,6 +1269,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         lastUpdate,
         personalGroupId,
         persistenceWarning,
+        preferredRelayUrl,
+        setPreferredRelayUrl,
         deleteIdentity,
     } as AppContextValue;
 

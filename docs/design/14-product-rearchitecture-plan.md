@@ -2,7 +2,7 @@
 
 > Status: approved direction and implementation handoff
 >
-> Last updated: 2026-07-15
+> Last updated: 2026-07-16
 
 This document is the starting point for future implementation sessions. It supersedes the platform and recovery direction in the older design roadmap where the two conflict. Do not begin by rewriting the React UI or moving all code to Rust. First correct the protocol and introduce platform boundaries; then add Tauri as another host for the same application.
 
@@ -366,6 +366,9 @@ Exit criterion: complete local group lifecycle and property tests pass without n
 - [x] Detect synchronization blocked by missing history and show that another group member with the required history needs to come online.
 - [x] Test recovery from an empty/replaced relay using only one member's durable local operation set.
 - [x] Verify two clients converge deterministically after offline concurrent writes arrive in opposite orders.
+- [x] Let each web client select the relay used for newly created groups; invitations continue to carry the selected group relay for recipients.
+- [x] Show a prominent offline or relay-unavailable notice while preserving local group use.
+- [x] Hide deterministic personal device-sync groups from the product group list, including remnants created by earlier local identities.
 
 Exit criterion: web clients on separate devices can use either the project relay or a clean self-hosted relay and converge deterministically.
 

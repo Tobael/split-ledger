@@ -185,6 +185,11 @@ export interface Translations {
         securitySigned: string;
         securityRelay: string;
         languageTitle: string;
+        relayTitle: string;
+        relayDescription: string;
+        relayUrlLabel: string;
+        relaySaved: string;
+        relayInvalid: string;
         exportIdentityTitle: string;
         exportIdentitySubtitle: string;
         exportWarning: string;
@@ -197,6 +202,10 @@ export interface Translations {
     };
     nav: {
         groups: string;
+    };
+    connection: {
+        offline: string;
+        relayUnavailable: string;
     };
     footer: {
         impressum: string;
@@ -390,6 +399,11 @@ const en: Translations = {
         securitySigned: 'All entries are signed and hash-linked',
         securityRelay: 'Disposable encrypted relays; complete history remains on member devices',
         languageTitle: 'Language',
+        relayTitle: 'Relay server',
+        relayDescription: 'New groups use this relay for encrypted synchronization. Existing groups keep the relay contained in their group access data.',
+        relayUrlLabel: 'WebSocket relay URL',
+        relaySaved: 'Relay preference saved',
+        relayInvalid: 'Enter a valid secure relay URL, for example wss://relay.example.org/ws',
         exportIdentityTitle: 'Export Identity',
         exportIdentitySubtitle: 'Scan this QR code on another device to log in.',
         exportWarning: 'This QR code contains your private key. Do not share it!',
@@ -402,6 +416,10 @@ const en: Translations = {
     },
     nav: {
         groups: 'Groups',
+    },
+    connection: {
+        offline: 'You are offline. Changes remain saved on this device and will synchronize when a connection returns.',
+        relayUnavailable: 'The relay server is unavailable. You can keep working locally, but synchronization and invitations may not work until it reconnects.',
     },
     footer: {
         impressum: 'Legal Notice',

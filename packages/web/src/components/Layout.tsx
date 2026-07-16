@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import type { ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { useApp } from '../context/AppContext';
 import { useI18n, supportedLocales, localeLabels } from '../i18n';
 
@@ -8,13 +8,31 @@ import { Footer } from './Footer';
 import { ConnectionStatus } from './ConnectionStatus';
 
 export function Layout({ children }: { children: ReactNode }) {
-    const { isOnboarded, identity, persistenceWarning } = useApp();
+    const { isOnboarded, identity, persistenceWarning, syncStatus } = useApp();
     const { t, locale, setLocale } = useI18n();
     const location = useLocation();
+    const [online, setOnline] = useState(() => navigator.onLine);
+
+    useEffect(() => {
+        const handleOnline = () => setOnline(true);
+        const handleOffline = () => setOnline(false);
+        window.addEventListener('online', handleOnline);
+        window.addEventListener('offline', handleOffline);
+        return () => {
+            window.removeEventListener('online', handleOnline);
+            window.removeEventListener('offline', handleOffline);
+        };
+    }, []);
 
     const storageWarning = persistenceWarning ? (
         <div role="alert" style={{ padding: '12px 16px', background: 'var(--danger-dim)', color: 'var(--danger)', textAlign: 'center' }}>
             {persistenceWarning}
+        </div>
+    ) : null;
+    const relayUnavailable = syncStatus === 'disconnected' || syncStatus === 'reconnecting';
+    const connectionWarning = !online || relayUnavailable ? (
+        <div role="status" style={{ padding: '10px 16px', background: 'var(--warning-dim, rgba(245, 158, 11, 0.14))', color: 'var(--text-primary)', textAlign: 'center', fontSize: 'var(--font-size-sm)' }}>
+            {!online ? t.connection.offline : t.connection.relayUnavailable}
         </div>
     ) : null;
 
@@ -26,6 +44,7 @@ export function Layout({ children }: { children: ReactNode }) {
     return (
         <div className="app-layout">
             {storageWarning}
+            {connectionWarning}
             <nav className="app-nav">
                 <div className="app-nav__inner">
                     <div style={{ display: 'flex', alignItems: 'center' }}>

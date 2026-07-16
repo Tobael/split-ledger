@@ -32,6 +32,35 @@ relay.example.org {
 
 The client relay URL is then `wss://relay.example.org/ws`. Test the public health route at `https://relay.example.org/api/v2/health` as well.
 
+## Selecting a relay in the web application
+
+Each browser can choose the relay used when it creates new groups. Open **Settings**, find **Relay server**, enter a secure WebSocket URL such as `wss://relay.example.org/ws`, and save it. This preference is local to that browser.
+
+Changing the preference does not silently move existing groups. Their invites and locally stored group-access records retain the relay selected when the group was created. Relay migration requires an explicit protocol operation so every member converges on the same destination.
+
+Members joining through an invite do not configure its relay manually: the signed invite carries that group's relay URL and opaque access capability. The relay receives ciphertext and cannot derive group plaintext or private keys.
+
+For the reference deployment behind Traefik, ensure the public router has a higher priority than any catch-all or blackhole router and supports WebSocket upgrades. For example:
+
+```yaml
+labels:
+  - traefik.enable=true
+  - traefik.http.routers.fair-money-relay.rule=Host(`relay.example.org`)
+  - traefik.http.routers.fair-money-relay.entrypoints=websecure
+  - traefik.http.routers.fair-money-relay.priority=100
+  - traefik.http.routers.fair-money-relay.tls=true
+  - traefik.http.routers.fair-money-relay.service=fair-money-relay
+  - traefik.http.services.fair-money-relay.loadbalancer.server.port=8443
+  - traefik.docker.network=external_network
+```
+
+Traefik forwards WebSocket upgrades without a separate `/ws` router or middleware. Verify both paths after deployment:
+
+```bash
+curl --fail https://relay.example.org/api/v2/health
+npx wscat -c wss://relay.example.org/ws
+```
+
 ## Configuration
 
 | Variable | Default | Meaning |
