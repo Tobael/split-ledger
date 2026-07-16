@@ -9,20 +9,20 @@
     /* Base colors - Fair Money Theme */
     /* Palette: #716969 (Gray), #FFFFFF (White), #004502 (Green), #D2D6EF (Lavender), #9B7E46 (Gold) */
 
-    --bg-primary: #FFFFFF;
-    --bg-secondary: #F8F9FC;
+    --bg-primary: #F7F9F7;
+    --bg-secondary: #FFFFFF;
     /* Very subtle cool gray */
     --bg-tertiary: #D2D6EF;
     /* Lavender tint */
-    --bg-card: rgba(255, 255, 255, 0.85);
-    --bg-card-hover: rgba(255, 255, 255, 0.95);
+    --bg-card: #FFFFFF;
+    --bg-card-hover: #FFFFFF;
 
     /* Glass effect */
-    --glass-bg: rgba(255, 255, 255, 0.65);
-    --glass-border: rgba(0, 69, 2, 0.08);
+    --glass-bg: #FFFFFF;
+    --glass-border: rgba(0, 69, 2, 0.1);
     /* Green tint border */
-    --glass-shadow: 0 8px 32px rgba(0, 69, 2, 0.05);
-    --glass-blur: blur(16px);
+    --glass-shadow: 0 1px 3px rgba(0, 69, 2, 0.06);
+    --glass-blur: none;
 
     /* Accent colors */
     --accent-primary: #004502;
@@ -147,8 +147,8 @@ a:hover {
 
 .glass-card {
     background: var(--glass-bg);
-    backdrop-filter: var(--glass-blur);
-    -webkit-backdrop-filter: var(--glass-blur);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
     border: 1px solid var(--glass-border);
     border-radius: var(--radius-lg);
     box-shadow: var(--glass-shadow);
@@ -156,8 +156,8 @@ a:hover {
 }
 
 .glass-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
+    transform: translateY(-1px);
+    box-shadow: 0 6px 18px rgba(0, 69, 2, 0.08);
 }
 
 .glass-card--static:hover {
@@ -174,7 +174,8 @@ a:hover {
     align-items: center;
     justify-content: center;
     gap: var(--space-2);
-    padding: var(--space-3) var(--space-6);
+    min-height: 2.5rem;
+    padding: var(--space-2) var(--space-4);
     border: none;
     border-radius: var(--radius-md);
     font-family: var(--font-family);
@@ -187,19 +188,6 @@ a:hover {
     overflow: hidden;
 }
 
-.btn::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(rgba(255, 255, 255, 0.1), transparent);
-    opacity: 0;
-    transition: opacity var(--transition-fast);
-}
-
-.btn:hover::after {
-    opacity: 1;
-}
-
 .btn:active {
     transform: scale(0.97);
 }
@@ -210,11 +198,11 @@ a:hover {
 }
 
 .btn--primary:hover {
-    box-shadow: 0 0 20px var(--accent-primary-glow);
+    background: #003601;
 }
 
 .btn--secondary {
-    background: var(--bg-tertiary);
+    background: #eef0fa;
     color: var(--text-primary);
     border: 1px solid var(--glass-border);
 }
@@ -231,7 +219,7 @@ a:hover {
 
 .btn--ghost:hover {
     color: var(--text-primary);
-    background: rgba(255, 255, 255, 0.05);
+    background: rgba(0, 69, 2, 0.05);
 }
 
 .btn--danger {
@@ -272,8 +260,9 @@ a:hover {
 }
 
 .form-input {
-    padding: var(--space-3) var(--space-4);
-    background: var(--bg-tertiary);
+    min-height: 2.5rem;
+    padding: var(--space-2) var(--space-3);
+    background: white;
     border: 1px solid var(--glass-border);
     border-radius: var(--radius-md);
     color: var(--text-primary);
@@ -377,7 +366,7 @@ select.form-input {
 }
 
 .page-header__title {
-    font-size: var(--font-size-3xl);
+    font-size: clamp(1.75rem, 5vw, 2.25rem);
     font-weight: 700;
     letter-spacing: -0.02em;
     margin-bottom: var(--space-2);

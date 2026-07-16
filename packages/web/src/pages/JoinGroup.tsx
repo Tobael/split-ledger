@@ -6,6 +6,12 @@ import { useApp } from '../context/AppContext';
 import { useI18n } from '../i18n';
 import { browserLinkReceiver } from '../platform/BrowserLinkReceiver';
 import { inviteTokenFromUrl } from '../platform/LinkReceiver';
+import { ArrowLeft, LogIn } from 'lucide-react';
+import { Alert } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 
 export function JoinGroup() {
     const { prepareInviteV2, claimInviteV2 } = useApp();
@@ -68,16 +74,17 @@ export function JoinGroup() {
     };
 
     return (
-        <div style={{ maxWidth: '480px', margin: '0 auto' }}>
-            <div className="page-header">
-                <h1 className="page-header__title">{t.joinGroup.title}</h1>
-                <p className="page-header__subtitle">{t.joinGroup.subtitle}</p>
-            </div>
-            <div className="glass-card glass-card--static animate-fade-in" style={{ padding: 'var(--space-6)' }}>
-                <div className="form-group" style={{ marginBottom: 'var(--space-4)' }}>
-                    <label className="form-label">{t.joinGroup.inviteLabel}</label>
-                    <input
-                        className="form-input"
+        <div className="mx-auto max-w-lg">
+            <Card className="animate-fade-in">
+                <CardHeader>
+                    <div className="mb-2 flex size-10 items-center justify-center rounded-lg bg-[#004502]/10"><LogIn className="size-5" /></div>
+                    <CardTitle className="text-2xl normal-case tracking-normal text-[#004502]">{t.joinGroup.title}</CardTitle>
+                    <CardDescription>{t.joinGroup.subtitle}</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-5">
+                <div>
+                    <Label>{t.joinGroup.inviteLabel}</Label>
+                    <Input
                         type="text"
                         placeholder={t.joinGroup.invitePlaceholder}
                         value={inviteLink}
@@ -92,16 +99,16 @@ export function JoinGroup() {
                 </div>
 
                 {preview?.invite.scope === 'targeted' && preview.invite.participantId && (
-                    <div className="form-group" style={{ marginBottom: 'var(--space-6)' }}>
-                        <label className="form-label">{t.joinGroup.invitedAs}</label>
-                        <div>{preview.state.participants[preview.invite.participantId]?.displayName}</div>
+                    <div>
+                        <Label>{t.joinGroup.invitedAs}</Label>
+                        <div className="rounded-lg bg-[#004502]/5 px-3 py-2 font-medium">{preview.state.participants[preview.invite.participantId]?.displayName}</div>
                     </div>
                 )}
 
                 {preview?.invite.scope === 'any-unclaimed-slot' && (
-                    <div className="form-group" style={{ marginBottom: 'var(--space-6)' }}>
-                        <label className="form-label" htmlFor="participant-choice">{t.joinGroup.chooseParticipant}</label>
-                        <select id="participant-choice" className="form-input" value={selectedParticipantId} onChange={(event) => setSelectedParticipantId(event.target.value)}>
+                    <div>
+                        <Label htmlFor="participant-choice">{t.joinGroup.chooseParticipant}</Label>
+                        <select id="participant-choice" className="h-10 w-full rounded-lg border border-[#004502]/15 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-[#004502]/30" value={selectedParticipantId} onChange={(event) => setSelectedParticipantId(event.target.value)}>
                             <option value="">{t.joinGroup.chooseParticipantPlaceholder}</option>
                             {Object.values(preview.state.participants)
                                 .filter(({ status }) => status === 'unclaimed')
@@ -110,19 +117,20 @@ export function JoinGroup() {
                     </div>
                 )}
 
-                {error && <div role="alert" style={{ padding: 'var(--space-3) var(--space-4)', background: 'var(--danger-dim)', borderRadius: 'var(--radius-md)', color: 'var(--danger)', fontSize: 'var(--font-size-sm)', marginBottom: 'var(--space-4)' }}>{error}</div>}
+                {error && <Alert className="rounded-lg border border-red-200 bg-red-50 text-left text-red-700">{error}</Alert>}
 
-                <div style={{ display: 'flex', gap: 'var(--space-3)' }}>
-                    <button className="btn btn--ghost" onClick={() => navigate('/dashboard')}>{t.common.cancel}</button>
-                    <button
-                        className="btn btn--primary btn--full"
+                <div className="flex gap-2">
+                    <Button variant="ghost" onClick={() => navigate('/dashboard')}><ArrowLeft className="size-4" />{t.common.cancel}</Button>
+                    <Button
+                        className="flex-1"
                         onClick={() => void loadOrClaim()}
                         disabled={!inviteLink.trim() || joining || Boolean(preview?.invite.scope === 'any-unclaimed-slot' && !selectedParticipantId)}
                     >
                         {joining ? (status || t.joinGroup.joining) : preview ? t.joinGroup.joinButton : t.joinGroup.loadInvite}
-                    </button>
+                    </Button>
                 </div>
-            </div>
+                </CardContent>
+            </Card>
         </div>
     );
 }

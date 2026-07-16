@@ -107,6 +107,7 @@ const de: Translations = {
         copyInvite: 'Einladung kopieren',
         inviteCopied: 'Einladung kopiert',
         voidExpense: 'Entfernen',
+        editExpense: 'Ausgabe bearbeiten',
         payerMustSettle: 'Der zahlende Teilnehmer muss diese Zahlung eintragen.',
         settling: 'Wird eingetragen…',
         renameParticipant: 'Umbenennen',

@@ -2,6 +2,11 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { useI18n } from '../i18n';
+import { ArrowLeft, Users } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 
 
 export function CreateGroup() {
@@ -27,32 +32,35 @@ export function CreateGroup() {
     };
 
     return (
-        <div style={{ maxWidth: '480px', margin: '0 auto' }}>
-            <div className="page-header">
-                <h1 className="page-header__title">{t.createGroup.title}</h1>
-                <p className="page-header__subtitle">{t.createGroup.subtitle}</p>
-            </div>
-
-            <div className="glass-card glass-card--static animate-fade-in" style={{ padding: 'var(--space-6)' }}>
-                <div className="form-group" style={{ marginBottom: 'var(--space-6)' }}>
-                    <label className="form-label">{t.createGroup.nameLabel}</label>
-                    <input
-                        className="form-input"
+        <div className="mx-auto max-w-lg">
+            <Card className="animate-fade-in">
+                <CardHeader>
+                    <div className="mb-2 flex size-10 items-center justify-center rounded-lg bg-[#004502]/10"><Users className="size-5" /></div>
+                    <CardTitle className="text-2xl normal-case tracking-normal text-[#004502]">{t.createGroup.title}</CardTitle>
+                    <CardDescription>{t.createGroup.subtitle}</CardDescription>
+                </CardHeader>
+                <CardContent>
+                <form onSubmit={handleSubmit} className="space-y-5">
+                <div>
+                    <Label htmlFor="group-name">{t.createGroup.nameLabel}</Label>
+                    <Input
+                        id="group-name"
                         type="text"
                         placeholder={t.createGroup.namePlaceholder}
                         value={name}
                         onChange={e => setName(e.target.value)}
-                        onKeyDown={e => e.key === 'Enter' && handleSubmit(e)}
                         autoFocus
                     />
                 </div>
-                <div style={{ display: 'flex', gap: 'var(--space-3)' }}>
-                    <button className="btn btn--ghost" onClick={() => navigate('/dashboard')}>{t.common.cancel}</button>
-                    <button className="btn btn--primary btn--full" onClick={handleSubmit} disabled={!name.trim() || isCreating}>
+                <div className="flex gap-2">
+                    <Button type="button" variant="ghost" onClick={() => navigate('/dashboard')}><ArrowLeft className="size-4" />{t.common.cancel}</Button>
+                    <Button type="submit" className="flex-1" disabled={!name.trim() || isCreating}>
                         {isCreating ? t.createGroup.creating : t.createGroup.createButton}
-                    </button>
+                    </Button>
                 </div>
-            </div>
+                </form>
+                </CardContent>
+            </Card>
         </div>
     );
 }

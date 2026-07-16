@@ -17,7 +17,7 @@ import {
     validateFullChain,
     getEffectiveExpenses,
 } from '@splitledger/core';
-import { Check, Copy, Link2, Pencil, RotateCcw, UserMinus, UserPlus } from 'lucide-react';
+import { ArrowRight, Check, Copy, Link2, Pencil, RotateCcw, Trash2, UserMinus, UserPlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -565,15 +565,18 @@ function ProtocolV2GroupDetail({ state, onDelete }: { state: GroupStateV2; onDel
                     )}
                     </CardContent>
                 </Card>
-                <section className="glass-card glass-card--static" style={{ padding: 'var(--space-5)' }}>
-                    <h3>{t.groupDetail.balancesTitle}</h3>
-                    {currencies.length === 0 ? <p>{t.groupDetail.allSettled}</p> : currencies.map((currency) => (
-                        <div key={currency} style={{ marginTop: 'var(--space-3)' }}>
-                            <strong>{currency}</strong>
+                <Card>
+                    <CardHeader><CardTitle>{t.groupDetail.balancesTitle}</CardTitle></CardHeader>
+                    <CardContent>
+                    {currencies.length === 0 ? <p className="text-sm text-[#716969]">{t.groupDetail.allSettled}</p> : currencies.map((currency) => (
+                        <div key={currency} className="mb-4 last:mb-0">
+                            <strong className="text-sm">{currency}</strong>
+                            <div className="mt-2 space-y-1">
                             {Object.entries(state.balances[currency] ?? {}).map(([participantId, amount]) => (
-                                <div key={participantId}>{state.participants[participantId]?.displayName ?? participantId}: {(amount / 100).toFixed(2)}</div>
+                                <div key={participantId} className="flex justify-between gap-3 text-sm"><span className="min-w-0 truncate text-[#716969]">{state.participants[participantId]?.displayName ?? participantId}</span><span className="shrink-0 font-medium">{currency} {(amount / 100).toFixed(2)}</span></div>
                             ))}
-                            <div style={{ marginTop: 'var(--space-3)', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+                            </div>
+                            <div className="mt-3 space-y-2 border-t border-[#004502]/10 pt-3">
                                 {computeSettlements(new Map(
                                     Object.entries(state.balances[currency] ?? {})
                                         .map(([participantId, amount]) => [participantId as PublicKey, amount]),
@@ -581,40 +584,43 @@ function ProtocolV2GroupDetail({ state, onDelete }: { state: GroupStateV2; onDel
                                     const key = `${currency}:${suggestion.from}:${suggestion.to}`;
                                     const canRecord = myParticipant?.participantId === suggestion.from;
                                     return (
-                                        <div key={key} style={{ fontSize: 'var(--font-size-sm)' }}>
-                                            {state.participants[suggestion.from]?.displayName} → {state.participants[suggestion.to]?.displayName}: {currency} {(suggestion.amount / 100).toFixed(2)}
+                                        <div key={key} className="rounded-lg bg-[#004502]/[0.03] p-2 text-sm">
+                                            <div className="flex flex-wrap items-center gap-1"><span>{state.participants[suggestion.from]?.displayName}</span><ArrowRight className="size-3.5" /><span>{state.participants[suggestion.to]?.displayName}</span><strong className="ml-auto">{currency} {(suggestion.amount / 100).toFixed(2)}</strong></div>
                                             {canRecord ? (
-                                                <button className="btn btn--secondary btn--sm" disabled={settling !== null} style={{ marginLeft: 'var(--space-2)' }} onClick={() => void settle(currency, suggestion.from, suggestion.to, suggestion.amount)}>
+                                                <Button variant="secondary" size="sm" className="mt-2 w-full" disabled={settling !== null} onClick={() => void settle(currency, suggestion.from, suggestion.to, suggestion.amount)}>
                                                     {settling === key ? t.groupDetail.settling : t.groupDetail.markAsPaid}
-                                                </button>
-                                            ) : <div style={{ color: 'var(--text-tertiary)' }}>{t.groupDetail.payerMustSettle}</div>}
+                                                </Button>
+                                            ) : <div className="mt-1 text-xs text-gray-400">{t.groupDetail.payerMustSettle}</div>}
                                         </div>
                                     );
                                 })}
                             </div>
                         </div>
                     ))}
-                    {settlementError && <p style={{ color: 'var(--danger)' }}>{settlementError}</p>}
-                </section>
+                    {settlementError && <p className="mt-3 text-sm text-red-600">{settlementError}</p>}
+                    </CardContent>
+                </Card>
             </div>
-            <section className="glass-card glass-card--static" style={{ padding: 'var(--space-5)', marginBottom: 'var(--space-6)' }}>
-                <h3>{t.groupDetail.expensesTitle}</h3>
-                {expenses.length === 0 ? <p>{t.groupDetail.noExpenses}</p> : expenses.map((expense) => (
-                    <div key={expense.expenseId} style={{ marginTop: 'var(--space-3)', display: 'flex', justifyContent: 'space-between', gap: 'var(--space-3)' }}>
-                        <div>
-                            <strong>{String(expense.expense.description)}</strong>
-                            <div style={{ color: 'var(--text-secondary)' }}>
+            <Card className="mb-6">
+                <CardHeader><CardTitle>{t.groupDetail.expensesTitle}</CardTitle></CardHeader>
+                <CardContent className="space-y-2">
+                {expenses.length === 0 ? <p className="text-sm text-[#716969]">{t.groupDetail.noExpenses}</p> : expenses.map((expense) => (
+                    <div key={expense.expenseId} className="flex flex-col gap-3 rounded-lg border border-[#004502]/10 p-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="min-w-0">
+                            <strong className="block truncate">{String(expense.expense.description)}</strong>
+                            <div className="text-sm text-[#716969]">
                                 {String(expense.expense.currency)} {(Number(expense.expense.amountMinorUnits) / 100).toFixed(2)} · {t.groupDetail.paidBy} {state.participants[String(expense.expense.paidBy)]?.displayName}
                             </div>
                         </div>
-                        <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
-                            <Link className="btn btn--ghost btn--sm" to={`/group/${state.groupId}/expense?edit=${expense.expenseId}`}>Edit</Link>
-                            <button className="btn btn--danger btn--sm" onClick={() => void voidExpenseV2(state.groupId as GroupId, expense.expenseId, 'Expense removed')}>{t.groupDetail.voidExpense}</button>
+                        <div className="flex shrink-0 gap-1 self-end sm:self-auto">
+                            <Button asChild variant="ghost" size="icon"><Link title={t.groupDetail.editExpense} aria-label={t.groupDetail.editExpense} to={`/group/${state.groupId}/expense?edit=${expense.expenseId}`}><Pencil className="size-4" /></Link></Button>
+                            <Button variant="destructive" size="icon" title={t.groupDetail.voidExpense} aria-label={t.groupDetail.voidExpense} onClick={() => void voidExpenseV2(state.groupId as GroupId, expense.expenseId, 'Expense removed')}><Trash2 className="size-4" /></Button>
                         </div>
                     </div>
                 ))}
-            </section>
-            <button className="btn btn--danger" onClick={() => void onDelete()}>{t.groupDetail.deleteGroup}</button>
+                </CardContent>
+            </Card>
+            <Button variant="destructive" className="w-full sm:w-auto" onClick={() => void onDelete()}><Trash2 className="size-4" />{t.groupDetail.deleteGroup}</Button>
         </div>
     );
 }

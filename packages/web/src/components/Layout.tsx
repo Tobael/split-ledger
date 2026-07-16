@@ -7,6 +7,7 @@ import { BrandLogo } from './Logo';
 import { Footer } from './Footer';
 import { ConnectionStatus } from './ConnectionStatus';
 import { Alert } from '@/components/ui/alert';
+import { Settings, UsersRound } from 'lucide-react';
 
 export function Layout({ children }: { children: ReactNode }) {
     const { isOnboarded, identity, persistenceWarning, syncStatus } = useApp();
@@ -46,12 +47,12 @@ export function Layout({ children }: { children: ReactNode }) {
         <div className="app-layout">
             {storageWarning}
             {connectionWarning}
-            <nav className="app-nav">
-                <div className="app-nav__inner">
+            <nav className="sticky top-0 z-50 border-b border-[#004502]/10 bg-white/95 px-3 py-2 backdrop-blur sm:px-6">
+                <div className="mx-auto flex max-w-6xl items-center justify-between gap-3">
                     <div style={{ display: 'flex', alignItems: 'center' }}>
-                        <Link to="/dashboard" className="app-nav__logo" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <Link to="/dashboard" className="flex items-center gap-2 font-bold text-[#004502]">
                             <BrandLogo width={28} height={28} />
-                            <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.1 }}>
+                            <div className="hidden flex-col leading-tight sm:flex">
                                 <span>Fair Money</span>
                                 <span style={{ fontSize: '0.65em', fontWeight: 500, opacity: 0.8 }}>Split Ledger</span>
                             </div>
@@ -60,18 +61,20 @@ export function Layout({ children }: { children: ReactNode }) {
                             <ConnectionStatus />
                         </div>
                     </div>
-                    <div className="app-nav__links">
+                    <div className="flex items-center gap-1">
                         <Link
                             to="/dashboard"
-                            className={`app-nav__link ${isActive('/dashboard') ? 'app-nav__link--active' : ''}`}
+                            title={t.nav.groups}
+                            className={`flex h-9 items-center gap-2 rounded-lg px-2.5 text-sm font-medium transition-colors ${isActive('/dashboard') ? 'bg-[#004502]/10 text-[#004502]' : 'text-[#716969] hover:bg-[#004502]/5'}`}
                         >
-                            {t.nav.groups}
+                            <UsersRound className="size-4" /><span className="hidden md:inline">{t.nav.groups}</span>
                         </Link>
                         <Link
                             to="/settings"
-                            className={`app-nav__link ${isActive('/settings') ? 'app-nav__link--active' : ''}`}
+                            title={identity?.displayName ?? t.settings.title}
+                            className={`flex h-9 items-center gap-2 rounded-lg px-2.5 text-sm font-medium transition-colors ${isActive('/settings') ? 'bg-[#004502]/10 text-[#004502]' : 'text-[#716969] hover:bg-[#004502]/5'}`}
                         >
-                            {identity?.displayName ?? t.settings.title}
+                            <Settings className="size-4" /><span className="hidden lg:inline">{identity?.displayName ?? t.settings.title}</span>
                         </Link>
                         {/* Compact language switcher in nav */}
                         <select
@@ -83,8 +86,8 @@ export function Layout({ children }: { children: ReactNode }) {
                                 border: '1px solid var(--glass-border)',
                                 borderRadius: 'var(--radius-sm)',
                                 color: 'var(--text-secondary)',
-                                fontSize: 'var(--font-size-xs)',
-                                padding: '4px 8px',
+                                fontSize: '0.75rem',
+                                padding: '4px',
                                 cursor: 'pointer',
                                 fontFamily: 'var(--font-family)',
                                 outline: 'none',
@@ -99,7 +102,7 @@ export function Layout({ children }: { children: ReactNode }) {
                     </div>
                 </div>
             </nav >
-            <main className="app-main">{children}</main>
+            <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 sm:px-6 sm:py-8">{children}</main>
             <Footer />
         </div >
     );

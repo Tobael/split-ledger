@@ -1,34 +1,37 @@
 import { Link } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { useI18n } from '../i18n';
+import { ArrowRight, LogIn, Plus, Upload, Users } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
 
 export function Dashboard() {
     const { groups, importIdentityFromJson } = useApp();
     const { t } = useI18n();
 
     return (
-        <div>
-            <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <div className="space-y-6">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                     <h1 className="page-header__title">{t.dashboard.title}</h1>
                     <p className="page-header__subtitle">{t.dashboard.subtitle}</p>
                 </div>
-                <div style={{ display: 'flex', gap: 'var(--space-3)' }}>
-                    <Link to="/join" className="btn btn--secondary">{t.dashboard.joinGroup}</Link>
-                    <Link to="/create-group" className="btn btn--primary">{t.dashboard.newGroup}</Link>
+                <div className="flex gap-2">
+                    <Button asChild variant="secondary" className="flex-1 sm:flex-none"><Link to="/join"><LogIn className="size-4" />{t.dashboard.joinGroup}</Link></Button>
+                    <Button asChild className="flex-1 sm:flex-none"><Link to="/create-group"><Plus className="size-4" />{t.dashboard.newGroup}</Link></Button>
                 </div>
             </div>
 
             {groups.length === 0 ? (
-                <div className="empty-state glass-card glass-card--static animate-fade-in">
-                    <div className="empty-state__icon">👥</div>
-                    <h3 className="empty-state__title">{t.dashboard.noGroupsTitle}</h3>
-                    <p className="empty-state__text">{t.dashboard.noGroupsText}</p>
-                    <div style={{ display: 'flex', gap: 'var(--space-3)' }}>
-                        <Link to="/join" className="btn btn--secondary">{t.dashboard.joinGroup}</Link>
-                        <Link to="/create-group" className="btn btn--primary">{t.dashboard.createGroup}</Link>
-                        <button
-                            className="btn btn--secondary"
+                <Card className="animate-fade-in py-12 text-center">
+                    <CardContent className="mx-auto flex max-w-md flex-col items-center gap-4">
+                    <div className="flex size-12 items-center justify-center rounded-full bg-[#004502]/10"><Users className="size-6" /></div>
+                    <div><h3 className="text-xl font-semibold">{t.dashboard.noGroupsTitle}</h3><p className="mt-1 text-sm text-[#716969]">{t.dashboard.noGroupsText}</p></div>
+                    <div className="flex w-full flex-col gap-2 sm:flex-row sm:justify-center">
+                        <Button asChild variant="secondary"><Link to="/join"><LogIn className="size-4" />{t.dashboard.joinGroup}</Link></Button>
+                        <Button asChild><Link to="/create-group"><Plus className="size-4" />{t.dashboard.createGroup}</Link></Button>
+                        <Button
+                            variant="ghost"
                             onClick={() => {
                                 const input = document.createElement('input');
                                 input.type = 'file';
@@ -64,32 +67,32 @@ export function Dashboard() {
                             }}
                             title={t.settings?.importButton ?? "Import Identity from JSON"}
                         >
-                            📁 {t.settings?.importButton ?? "Import"}
-                        </button>
+                            <Upload className="size-4" />{t.settings?.importButton ?? "Import"}
+                        </Button>
                     </div>
-                </div>
+                    </CardContent>
+                </Card>
             ) : (
-                <div style={{ display: 'grid', gap: 'var(--space-4)', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))' }}>
+                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                     {groups.map((g, i) => (
                         <Link
                             key={g.groupId}
                             to={`/group/${g.groupId}`}
-                            className={`glass-card stagger-${Math.min(i + 1, 5)} animate-fade-in`}
-                            style={{ padding: 'var(--space-5)', display: 'block', color: 'inherit' }}
+                            className={`group rounded-xl border border-[#004502]/10 bg-white p-5 text-inherit shadow-sm transition hover:-translate-y-0.5 hover:border-[#004502]/25 hover:shadow-md stagger-${Math.min(i + 1, 5)} animate-fade-in`}
                         >
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 'var(--space-3)' }}>
-                                <div>
-                                    <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 600, marginBottom: 'var(--space-1)' }}>
+                            <div className="flex items-start justify-between gap-3">
+                                <div className="min-w-0">
+                                    <h3 className="truncate text-lg font-semibold">
                                         {g.name}
                                     </h3>
-                                    <span className="badge badge--accent">
+                                    <span className="mt-1 inline-flex rounded-full bg-[#004502]/10 px-2 py-0.5 text-xs font-medium">
                                         {g.memberCount} {g.memberCount === 1 ? t.common.member : t.common.members}
                                     </span>
                                 </div>
                                 <BalanceDisplay amount={g.myBalance} currency={g.currency} />
                             </div>
-                            <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-tertiary)' }}>
-                                {t.dashboard.viewDetails}
+                            <div className="mt-4 flex items-center gap-1 text-xs text-[#716969] group-hover:text-[#004502]">
+                                {t.dashboard.viewDetails}<ArrowRight className="size-3.5" />
                             </div>
                         </Link>
                     ))}
