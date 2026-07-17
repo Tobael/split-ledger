@@ -32,6 +32,9 @@ export interface Translations {
         keyHint: string;
         generatingTitle: string;
         generatingSub: string;
+        fileImportTitle: string;
+        fileImportSubtitle: string;
+        identityFileLabel: string;
     };
     dashboard: {
         title: string;
@@ -231,6 +234,9 @@ const en: Translations = {
         keyHint: '🔑 A unique cryptographic identity will be generated on your device. No passwords, no accounts.',
         generatingTitle: 'Generating your identity…',
         generatingSub: 'Creating cryptographic keys on your device',
+        fileImportTitle: 'Import your identity',
+        fileImportSubtitle: 'Select an encrypted Fair Money identity file and enter its password.',
+        identityFileLabel: 'Encrypted identity file',
     },
     dashboard: {
         title: 'Your Groups',

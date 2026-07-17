@@ -1,13 +1,12 @@
 import { Link } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { useI18n } from '../i18n';
-import { ArrowRight, LogIn, Plus, Upload, Users } from 'lucide-react';
+import { ArrowRight, LogIn, Plus, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { decryptIdentity } from '../utils/identity-export';
 
 export function Dashboard() {
-    const { groups, importIdentityFromJson } = useApp();
+    const { groups } = useApp();
     const { t } = useI18n();
 
     return (
@@ -31,44 +30,6 @@ export function Dashboard() {
                     <div className="flex w-full flex-col gap-2 sm:flex-row sm:justify-center">
                         <Button asChild variant="secondary"><Link to="/join"><LogIn className="size-4" />{t.dashboard.joinGroup}</Link></Button>
                         <Button asChild><Link to="/create-group"><Plus className="size-4" />{t.dashboard.createGroup}</Link></Button>
-                        <Button
-                            variant="ghost"
-                            onClick={() => {
-                                const input = document.createElement('input');
-                                input.type = 'file';
-                                input.accept = '.json';
-                                input.onchange = (e) => {
-                                    const file = (e.target as HTMLInputElement).files?.[0];
-                                    if (file) {
-                                        const reader = new FileReader();
-                                        reader.onload = async (re) => {
-                                            const content = re.target?.result as string;
-                                            const pwd = prompt(t.settings?.passwordPrompt ?? "Enter password to decrypt:");
-                                            if (pwd) {
-                                                try {
-                                                    const decryptedJson = await decryptIdentity(content, pwd);
-                                                    const imported = JSON.parse(decryptedJson);
-
-                                                    if (imported?.format === 'fair-money-identity-transfer' && imported.version === 2) {
-                                                        await importIdentityFromJson(decryptedJson);
-                                                        // Page will likely reload or refresh AppContext state implicitly
-                                                    } else {
-                                                        throw new Error("Invalid identity file structure");
-                                                    }
-                                                } catch {
-                                                    alert(t.settings?.importError ?? "Invalid file or password");
-                                                }
-                                            }
-                                        };
-                                        reader.readAsText(file);
-                                    }
-                                };
-                                input.click();
-                            }}
-                            title={t.settings?.importButton ?? "Import Identity from JSON"}
-                        >
-                            <Upload className="size-4" />{t.settings?.importButton ?? "Import"}
-                        </Button>
                     </div>
                     </CardContent>
                 </Card>

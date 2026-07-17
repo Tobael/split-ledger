@@ -34,6 +34,9 @@ const de: Translations = {
         keyHint: '🔑 Eine einzigartige kryptographische Identität wird auf deinem Gerät erzeugt. Keine Passwörter, keine Konten.',
         generatingTitle: 'Identität wird erzeugt…',
         generatingSub: 'Kryptographische Schlüssel werden auf deinem Gerät erstellt',
+        fileImportTitle: 'Identität importieren',
+        fileImportSubtitle: 'Wähle eine verschlüsselte Fair-Money-Identitätsdatei und gib ihr Passwort ein.',
+        identityFileLabel: 'Verschlüsselte Identitätsdatei',
     },
     dashboard: {
         title: 'Deine Gruppen',
