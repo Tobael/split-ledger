@@ -14,8 +14,8 @@ export function Dashboard() {
         <div className="space-y-6">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                 <div>
-                    <h1 className="page-header__title">{t.dashboard.title}</h1>
-                    <p className="page-header__subtitle">{t.dashboard.subtitle}</p>
+                    <h1 className="text-3xl font-bold tracking-tight text-[#004502]">{t.dashboard.title}</h1>
+                    <p className="mt-1 text-sm text-[#716969]">{t.dashboard.subtitle}</p>
                 </div>
                 <div className="flex gap-2">
                     <Button asChild variant="secondary" className="flex-1 sm:flex-none"><Link to="/join"><LogIn className="size-4" />{t.dashboard.joinGroup}</Link></Button>

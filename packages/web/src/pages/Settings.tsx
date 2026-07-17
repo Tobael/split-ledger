@@ -148,9 +148,9 @@ export function Settings() {
 
     return (
         <div className="mx-auto max-w-2xl space-y-4 pb-8">
-            <div className="page-header">
-                <h1 className="page-header__title">{t.settings.title}</h1>
-                <p className="page-header__subtitle">{t.settings.subtitle}</p>
+            <div className="mb-2">
+                <h1 className="text-3xl font-bold tracking-tight text-[#004502]">{t.settings.title}</h1>
+                <p className="mt-1 text-sm text-[#716969]">{t.settings.subtitle}</p>
             </div>
 
             {/* Status banner */}

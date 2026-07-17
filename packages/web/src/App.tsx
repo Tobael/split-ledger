@@ -17,8 +17,8 @@ const Impressum = lazy(() => import('./pages/Impressum').then(({ Impressum }) =>
 const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy').then(({ PrivacyPolicy }) => ({ default: PrivacyPolicy })));
 
 const PublicLayout = ({ children }: { children: ReactNode }) => (
-  <div className="app-layout">
-    <main className="app-main">{children}</main>
+  <div className="flex min-h-dvh flex-col">
+    <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 sm:px-6 sm:py-8">{children}</main>
     <Footer />
   </div>
 );

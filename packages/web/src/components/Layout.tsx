@@ -44,7 +44,7 @@ export function Layout({ children }: { children: ReactNode }) {
         location.pathname === path || location.pathname.startsWith(path + '/');
 
     return (
-        <div className="app-layout">
+        <div className="flex min-h-dvh flex-col">
             {storageWarning}
             {connectionWarning}
             <nav className="sticky top-0 z-50 border-b border-[#004502]/10 bg-white/95 px-3 py-2 backdrop-blur sm:px-6">

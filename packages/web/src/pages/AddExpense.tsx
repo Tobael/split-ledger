@@ -69,7 +69,7 @@ export function AddExpense() {
     }, [groupId, getGroupStateV2, identity, editId]);
 
     if (!stateV2 || !identity) {
-        return <div style={{ padding: 'var(--space-8)', color: 'var(--text-secondary)' }}>{t.common.loading}</div>;
+        return <div className="p-8 text-sm text-[#716969]">{t.common.loading}</div>;
     }
 
     const activeMembers = Object.values(stateV2.participants)
