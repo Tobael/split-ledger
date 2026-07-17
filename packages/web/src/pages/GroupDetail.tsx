@@ -8,7 +8,7 @@ import {
     type PublicKey,
     computeSettlements,
 } from '@splitledger/core';
-import { ArrowRight, Check, Copy, Link2, Pencil, RotateCcw, Trash2, UserMinus, UserPlus } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, Clock3, Copy, Link2, Pencil, Plus, RotateCcw, ShieldX, Trash2, UserMinus, UserPlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -51,16 +51,18 @@ export function GroupDetail() {
     if (!state) {
         const waitingForHistory = groupsWaitingForHistory.has(groupId);
         return (
-            <div className="empty-state animate-fade-in" role="status">
-                <div className="empty-state__icon">{waitingForHistory ? '⏳' : '🚫'}</div>
-                <h2 className="empty-state__title">
+            <Card className="mx-auto max-w-lg animate-fade-in text-center" role="status">
+                <CardContent className="flex flex-col items-center gap-4 py-8">
+                <div className="flex size-12 items-center justify-center rounded-full bg-[#004502]/10 text-[#004502]">{waitingForHistory ? <Clock3 className="size-6" /> : <ShieldX className="size-6" />}</div>
+                <h2 className="text-xl font-semibold">
                     {waitingForHistory ? t.groupDetail.waitingForMemberTitle : t.groupDetail.accessDeniedTitle}
                 </h2>
-                <p className="empty-state__text">
+                <p className="max-w-md text-sm text-[#716969]">
                     {waitingForHistory ? t.groupDetail.waitingForMemberText : t.groupDetail.accessDeniedText}
                 </p>
-                <Button asChild variant="secondary"><Link to="/dashboard">{t.groupDetail.backToGroups}</Link></Button>
-            </div>
+                <Button asChild variant="secondary"><Link to="/dashboard"><ArrowLeft className="size-4" />{t.groupDetail.backToGroups}</Link></Button>
+                </CardContent>
+            </Card>
         );
     }
 
@@ -142,7 +144,7 @@ function ProtocolV2GroupDetail({ state, onDelete }: { state: GroupStateV2; onDel
         try {
             await createSettlementV2(state.groupId as GroupId, from, to, amount, currency);
         } catch (error) {
-            setSettlementError(error instanceof Error ? error.message : 'Unable to record settlement');
+            setSettlementError(error instanceof Error ? error.message : t.groupDetail.settlementFailed);
         } finally {
             setSettling(null);
         }
@@ -155,7 +157,7 @@ function ProtocolV2GroupDetail({ state, onDelete }: { state: GroupStateV2; onDel
             await renameParticipantV2(state.groupId as GroupId, participantId, editedParticipantName);
             setEditingParticipantId(null);
         } catch (error) {
-            setParticipantError(error instanceof Error ? error.message : 'Unable to rename participant');
+            setParticipantError(error instanceof Error ? error.message : t.groupDetail.renameParticipantFailed);
         } finally {
             setBusyParticipantId(null);
         }
@@ -168,7 +170,7 @@ function ProtocolV2GroupDetail({ state, onDelete }: { state: GroupStateV2; onDel
         try {
             await disableParticipantV2(state.groupId as GroupId, participantId);
         } catch (error) {
-            setParticipantError(error instanceof Error ? error.message : 'Unable to disable participant');
+            setParticipantError(error instanceof Error ? error.message : t.groupDetail.disableParticipantFailed);
         } finally {
             setBusyParticipantId(null);
         }
@@ -181,20 +183,28 @@ function ProtocolV2GroupDetail({ state, onDelete }: { state: GroupStateV2; onDel
         try {
             await resetParticipantV2(state.groupId as GroupId, participantId);
         } catch (error) {
-            setParticipantError(error instanceof Error ? error.message : 'Unable to reset participant');
+            setParticipantError(error instanceof Error ? error.message : t.groupDetail.resetParticipantFailed);
         } finally {
             setBusyParticipantId(null);
         }
     };
+
+    const voidExpense = async (expenseId: string) => {
+        if (!window.confirm(t.groupDetail.confirmVoidExpense)) return;
+        await voidExpenseV2(state.groupId as GroupId, expenseId, t.groupDetail.voidExpenseReason);
+    };
+
     return (
-        <div className="animate-fade-in">
-            <div className="page-header">
-                <Link to="/dashboard" style={{ color: 'var(--text-tertiary)', fontSize: 'var(--font-size-sm)' }}>{t.groupDetail.backToGroups}</Link>
-                <h1 className="page-header__title">{state.groupName}</h1>
-                <p className="page-header__subtitle">{participants.length} {participants.length === 1 ? t.common.member : t.common.members}</p>
-                <Button asChild><Link to={`/group/${state.groupId}/expense`}>{t.groupDetail.addExpense}</Link></Button>
+        <div className="animate-fade-in space-y-6">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                    <Button asChild variant="ghost" size="sm" className="-ml-3 mb-1"><Link to="/dashboard"><ArrowLeft className="size-4" />{t.groupDetail.backToGroups}</Link></Button>
+                    <h1 className="text-3xl font-bold tracking-tight text-[#004502]">{state.groupName}</h1>
+                    <p className="mt-1 text-sm text-[#716969]">{participants.length} {participants.length === 1 ? t.common.member : t.common.members}</p>
+                </div>
+                <Button asChild className="w-full sm:w-auto"><Link to={`/group/${state.groupId}/expense`}><Plus className="size-4" />{t.groupDetail.addExpense}</Link></Button>
             </div>
-            <div className="grid-responsive-cards" style={{ marginBottom: 'var(--space-6)' }}>
+            <div className="grid gap-4 lg:grid-cols-2">
                 <Card>
                     <CardHeader><CardTitle>{t.groupDetail.membersTitle}</CardTitle></CardHeader>
                     <CardContent className="space-y-3">
@@ -205,7 +215,7 @@ function ProtocolV2GroupDetail({ state, onDelete }: { state: GroupStateV2; onDel
                                     <Input value={editedParticipantName} onChange={(event) => setEditedParticipantName(event.target.value)} />
                                     <Button size="icon" title={t.groupDetail.saveParticipantName} aria-label={t.groupDetail.saveParticipantName} disabled={!editedParticipantName.trim() || busyParticipantId !== null} onClick={() => void saveParticipantName(participant.participantId)}><Check className="size-4" /></Button>
                                 </div>
-                            ) : <div className="flex items-center justify-between gap-2"><strong className="min-w-0 truncate">{participant.displayName}</strong><span className="badge badge--accent shrink-0">{participant.status}</span></div>}
+                            ) : <div className="flex items-center justify-between gap-2"><strong className="min-w-0 truncate">{participant.displayName}</strong><span className="shrink-0 rounded-full bg-[#004502]/10 px-2 py-1 text-xs font-medium text-[#004502]">{participant.status === 'claimed' ? t.groupDetail.participantClaimed : t.groupDetail.participantUnclaimed}</span></div>}
                             {isCreator && editingParticipantId !== participant.participantId && (
                                 <div className="mt-2 flex flex-wrap gap-1">
                                     <Button variant="ghost" size="icon" title={t.groupDetail.renameParticipant} aria-label={t.groupDetail.renameParticipant} onClick={() => {
@@ -232,7 +242,7 @@ function ProtocolV2GroupDetail({ state, onDelete }: { state: GroupStateV2; onDel
                             )}
                         </div>
                     ))}
-                    {participantError && <p style={{ color: 'var(--danger)' }}>{participantError}</p>}
+                    {participantError && <p className="text-sm text-red-700">{participantError}</p>}
                     {isCreator && (
                         <div className="border-t border-[#004502]/10 pt-3">
                             <div className="flex gap-2">
@@ -293,7 +303,7 @@ function ProtocolV2GroupDetail({ state, onDelete }: { state: GroupStateV2; onDel
                     </CardContent>
                 </Card>
             </div>
-            <Card className="mb-6">
+            <Card>
                 <CardHeader><CardTitle>{t.groupDetail.expensesTitle}</CardTitle></CardHeader>
                 <CardContent className="space-y-2">
                 {expenses.length === 0 ? <p className="text-sm text-[#716969]">{t.groupDetail.noExpenses}</p> : expenses.map((expense) => (
@@ -306,7 +316,7 @@ function ProtocolV2GroupDetail({ state, onDelete }: { state: GroupStateV2; onDel
                         </div>
                         <div className="flex shrink-0 gap-1 self-end sm:self-auto">
                             <Button asChild variant="ghost" size="icon"><Link title={t.groupDetail.editExpense} aria-label={t.groupDetail.editExpense} to={`/group/${state.groupId}/expense?edit=${expense.expenseId}`}><Pencil className="size-4" /></Link></Button>
-                            <Button variant="destructive" size="icon" title={t.groupDetail.voidExpense} aria-label={t.groupDetail.voidExpense} onClick={() => void voidExpenseV2(state.groupId as GroupId, expense.expenseId, t.groupDetail.voidExpenseReason)}><Trash2 className="size-4" /></Button>
+                            <Button variant="destructive" size="icon" title={t.groupDetail.voidExpense} aria-label={t.groupDetail.voidExpense} onClick={() => void voidExpense(expense.expenseId)}><Trash2 className="size-4" /></Button>
                         </div>
                     </div>
                 ))}

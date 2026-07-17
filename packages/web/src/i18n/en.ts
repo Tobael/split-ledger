@@ -78,16 +78,10 @@ export interface Translations {
         inviteLinkTitle: string;
         membersTitle: string;
         balancesTitle: string;
-        settlementsTitle: string;
         allSettled: string;
         expensesTitle: string;
         noExpenses: string;
         paidBy: string;
-        viewChain: string;
-        hideChain: string;
-        removeMember: string;
-        confirmRemove: string;
-        settleUp: string;
         confirmSettleUp: string;
         markAsPaid: string;
         settlementDescription: string;
@@ -95,7 +89,6 @@ export interface Translations {
         confirmDelete: string;
         accessDeniedTitle: string;
         accessDeniedText: string;
-        exportData: string;
         waitingForMemberTitle: string;
         waitingForMemberText: string;
         addParticipant: string;
@@ -103,9 +96,9 @@ export interface Translations {
         createInviteForParticipant: string;
         replaceInviteForParticipant: string;
         copyInvite: string;
-        inviteCopied: string;
         voidExpense: string;
         voidExpenseReason: string;
+        confirmVoidExpense: string;
         editExpense: string;
         payerMustSettle: string;
         settling: string;
@@ -118,6 +111,12 @@ export interface Translations {
         createGenericInvite: string;
         replaceGenericInvite: string;
         genericInviteHelp: string;
+        participantClaimed: string;
+        participantUnclaimed: string;
+        settlementFailed: string;
+        renameParticipantFailed: string;
+        disableParticipantFailed: string;
+        resetParticipantFailed: string;
     };
     addExpense: {
         backTo: string;
@@ -280,22 +279,16 @@ const en: Translations = {
         chooseParticipantPlaceholder: 'Select a participant',
     },
     groupDetail: {
-        backToGroups: '← Groups',
-        invite: '🔗 Invite',
-        addExpense: '+ Add Expense',
+        backToGroups: 'Groups',
+        invite: 'Invite',
+        addExpense: 'Add expense',
         inviteLinkTitle: 'Invite Link',
         membersTitle: 'Members',
         balancesTitle: 'Balances',
-        settlementsTitle: 'Settlements',
-        allSettled: 'All settled up! 🎉',
+        allSettled: 'All settled up',
         expensesTitle: 'Expenses',
         noExpenses: 'No expenses yet. Add one to get started!',
         paidBy: 'Paid by',
-        viewChain: '⛓ View Chain',
-        hideChain: '⛓ Hide Chain',
-        removeMember: 'Remove',
-        confirmRemove: 'Are you sure you want to remove this member?',
-        settleUp: 'Settle Up',
         confirmSettleUp: 'Are you sure you want to mark this as paid?',
         markAsPaid: 'Mark as Paid',
         settlementDescription: 'Settlement',
@@ -303,7 +296,6 @@ const en: Translations = {
         confirmDelete: 'Are you sure you want to delete this group? This cannot be undone.',
         accessDeniedTitle: 'Access Denied',
         accessDeniedText: 'You are not a member of this group or the group does not exist locally.',
-        exportData: 'Export Data',
         waitingForMemberTitle: 'Waiting for group history',
         waitingForMemberText: 'Another group member who has the missing history needs to come online. Your existing local data remains available.',
         addParticipant: 'Add participant',
@@ -311,9 +303,9 @@ const en: Translations = {
         createInviteForParticipant: 'Create invite',
         replaceInviteForParticipant: 'Replace invite',
         copyInvite: 'Copy invite',
-        inviteCopied: 'Invite copied',
         voidExpense: 'Remove',
         voidExpenseReason: 'Expense removed',
+        confirmVoidExpense: 'Remove this expense? The signed history remains available for audit.',
         editExpense: 'Edit expense',
         payerMustSettle: 'The paying participant must record this payment.',
         settling: 'Recording…',
@@ -326,6 +318,12 @@ const en: Translations = {
         createGenericInvite: 'Create open invite',
         replaceGenericInvite: 'Replace open invite',
         genericInviteHelp: 'The recipient chooses one currently unclaimed participant.',
+        participantClaimed: 'Joined',
+        participantUnclaimed: 'Not joined',
+        settlementFailed: 'Unable to record settlement',
+        renameParticipantFailed: 'Unable to rename participant',
+        disableParticipantFailed: 'Unable to disable participant',
+        resetParticipantFailed: 'Unable to reset participant identity',
     },
     addExpense: {
         backTo: '← Back to',
