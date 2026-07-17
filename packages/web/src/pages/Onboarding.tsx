@@ -1,12 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { useI18n } from '../i18n';
 import { Footer } from '../components/Footer';
-import { IdentityImport } from '../components/IdentityImport';
 import { postAuthRoute } from '../utils/post-auth-route';
 import { BrandLogo } from '../components/Logo';
-import { Camera, Loader2, ShieldCheck, Smartphone, Upload, UserRoundCheck } from 'lucide-react';
+import { Loader2, ShieldCheck, Smartphone, Upload, UserRoundCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -19,16 +18,6 @@ export function Onboarding() {
     const location = useLocation();
     const [name, setName] = useState('');
     const [step, setStep] = useState<'welcome' | 'name' | 'creating'>('welcome');
-    const [showScanner, setShowScanner] = useState(false);
-    const [hasCamera, setHasCamera] = useState(false);
-
-    useEffect(() => {
-        if (navigator.mediaDevices && navigator.mediaDevices.enumerateDevices) {
-            navigator.mediaDevices.enumerateDevices()
-                .then(devices => setHasCamera(devices.some(d => d.kind === 'videoinput')))
-                .catch(() => setHasCamera(false));
-        }
-    }, []);
 
     const handleCreate = () => {
         if (!name.trim()) return;
@@ -73,7 +62,7 @@ export function Onboarding() {
         <div className="flex min-h-dvh flex-col bg-[#f7f9f7]">
             <main className="mx-auto flex w-full max-w-lg flex-1 items-center px-4 py-8 sm:px-6">
             <div className="w-full animate-slide-up">
-                {step === 'welcome' && !showScanner && (
+                {step === 'welcome' && (
                     <Card>
                         <CardHeader className="items-center text-center">
                             <BrandLogo width={52} height={52} />
@@ -96,16 +85,9 @@ export function Onboarding() {
                             <Button size="lg" className="w-full" onClick={() => setStep('name')}>
                                 {t.onboarding.getStarted}
                             </Button>
-                            <div className="grid grid-cols-2 gap-2">
-                                <Button variant="secondary" className="min-w-0 px-3 text-xs sm:text-sm" disabled={!hasCamera} onClick={() => setShowScanner(true)}><Camera className="size-4 shrink-0" /><span className="leading-tight">{t.onboarding.scanQrTitle}</span></Button>
-                                <Button variant="secondary" className="min-w-0 px-3 text-xs sm:text-sm" onClick={handleFileImport}><Upload className="size-4 shrink-0" /><span className="leading-tight">{t.settings.importButton}</span></Button>
-                            </div>
+                            <Button variant="secondary" className="w-full" onClick={handleFileImport}><Upload className="size-4 shrink-0" />{t.settings.importButton}</Button>
                         </CardContent>
                     </Card>
-                )}
-
-                {showScanner && (
-                    <IdentityImport onCancel={() => setShowScanner(false)} />
                 )}
 
                 {step === 'name' && (

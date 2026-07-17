@@ -382,12 +382,14 @@ Before beginning this phase, deploy the v2 web application and complete [the man
 - [x] Prepare the pre-Tauri web deployment: external relay build configuration, standalone web image, v2 container health check, gated deployment workflow, release builds, and manual test checklist.
 - [x] Establish shadcn/ui and Tailwind CSS as the shared component foundation; migrate pages incrementally while keeping the web build deployable.
 - [x] Split web routes and identity-transfer utilities into on-demand production chunks so secondary workflows do not inflate the initial application bundle.
+- [x] Remove the unsafe full identity package QR and its oversized scanner dependency; retain password-encrypted file transfer until compact relay-mediated pairing exists.
 - Deploy the reviewed commit to the test environment and record the physical-device results.
 
 - Initialize Tauri 2 around the existing Vite/React build.
 - Add iOS, Android, and desktop targets incrementally.
 - Implement SQLite and native secure identity storage adapters.
 - Add Tauri deep-link reception.
+- Add a compact, single-use, end-to-end encrypted relay pairing flow for device-transfer QR codes; the QR must contain only a locator and decryption key, never the identity package itself.
 - Configure iOS Universal Links with an AASA file.
 - Configure Android App Links with `assetlinks.json`.
 - Add the static web landing/fallback experience.

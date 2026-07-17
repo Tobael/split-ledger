@@ -32,11 +32,6 @@ export interface Translations {
         keyHint: string;
         generatingTitle: string;
         generatingSub: string;
-        importTitle: string;
-        scanQrTitle: string;
-        importInvalid: string;
-        cameraError: string;
-        cameraPermissionHelp: string;
     };
     dashboard: {
         title: string;
@@ -186,11 +181,6 @@ export interface Translations {
         relayUrlLabel: string;
         relaySaved: string;
         relayInvalid: string;
-        exportIdentityTitle: string;
-        exportIdentitySubtitle: string;
-        exportWarning: string;
-        revealQr: string;
-        keepPrivate: string;
         dangerZone: string;
         dangerZoneDesc: string;
         deleteAccount: string;
@@ -241,11 +231,6 @@ const en: Translations = {
         keyHint: '🔑 A unique cryptographic identity will be generated on your device. No passwords, no accounts.',
         generatingTitle: 'Generating your identity…',
         generatingSub: 'Creating cryptographic keys on your device',
-        importTitle: 'Scan QR to import identity',
-        scanQrTitle: 'Scan Identity QR',
-        importInvalid: 'Invalid QR Code. Please try again.',
-        cameraError: 'Could not access camera. Please check permissions.',
-        cameraPermissionHelp: 'Allow camera access in your browser settings, or import an encrypted identity file instead.',
     },
     dashboard: {
         title: 'Your Groups',
@@ -396,11 +381,6 @@ const en: Translations = {
         relayUrlLabel: 'WebSocket relay URL',
         relaySaved: 'Relay preference saved',
         relayInvalid: 'Enter a valid secure relay URL, for example wss://relay.example.org/ws',
-        exportIdentityTitle: 'Export Identity',
-        exportIdentitySubtitle: 'Scan this QR code on another device to log in.',
-        exportWarning: 'This QR code contains your private key. Do not share it!',
-        revealQr: 'Reveal QR Code',
-        keepPrivate: 'Keep this screen private!',
         dangerZone: 'Danger Zone',
         dangerZoneDesc: 'Irreversibly delete your account, keys, and local data from this device. You will lose access to all groups unless you have a backup.',
         deleteAccount: 'Delete Account',

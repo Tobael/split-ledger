@@ -26,6 +26,8 @@ If an invite opens in an embedded browser, show actions to open the installed ap
 
 Users can name, add, inspect, and revoke devices. Device enrollment requires proof from the owning root identity or an already approved transfer mechanism. Revocation is an operation and only takes effect for peers that receive it.
 
+A QR device handoff must never embed the complete identity-transfer package. The package grows with group access material and exposes root and group secrets to cameras and screenshots. A future QR flow must contain only a compact, single-use locator and decryption key for a short-lived, end-to-end encrypted relay handoff. Until that flow exists, password-encrypted file export/import is the supported transfer path.
+
 ## Identity loss
 
 There is no social recovery flow. The UX distinguishes:

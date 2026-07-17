@@ -7,7 +7,6 @@ import {
     decryptIdentity,
     readFileAsText,
 } from '../utils/identity-export';
-import { IdentityExport } from '../components/IdentityExport';
 import type { GroupId } from '@splitledger/core';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -266,7 +265,6 @@ export function Settings() {
             <Card className="animate-fade-in stagger-2">
                 <CardHeader><CardTitle>{t.settings.transferTitle}</CardTitle><CardDescription>{t.settings.transferDescription}</CardDescription></CardHeader>
                 <CardContent className="space-y-3">
-                    <IdentityExport />
                     {!showExport ? (
                         <Button variant="secondary" className="w-full" onClick={() => { setShowExport(true); setShowImport(false); setStatus(null); }}>
                             <Download className="size-4" />
