@@ -97,8 +97,8 @@ export function Onboarding() {
                                 {t.onboarding.getStarted}
                             </Button>
                             <div className="grid grid-cols-2 gap-2">
-                                <Button variant="secondary" disabled={!hasCamera} onClick={() => setShowScanner(true)}><Camera className="size-4" />{t.onboarding.scanQrTitle}</Button>
-                                <Button variant="secondary" onClick={handleFileImport}><Upload className="size-4" />{t.settings.importButton}</Button>
+                                <Button variant="secondary" className="min-w-0 px-3 text-xs sm:text-sm" disabled={!hasCamera} onClick={() => setShowScanner(true)}><Camera className="size-4 shrink-0" /><span className="leading-tight">{t.onboarding.scanQrTitle}</span></Button>
+                                <Button variant="secondary" className="min-w-0 px-3 text-xs sm:text-sm" onClick={handleFileImport}><Upload className="size-4 shrink-0" /><span className="leading-tight">{t.settings.importButton}</span></Button>
                             </div>
                         </CardContent>
                     </Card>

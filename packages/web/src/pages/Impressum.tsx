@@ -1,17 +1,9 @@
-import { Link } from 'react-router-dom';
-import { useI18n } from '../i18n';
+import { Landmark } from 'lucide-react';
+import { LegalPage } from '../components/LegalPage';
 
 export function Impressum() {
-    const { t } = useI18n();
-
     return (
-        <div className="app-main animate-fade-in">
-            <div className="page-header">
-                <Link to="/" style={{ color: 'var(--text-tertiary)', fontSize: 'var(--font-size-sm)' }}>&larr; {t.common.back}</Link>
-            </div>
-
-            <div className="glass-card" style={{ padding: 'var(--space-8)', maxWidth: '800px', margin: '0 auto' }}>
-                <h1>Impressum</h1>
+        <LegalPage title="Impressum" description="Anbieterkennzeichnung und rechtliche Hinweise zu Fair Money." icon={Landmark}>
                 <p>Angaben gemäß § 5 DDG</p>
                 <p>Tobias Betz<br />
                     <br />
@@ -33,7 +25,6 @@ export function Impressum() {
                     Unser Angebot enthält Links zu externen Webseiten Dritter, auf deren Inhalte wir keinen Einfluss haben. Deshalb können wir für diese fremden Inhalte auch keine Gewähr übernehmen. Für die Inhalte der verlinkten Seiten ist stets der jeweilige Anbieter oder Betreiber der Seiten verantwortlich. Die verlinkten Seiten wurden zum Zeitpunkt der Verlinkung auf mögliche Rechtsverstöße überprüft. Rechtswidrige Inhalte waren zum Zeitpunkt der Verlinkung nicht erkennbar. Eine permanente inhaltliche Kontrolle der verlinkten Seiten ist jedoch ohne konkrete Anhaltspunkte einer Rechtsverletzung nicht zumutbar. Bei Bekanntwerden von Rechtsverletzungen werden wir derartige Links umgehend entfernen.<br /><br /><strong>Urheberrecht</strong><br />
                     Die durch die Seitenbetreiber erstellten Inhalte und Werke auf diesen Seiten unterliegen dem deutschen Urheberrecht. Die Vervielfältigung, Bearbeitung, Verbreitung und jede Art der Verwertung außerhalb der Grenzen des Urheberrechtes bedürfen der schriftlichen Zustimmung des jeweiligen Autors bzw. Erstellers. Downloads und Kopien dieser Seite sind nur für den privaten, nicht kommerziellen Gebrauch gestattet. Soweit die Inhalte auf dieser Seite nicht vom Betreiber erstellt wurden, werden die Urheberrechte Dritter beachtet. Insbesondere werden Inhalte Dritter als solche gekennzeichnet. Sollten Sie trotzdem auf eine Urheberrechtsverletzung aufmerksam werden, bitten wir um einen entsprechenden Hinweis. Bei Bekanntwerden von Rechtsverletzungen werden wir derartige Inhalte umgehend entfernen.</p>
                 <p style={{ marginTop: 'var(--space-8)', fontSize: 'var(--font-size-xs)', color: 'var(--text-tertiary)' }}>Erstellt mit <a href="https://impressum-generator.de" rel="dofollow" target="_blank">Impressum-Generator.de</a>, dem Tool für Impressum und <a href="https://impressum-generator.de/datenschutz-generator" rel="dofollow" target="_blank">Datenschutz-Erklärung</a>. Nach einer Vorlage der <a href="https://www.kanzlei-hasselbach.de/" rel="dofollow" target="_blank">Kanzlei Hasselbach</a>.</p>
-            </div>
-        </div>
+        </LegalPage>
     );
 }

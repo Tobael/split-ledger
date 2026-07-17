@@ -42,7 +42,7 @@ const de: Translations = {
         title: 'Deine Gruppen',
         subtitle: 'Gemeinsame Ausgaben verwalten',
         joinGroup: 'Gruppe beitreten',
-        newGroup: '+ Neue Gruppe',
+        newGroup: 'Neue Gruppe',
         noGroupsTitle: 'Noch keine Gruppen',
         noGroupsText: 'Erstelle eine neue Gruppe oder tritt einer bestehenden bei, um gemeinsame Ausgaben zu verfolgen.',
         createGroup: 'Gruppe erstellen',

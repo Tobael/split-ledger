@@ -254,7 +254,7 @@ const en: Translations = {
         title: 'Your Groups',
         subtitle: 'Manage shared expenses',
         joinGroup: 'Join Group',
-        newGroup: '+ New Group',
+        newGroup: 'New Group',
         noGroupsTitle: 'No groups yet',
         noGroupsText: 'Create a new group or join an existing one to start tracking shared expenses.',
         createGroup: 'Create Group',

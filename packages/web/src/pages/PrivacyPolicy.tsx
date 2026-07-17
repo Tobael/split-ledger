@@ -1,17 +1,9 @@
-import { Link } from 'react-router-dom';
-import { useI18n } from '../i18n';
+import { ShieldCheck } from 'lucide-react';
+import { LegalPage } from '../components/LegalPage';
 
 export function PrivacyPolicy() {
-    const { t } = useI18n();
-
     return (
-        <div className="app-main animate-fade-in">
-            <div className="page-header">
-                <Link to="/" style={{ color: 'var(--text-tertiary)', fontSize: 'var(--font-size-sm)' }}>&larr; {t.common.back}</Link>
-            </div>
-
-            <div className="glass-card" style={{ padding: 'var(--space-8)', maxWidth: '800px', margin: '0 auto', overflowWrap: 'break-word' }}>
-                <h1>Datenschutzerklärung</h1>
+        <LegalPage title="Datenschutzerklärung" description="Informationen zur Verarbeitung personenbezogener Daten bei Fair Money." icon={ShieldCheck}>
                 <h2 id="m716">Präambel</h2>
                 <p>Mit der folgenden Datenschutzerklärung möchten wir Sie darüber aufklären, welche Arten Ihrer personenbezogenen Daten (nachfolgend auch kurz als "Daten" bezeichnet) wir zu welchen Zwecken und in welchem Umfang verarbeiten. Die Datenschutzerklärung gilt für alle von uns durchgeführten Verarbeitungen personenbezogener Daten, sowohl im Rahmen der Erbringung unserer Leistungen als auch insbesondere auf unseren Webseiten, in mobilen Applikationen sowie innerhalb externer Onlinepräsenzen, wie z. B. unserer Social-Media-Profile (nachfolgend zusammenfassend bezeichnet als "Onlineangebot").</p>
                 <p>Die verwendeten Begriffe sind nicht geschlechtsspezifisch.</p>
@@ -136,7 +128,6 @@ export function PrivacyPolicy() {
                     <li><strong>Verantwortlicher:</strong> Als "Verantwortlicher" wird die natürliche oder juristische Person, Behörde, Einrichtung oder andere Stelle, die allein oder gemeinsam mit anderen über die Zwecke und Mittel der Verarbeitung von personenbezogenen Daten entscheidet, bezeichnet. </li>
                     <li><strong>Verarbeitung:</strong> "Verarbeitung" ist jeder mit oder ohne Hilfe automatisierter Verfahren ausgeführte Vorgang oder jede solche Vorgangsreihe im Zusammenhang mit personenbezogenen Daten. Der Begriff reicht weit und umfasst praktisch jeden Umgang mit Daten, sei es das Erheben, das Auswerten, das Speichern, das Übermitteln oder das Löschen. </li>
                 </ul>
-            </div>
-        </div>
+        </LegalPage>
     );
 }
