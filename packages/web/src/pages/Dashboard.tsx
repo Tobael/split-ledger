@@ -4,6 +4,7 @@ import { useI18n } from '../i18n';
 import { ArrowRight, LogIn, Plus, Upload, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { decryptIdentity } from '../utils/identity-export';
 
 export function Dashboard() {
     const { groups, importIdentityFromJson } = useApp();
@@ -45,7 +46,6 @@ export function Dashboard() {
                                             const pwd = prompt(t.settings?.passwordPrompt ?? "Enter password to decrypt:");
                                             if (pwd) {
                                                 try {
-                                                    const { decryptIdentity } = await import('../utils/identity-export');
                                                     const decryptedJson = await decryptIdentity(content, pwd);
                                                     const imported = JSON.parse(decryptedJson);
 

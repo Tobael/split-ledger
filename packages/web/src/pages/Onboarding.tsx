@@ -10,6 +10,7 @@ import { Camera, Loader2, ShieldCheck, Smartphone, Upload, UserRoundCheck } from
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { decryptIdentity } from '../utils/identity-export';
 
 export function Onboarding() {
     const { createIdentity, importIdentityFromJson } = useApp();
@@ -54,7 +55,6 @@ export function Onboarding() {
                 const password = prompt(t.settings.passwordPrompt);
                 if (!password) return;
                 try {
-                    const { decryptIdentity } = await import('../utils/identity-export');
                     const decryptedJson = await decryptIdentity(result.target?.result as string, password);
                     const imported = JSON.parse(decryptedJson);
                     if (imported?.format !== 'fair-money-identity-transfer' || imported.version !== 2) throw new Error('Invalid identity transfer');
