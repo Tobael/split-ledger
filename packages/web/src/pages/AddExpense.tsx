@@ -13,6 +13,12 @@ import {
     getEffectiveExpenses,
 } from '@splitledger/core';
 import { equalParticipantSplits } from '../utils/expense-splits';
+import { ArrowLeft, Check, CircleDollarSign, X } from 'lucide-react';
+import { Alert } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 
 export function AddExpense() {
     const { id } = useParams<{ id: string }>();
@@ -243,29 +249,30 @@ export function AddExpense() {
     };
 
     return (
-        <div style={{ maxWidth: '520px', margin: '0 auto' }}>
-            <div className="page-header">
-                <Link to={`/group/${groupId}`} style={{ color: 'var(--text-tertiary)', fontSize: 'var(--font-size-sm)' }}>{t.addExpense.backTo} {stateV2?.groupName ?? state?.groupName}</Link>
-                <h1 className="page-header__title" style={{ marginTop: 'var(--space-2)' }}>{editId ? 'Edit Expense' : t.addExpense.title}</h1>
-            </div>
-
-            <div className="glass-card glass-card--static animate-fade-in" style={{ padding: 'var(--space-6)' }}>
-                <div className="form-group" style={{ marginBottom: 'var(--space-4)' }}>
-                    <label className="form-label">{t.addExpense.descriptionLabel}</label>
-                    <input className="form-input" type="text" placeholder={t.addExpense.descriptionPlaceholder} value={description} onChange={e => setDescription(e.target.value)} autoFocus />
+        <div className="mx-auto max-w-xl">
+            <Link to={`/group/${groupId}`} className="mb-3 inline-flex items-center gap-1 text-sm text-[#716969] hover:text-[#004502]"><ArrowLeft className="size-4" />{t.addExpense.backTo} {stateV2?.groupName ?? state?.groupName}</Link>
+            <Card className="animate-fade-in">
+                <CardHeader>
+                    <div className="mb-2 flex size-10 items-center justify-center rounded-lg bg-[#004502]/10"><CircleDollarSign className="size-5" /></div>
+                    <CardTitle className="text-2xl normal-case tracking-normal text-[#004502]">{editId ? t.groupDetail.editExpense : t.addExpense.title}</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-5">
+                <div>
+                    <Label htmlFor="expense-description">{t.addExpense.descriptionLabel}</Label>
+                    <Input id="expense-description" type="text" placeholder={t.addExpense.descriptionPlaceholder} value={description} onChange={e => setDescription(e.target.value)} autoFocus />
                 </div>
 
-                <div className="form-group" style={{ marginBottom: 'var(--space-4)' }}>
-                    <label className="form-label">{t.addExpense.amountLabel}</label>
-                    <input className="form-input" type="number" step="0.01" min="0" placeholder="0.00" value={amount} onChange={e => {
+                <div>
+                    <Label htmlFor="expense-amount">{t.addExpense.amountLabel}</Label>
+                    <div className="relative"><span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-[#716969]">€</span><Input id="expense-amount" className="pl-7 text-lg font-semibold tabular-nums" inputMode="decimal" type="number" step="0.01" min="0" placeholder="0.00" value={amount} onChange={e => {
                         setAmount(e.target.value);
                         if (splitMode === 'custom') prefillCustomSplits(excludedParticipants, e.target.value);
-                    }} />
+                    }} /></div>
                 </div>
 
-                <div className="form-group" style={{ marginBottom: 'var(--space-4)' }}>
-                    <label className="form-label">{t.addExpense.paidByLabel}</label>
-                    <select className="form-input" value={paidBy} onChange={e => setPaidBy(e.target.value)}>
+                <div>
+                    <Label htmlFor="paid-by">{t.addExpense.paidByLabel}</Label>
+                    <select id="paid-by" className="h-10 w-full rounded-lg border border-[#004502]/15 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-[#004502]/30" value={paidBy} onChange={e => setPaidBy(e.target.value)}>
                         {activeMembers.map(m => (
                             <option key={m.id} value={m.id}>
                                 {m.displayName}{m.isMe ? ` (${t.common.you})` : ''}
@@ -274,71 +281,56 @@ export function AddExpense() {
                     </select>
                 </div>
 
-                <div className="form-group" style={{ marginBottom: 'var(--space-4)' }}>
-                    <label className="form-label">{t.addExpense.splitLabel}</label>
-                    <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
-                        <button className={`btn ${splitMode === 'equal' ? 'btn--primary' : 'btn--secondary'}`} onClick={() => setSplitMode('equal')} style={{ flex: 1 }}>{t.addExpense.equal}</button>
-                        <button className={`btn ${splitMode === 'custom' ? 'btn--primary' : 'btn--secondary'}`} onClick={chooseCustomMode} style={{ flex: 1 }}>{t.addExpense.custom}</button>
+                <div>
+                    <Label>{t.addExpense.splitLabel}</Label>
+                    <div className="grid grid-cols-2 gap-2 rounded-lg bg-[#004502]/5 p-1">
+                        <Button variant={splitMode === 'equal' ? 'default' : 'ghost'} onClick={() => setSplitMode('equal')}>{t.addExpense.equal}</Button>
+                        <Button variant={splitMode === 'custom' ? 'default' : 'ghost'} onClick={chooseCustomMode}>{t.addExpense.custom}</Button>
                     </div>
                 </div>
 
                 {splitMode === 'custom' && (
-                    <div style={{ marginBottom: 'var(--space-4)', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-                        <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)' }}>{t.addExpense.customSplitHelp}</p>
+                    <div className="space-y-2">
+                        <p className="text-sm text-[#716969]">{t.addExpense.customSplitHelp}</p>
                         {activeMembers.map(m => (
-                            <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
-                                <button
+                            <div key={m.id} className={`grid grid-cols-[minmax(0,1fr)_7rem] items-center gap-2 rounded-lg border p-2 ${excludedParticipants.has(m.id) ? 'border-gray-200 bg-gray-50 opacity-65' : 'border-[#004502]/10 bg-white'}`}>
+                                <Button
                                     type="button"
-                                    className={`btn btn--sm ${excludedParticipants.has(m.id) ? 'btn--ghost' : 'btn--secondary'}`}
-                                    style={{ flex: 1, justifyContent: 'flex-start' }}
+                                    variant="ghost"
+                                    size="sm"
+                                    className="min-w-0 justify-start px-2"
                                     onClick={() => toggleParticipantEligibility(m.id)}
                                     aria-pressed={!excludedParticipants.has(m.id)}
                                 >
-                                    {m.displayName} · {excludedParticipants.has(m.id) ? t.addExpense.excluded : t.addExpense.eligible}
-                                </button>
-                                <input className="form-input" type="number" step="0.01" min="0" placeholder="0.00"
+                                    {excludedParticipants.has(m.id) ? <X className="size-4 shrink-0 text-red-600" /> : <Check className="size-4 shrink-0 text-emerald-600" />}<span className="truncate">{m.displayName}</span>
+                                </Button>
+                                <Input className="text-right tabular-nums" inputMode="decimal" type="number" step="0.01" min="0" placeholder="0.00"
                                     value={customSplits[m.id] || ''}
                                     onChange={e => setCustomSplits(prev => ({ ...prev, [m.id]: e.target.value }))}
-                                    disabled={excludedParticipants.has(m.id)}
-                                    style={{ width: '120px' }} />
+                                    disabled={excludedParticipants.has(m.id)} />
                             </div>
                         ))}
                     </div>
                 )}
 
                 {splitMode === 'equal' && amount && parseFloat(amount) > 0 && (
-                    <div style={{
-                        padding: 'var(--space-3) var(--space-4)',
-                        background: 'var(--accent-primary-dim)',
-                        borderRadius: 'var(--radius-md)',
-                        marginBottom: 'var(--space-4)',
-                        fontSize: 'var(--font-size-sm)',
-                        color: 'var(--accent-primary)',
-                    }}>
+                    <Alert className="rounded-lg border-[#004502]/10 bg-[#004502]/5 text-[#004502]">
                         {t.addExpense.splitEqually} €{(parseFloat(amount) / activeMembers.length).toFixed(2)} {t.addExpense.perPerson}
-                    </div>
+                    </Alert>
                 )}
 
                 {error && (
-                    <div style={{
-                        padding: 'var(--space-3) var(--space-4)',
-                        background: 'var(--danger-dim)',
-                        borderRadius: 'var(--radius-md)',
-                        color: 'var(--danger)',
-                        fontSize: 'var(--font-size-sm)',
-                        marginBottom: 'var(--space-4)',
-                    }}>
-                        {error}
-                    </div>
+                    <Alert className="rounded-lg border-red-200 bg-red-50 text-left text-red-700">{error}</Alert>
                 )}
 
-                <div style={{ display: 'flex', gap: 'var(--space-3)' }}>
-                    <button className="btn btn--ghost" onClick={() => navigate(`/group/${groupId}`)}>{t.common.cancel}</button>
-                    <button className="btn btn--primary btn--full" onClick={handleSubmit} disabled={!description.trim() || !amount || submitting}>
+                <div className="flex gap-2">
+                    <Button variant="ghost" onClick={() => navigate(`/group/${groupId}`)}>{t.common.cancel}</Button>
+                    <Button className="flex-1" onClick={handleSubmit} disabled={!description.trim() || !amount || submitting}>
                         {submitting ? t.addExpense.adding : t.addExpense.addButton}
-                    </button>
+                    </Button>
                 </div>
-            </div>
+                </CardContent>
+            </Card>
         </div>
     );
 }
