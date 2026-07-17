@@ -170,6 +170,11 @@ export interface Translations {
         thisDevice: string;
         revoke: string;
         confirmRevoke: string;
+        deviceRevoked: string;
+        revokeFailed: string;
+        exportFailed: string;
+        renameFailed: string;
+        groupAccessCount: (count: number) => string;
         securityTitle: string;
         securityEd25519: string;
         securitySigned: string;
@@ -357,8 +362,8 @@ const en: Translations = {
         deviceTitle: 'This Device',
         transferTitle: 'Account Transfer',
         transferDescription: 'Move your identity to another browser or device',
-        exportButton: '📤 Export Identity',
-        importButton: '📥 Import Identity',
+        exportButton: 'Export identity',
+        importButton: 'Import identity',
         passwordPrompt: 'Enter a password to protect the export:',
         passwordMinLength: 'Password must be at least 6 characters',
         exporting: 'Encrypting…',
@@ -374,9 +379,14 @@ const en: Translations = {
         thisDevice: 'This Device',
         revoke: 'Revoke',
         confirmRevoke: 'Are you sure you want to revoke this device? It will be removed from all groups.',
+        deviceRevoked: 'Device revoked',
+        revokeFailed: 'Failed to revoke device',
+        exportFailed: 'Failed to export identity',
+        renameFailed: 'Failed to update name',
+        groupAccessCount: (count: number) => `${count} ${count === 1 ? 'group' : 'groups'}`,
         securityTitle: 'Security',
         securityEd25519: 'Ed25519 cryptographic identity',
-        securitySigned: 'All entries are signed and hash-linked',
+        securitySigned: 'Signed, tamper-evident operation history',
         securityRelay: 'Disposable encrypted relays; complete history remains on member devices',
         languageTitle: 'Language',
         relayTitle: 'Relay server',

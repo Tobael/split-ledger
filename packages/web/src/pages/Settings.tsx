@@ -13,6 +13,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Alert } from '@/components/ui/alert';
+import { Download, KeyRound, Languages, Pencil, ShieldCheck, Trash2, Upload } from 'lucide-react';
 
 export function Settings() {
     const {
@@ -52,9 +54,9 @@ export function Settings() {
         try {
             await revokeDeviceV2(deviceKey);
             setAuthorizedDevices(await getAuthorizedDevicesV2());
-            setStatus({ type: 'success', msg: 'Device revoked' });
+            setStatus({ type: 'success', msg: t.settings.deviceRevoked });
         } catch {
-            setStatus({ type: 'error', msg: 'Failed to revoke device' });
+            setStatus({ type: 'error', msg: t.settings.revokeFailed });
         } finally {
             setBusy(false);
         }
@@ -80,7 +82,7 @@ export function Settings() {
             setShowExport(false);
             setExportPassword('');
         } catch {
-            setStatus({ type: 'error', msg: 'Export failed' });
+            setStatus({ type: 'error', msg: t.settings.exportFailed });
         } finally {
             setBusy(false);
         }
@@ -128,7 +130,7 @@ export function Settings() {
             setStatus({ type: 'success', msg: t.settings.renameSuccess || 'Name updated' });
             setIsEditingName(false);
         } catch {
-            setStatus({ type: 'error', msg: 'Failed to update name' });
+            setStatus({ type: 'error', msg: t.settings.renameFailed });
         } finally {
             setBusy(false);
         }
@@ -144,11 +146,8 @@ export function Settings() {
         }
     };
 
-    const sectionHeading = { fontSize: 'var(--font-size-sm)', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 'var(--space-4)', textTransform: 'uppercase' as const, letterSpacing: '0.05em' };
-    const cardStyle = { padding: 'var(--space-6)', marginBottom: 'var(--space-4)' };
-
     return (
-        <div style={{ maxWidth: '600px', margin: '0 auto' }}>
+        <div className="mx-auto max-w-2xl space-y-4 pb-8">
             <div className="page-header">
                 <h1 className="page-header__title">{t.settings.title}</h1>
                 <p className="page-header__subtitle">{t.settings.subtitle}</p>
@@ -156,59 +155,44 @@ export function Settings() {
 
             {/* Status banner */}
             {status && (
-                <div style={{
-                    padding: 'var(--space-3) var(--space-4)',
-                    background: status.type === 'success' ? 'var(--accent-primary-dim)' : 'var(--danger-dim)',
-                    borderRadius: 'var(--radius-md)',
-                    color: status.type === 'success' ? 'var(--accent-primary)' : 'var(--danger)',
-                    fontSize: 'var(--font-size-sm)',
-                    marginBottom: 'var(--space-4)',
-                }}>
+                <Alert className={status.type === 'success' ? 'rounded-lg border border-green-700/15 bg-green-50 text-green-950' : 'rounded-lg border border-red-700/15 bg-red-50 text-red-950'}>
                     {status.msg}
-                </div>
+                </Alert>
             )}
 
             {/* Identity */}
-            <div className="glass-card glass-card--static animate-fade-in" style={cardStyle}>
-                <h3 style={sectionHeading}>{t.settings.identityTitle}</h3>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+            <Card className="animate-fade-in">
+                <CardHeader><CardTitle>{t.settings.identityTitle}</CardTitle></CardHeader>
+                <CardContent className="space-y-4">
                     <div>
-                        <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-tertiary)', marginBottom: 'var(--space-1)' }}>{t.settings.displayNameLabel}</div>
+                        <Label htmlFor="display-name">{t.settings.displayNameLabel}</Label>
                         {isEditingName ? (
-                            <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
-                                <input
-                                    className="form-input"
+                            <div className="mt-1 flex flex-col gap-2 sm:flex-row">
+                                <Input id="display-name"
                                     value={editNameValue}
                                     onChange={e => setEditNameValue(e.target.value)}
                                     disabled={busy}
                                     autoFocus
                                     onKeyDown={e => e.key === 'Enter' && handleSaveName()}
                                 />
-                                <button className="btn btn--primary" onClick={handleSaveName} disabled={busy || !editNameValue.trim()}>Save</button>
-                                <button className="btn btn--ghost" onClick={() => { setIsEditingName(false); setEditNameValue(identity.displayName); }} disabled={busy}>Cancel</button>
+                                <Button onClick={handleSaveName} disabled={busy || !editNameValue.trim()}>{t.common.save}</Button>
+                                <Button variant="ghost" onClick={() => { setIsEditingName(false); setEditNameValue(identity.displayName); }} disabled={busy}>{t.common.cancel}</Button>
                             </div>
                         ) : (
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <div style={{ fontWeight: 600 }}>{identity.displayName}</div>
-                                <button className="btn btn--secondary btn--sm" onClick={() => setIsEditingName(true)}>Edit</button>
+                            <div className="mt-1 flex items-center justify-between gap-3">
+                                <div className="font-semibold">{identity.displayName}</div>
+                                <Button variant="secondary" size="sm" onClick={() => setIsEditingName(true)}><Pencil className="size-3.5" />{t.groupDetail.renameParticipant}</Button>
                             </div>
                         )}
                     </div>
                     <div>
-                        <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-tertiary)', marginBottom: 'var(--space-1)' }}>{t.settings.rootKeyLabel}</div>
-                        <code style={{
-                            padding: 'var(--space-2) var(--space-3)',
-                            background: 'var(--bg-primary)',
-                            borderRadius: 'var(--radius-sm)',
-                            fontSize: 'var(--font-size-xs)',
-                            color: 'var(--accent-primary)',
-                            display: 'block',
-                        }}>
+                        <Label>{t.settings.rootKeyLabel}</Label>
+                        <code className="mt-1 block rounded-lg bg-[#f7f9f7] px-3 py-2 text-xs text-[#004502]">
                             {pubkeyShort}
                         </code>
                     </div>
-                </div>
-            </div>
+                </CardContent>
+            </Card>
 
             <Card className="mb-4 animate-fade-in">
                 <CardHeader>
@@ -237,77 +221,61 @@ export function Settings() {
             </Card>
 
             {/* Device */}
-            <div className="glass-card glass-card--static animate-fade-in stagger-1" style={cardStyle}>
-                <h3 style={sectionHeading}>{t.settings.deviceTitle}</h3>
+            <Card className="animate-fade-in stagger-1">
+                <CardHeader><CardTitle>{t.settings.deviceTitle}</CardTitle></CardHeader>
+                <CardContent>
 
                 {/* Current Device */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-4)' }}>
+                <div className="flex items-center justify-between gap-3">
                     <div>
-                        <div style={{ fontWeight: 600, marginBottom: 'var(--space-1)' }}>
-                            {identity.device.deviceName} <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-tertiary)' }}>({t.settings.thisDevice})</span>
+                        <div className="font-semibold">
+                            {identity.device.deviceName} <span className="text-xs font-normal text-[#716969]">({t.settings.thisDevice})</span>
                         </div>
-                        <code style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-tertiary)' }}>{devicePubkeyShort}</code>
+                        <code className="text-xs text-[#716969]">{devicePubkeyShort}</code>
                     </div>
-                    <span className="badge badge--positive">{t.common.active}</span>
+                    <span className="rounded-full bg-green-100 px-2 py-1 text-xs font-medium text-green-800">{t.common.active}</span>
                 </div>
 
                 {/* Other Devices */}
                 {authorizedDevices.size > 1 && (
                     <>
-                        <h4 style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-secondary)', marginBottom: 'var(--space-3)', textTransform: 'uppercase' }}>{t.settings.authorizedDevices}</h4>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+                        <h4 className="mt-5 mb-2 text-xs font-semibold uppercase tracking-wide text-[#716969]">{t.settings.authorizedDevices}</h4>
+                        <div className="space-y-2">
                             {[...authorizedDevices.entries()].filter(([k]) => k !== identity.device.deviceKeyPair.publicKey).map(([key, data]) => (
-                                <div key={key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: 'var(--space-3)', background: 'var(--bg-primary)', borderRadius: 'var(--radius-sm)' }}>
-                                    <div style={{ overflow: 'hidden' }}>
-                                        <div style={{ fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{data.name}</div>
-                                        <code style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-tertiary)', display: 'block' }}>{key.slice(0, 8)}…{key.slice(-8)}</code>
-                                        <div style={{ fontSize: '10px', color: 'var(--text-tertiary)' }}>{data.groups.length} groups</div>
+                                <div key={key} className="flex items-center justify-between gap-3 rounded-lg bg-[#f7f9f7] p-3">
+                                    <div className="min-w-0">
+                                        <div className="truncate font-medium">{data.name}</div>
+                                        <code className="block text-xs text-[#716969]">{key.slice(0, 8)}…{key.slice(-8)}</code>
+                                        <div className="text-xs text-[#716969]">{t.settings.groupAccessCount(data.groups.length)}</div>
                                     </div>
-                                    <button
-                                        className="btn btn--secondary btn--sm"
-                                        style={{ color: 'var(--danger)', borderColor: 'var(--danger-dim)' }}
+                                    <Button variant="secondary" size="sm" className="text-red-700"
                                         onClick={() => handleRevoke(key)}
                                         disabled={busy}
                                     >
                                         {t.settings.revoke}
-                                    </button>
+                                    </Button>
                                 </div>
                             ))}
                         </div>
                     </>
                 )}
-            </div>
+                </CardContent>
+            </Card>
 
             {/* Account Transfer */}
-            <div className="glass-card glass-card--static animate-fade-in stagger-2" style={cardStyle}>
-                <h3 style={sectionHeading}>{t.settings.transferTitle}</h3>
-                <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)', marginBottom: 'var(--space-4)' }}>
-                    {t.settings.transferDescription}
-                </p>
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-                    {/* Identity Export QR Code */}
+            <Card className="animate-fade-in stagger-2">
+                <CardHeader><CardTitle>{t.settings.transferTitle}</CardTitle><CardDescription>{t.settings.transferDescription}</CardDescription></CardHeader>
+                <CardContent className="space-y-3">
                     <IdentityExport />
-
-                    {/* Export File */}
                     {!showExport ? (
-                        <button className="btn btn--secondary" onClick={() => { setShowExport(true); setShowImport(false); setStatus(null); }}>
+                        <Button variant="secondary" className="w-full" onClick={() => { setShowExport(true); setShowImport(false); setStatus(null); }}>
+                            <Download className="size-4" />
                             {t.settings.exportButton}
-                        </button>
+                        </Button>
                     ) : (
-                        <div style={{
-                            padding: 'var(--space-4)',
-                            background: 'var(--bg-primary)',
-                            borderRadius: 'var(--radius-md)',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: 'var(--space-3)',
-                        }}>
-                            <label style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)' }}>
-                                {t.settings.passwordPrompt}
-                            </label>
-                            <input
-                                className="form-input"
+                        <div className="space-y-3 rounded-lg bg-[#f7f9f7] p-4">
+                            <Label htmlFor="export-password">{t.settings.passwordPrompt}</Label>
+                            <Input id="export-password"
                                 type="password"
                                 value={exportPassword}
                                 onChange={e => setExportPassword(e.target.value)}
@@ -315,54 +283,31 @@ export function Settings() {
                                 autoFocus
                                 placeholder="••••••"
                             />
-                            <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
-                                <button className="btn btn--ghost" onClick={() => { setShowExport(false); setExportPassword(''); }} style={{ flex: 1 }}>
-                                    {t.common.cancel}
-                                </button>
-                                <button className="btn btn--primary" onClick={handleExport} disabled={busy} style={{ flex: 1 }}>
-                                    {busy ? t.settings.exporting : t.settings.exportButton}
-                                </button>
+                            <div className="grid grid-cols-2 gap-2">
+                                <Button variant="ghost" onClick={() => { setShowExport(false); setExportPassword(''); }}>{t.common.cancel}</Button>
+                                <Button onClick={handleExport} disabled={busy}>{busy ? t.settings.exporting : t.settings.exportButton}</Button>
                             </div>
                         </div>
                     )}
-
-                    {/* Import File */}
                     {!showImport ? (
-                        <button className="btn btn--secondary" onClick={() => { setShowImport(true); setShowExport(false); setStatus(null); }}>
+                        <Button variant="secondary" className="w-full" onClick={() => { setShowImport(true); setShowExport(false); setStatus(null); }}>
+                            <Upload className="size-4" />
                             {t.settings.importButton}
-                        </button>
+                        </Button>
                     ) : (
-                        <div style={{
-                            padding: 'var(--space-4)',
-                            background: 'var(--bg-primary)',
-                            borderRadius: 'var(--radius-md)',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: 'var(--space-3)',
-                        }}>
-                            <div style={{
-                                padding: 'var(--space-3) var(--space-4)',
-                                background: 'var(--danger-dim)',
-                                borderRadius: 'var(--radius-sm)',
-                                fontSize: 'var(--font-size-xs)',
-                                color: 'var(--danger)',
-                            }}>
-                                ⚠️ {t.settings.importWarning}
-                            </div>
+                        <div className="space-y-3 rounded-lg bg-[#f7f9f7] p-4">
+                            <Alert className="rounded-lg border border-amber-700/15">{t.settings.importWarning}</Alert>
                             <input
                                 ref={fileInputRef}
                                 type="file"
                                 accept=".json"
                                 onChange={e => setImportFile(e.target.files?.[0] ?? null)}
-                                style={{ fontSize: 'var(--font-size-sm)' }}
+                                className="block w-full text-sm file:mr-3 file:rounded-md file:border-0 file:bg-[#eef4ef] file:px-3 file:py-2 file:font-medium file:text-[#004502]"
                             />
                             {importFile && (
                                 <>
-                                    <label style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)' }}>
-                                        {t.settings.passwordPrompt}
-                                    </label>
-                                    <input
-                                        className="form-input"
+                                    <Label htmlFor="import-password">{t.settings.passwordPrompt}</Label>
+                                    <Input id="import-password"
                                         type="password"
                                         value={importPassword}
                                         onChange={e => setImportPassword(e.target.value)}
@@ -371,71 +316,59 @@ export function Settings() {
                                     />
                                 </>
                             )}
-                            <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
-                                <button className="btn btn--ghost" onClick={() => { setShowImport(false); setImportFile(null); setImportPassword(''); }} style={{ flex: 1 }}>
-                                    {t.common.cancel}
-                                </button>
-                                <button className="btn btn--primary" onClick={handleImport} disabled={!importFile || busy} style={{ flex: 1 }}>
-                                    {busy ? t.settings.importing : t.settings.importButton}
-                                </button>
+                            <div className="grid grid-cols-2 gap-2">
+                                <Button variant="ghost" onClick={() => { setShowImport(false); setImportFile(null); setImportPassword(''); }}>{t.common.cancel}</Button>
+                                <Button onClick={handleImport} disabled={!importFile || busy}>{busy ? t.settings.importing : t.settings.importButton}</Button>
                             </div>
                         </div>
                     )}
-                </div>
-            </div>
+                </CardContent>
+            </Card>
 
             {/* Language */}
-            <div className="glass-card glass-card--static animate-fade-in stagger-3" style={cardStyle}>
-                <h3 style={sectionHeading}>{t.settings.languageTitle}</h3>
-                <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+            <Card className="animate-fade-in stagger-3">
+                <CardHeader><CardTitle className="flex items-center gap-2"><Languages className="size-5" />{t.settings.languageTitle}</CardTitle></CardHeader>
+                <CardContent className="grid grid-cols-2 gap-2">
                     {supportedLocales.map(l => (
-                        <button
+                        <Button
                             key={l}
-                            className={`btn ${locale === l ? 'btn--primary' : 'btn--secondary'}`}
+                            variant={locale === l ? 'default' : 'secondary'}
                             onClick={() => setLocale(l)}
-                            style={{ flex: 1 }}
                         >
                             {localeLabels[l]}
-                        </button>
+                        </Button>
                     ))}
-                </div>
-            </div>
+                </CardContent>
+            </Card>
 
             {/* Security */}
-            <div className="glass-card glass-card--static animate-fade-in stagger-4" style={cardStyle}>
-                <h3 style={sectionHeading}>{t.settings.securityTitle}</h3>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-                    {[
-                        ['🔐', t.settings.securityEd25519],
-                        ['📋', t.settings.securitySigned],
-                        ['🌐', t.settings.securityRelay],
-                    ].map(([icon, text], i) => (
-                        <div key={i} style={{ display: 'flex', gap: 'var(--space-3)', fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)' }}>
-                            <span>{icon}</span>
+            <Card className="animate-fade-in stagger-4">
+                <CardHeader><CardTitle className="flex items-center gap-2"><ShieldCheck className="size-5" />{t.settings.securityTitle}</CardTitle></CardHeader>
+                <CardContent className="space-y-3">
+                    {[t.settings.securityEd25519, t.settings.securitySigned, t.settings.securityRelay].map((text, i) => (
+                        <div key={i} className="flex gap-3 text-sm text-[#716969]">
+                            <KeyRound className="mt-0.5 size-4 shrink-0 text-[#004502]" />
                             <span>{text}</span>
                         </div>
                     ))}
-                </div>
-            </div>
+                </CardContent>
+            </Card>
 
             {/* Danger Zone */}
-            <div className="glass-card glass-card--static animate-fade-in stagger-4" style={{ ...cardStyle, border: '1px solid var(--danger-dim)' }}>
-                <h3 style={{ ...sectionHeading, color: 'var(--danger)' }}>{t.settings.dangerZone}</h3>
-                <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)', marginBottom: 'var(--space-4)' }}>
-                    {t.settings.dangerZoneDesc}
-                </p>
-                <button
-                    className="btn btn--secondary"
-                    style={{ color: 'var(--danger)', borderColor: 'var(--danger-dim)' }}
+            <Card className="animate-fade-in border-red-200">
+                <CardHeader><CardTitle className="text-red-700">{t.settings.dangerZone}</CardTitle><CardDescription>{t.settings.dangerZoneDesc}</CardDescription></CardHeader>
+                <CardContent>
+                <Button variant="destructive"
                     onClick={async () => {
                         if (confirm(t.settings.deleteConfirm)) {
                             await deleteIdentity();
                         }
                     }}
                 >
-                    {t.settings.deleteAccount}
-                </button>
-            </div>
+                    <Trash2 className="size-4" />{t.settings.deleteAccount}
+                </Button>
+                </CardContent>
+            </Card>
         </div>
     );
 }
