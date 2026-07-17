@@ -25,6 +25,7 @@ import {
 } from '@splitledger/core';
 import { IndexedDbIdentityStore } from '../storage/IndexedDbIdentityStore';
 import { IndexedDbOperationStorageV2 } from '../storage/IndexedDbOperationStorageV2';
+import { BrowserDeviceInfo } from '../platform/BrowserDeviceInfo';
 
 // ─── Types ───
 
@@ -55,7 +56,7 @@ interface AppContextValue {
     // Identity
     identity: IdentityState | null;
     createIdentity: (displayName: string) => Promise<void>;
-    restoreIdentity: (imported: IdentityState) => Promise<void>;
+    updateIdentity: (updated: IdentityState) => Promise<void>;
     isOnboarded: boolean;
     identityReady: boolean;
 
@@ -85,7 +86,6 @@ interface AppContextValue {
     groupsWaitingForHistory: ReadonlySet<GroupId>;
 
     deleteGroup: (groupId: GroupId) => Promise<void>;
-    importIdentity: (qrPayload: string) => Promise<boolean>;
     importIdentityFromJson: (jsonPayload: string) => Promise<void>;
     exportIdentityTransferV2: () => Promise<string>;
     createGroup: (name: string, currency: string) => Promise<GroupId>;
@@ -171,6 +171,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const identityStore = useMemo(() => new IndexedDbIdentityStore(), []);
     const operationStorageV2 = useMemo(() => new IndexedDbOperationStorageV2(), []);
     const groupServiceV2 = useMemo(() => new GroupServiceV2(operationStorageV2), [operationStorageV2]);
+    const deviceInfo = useMemo(() => new BrowserDeviceInfo(), []);
 
     const syncGroupV2 = useCallback(async (access: GroupAccessV2): Promise<GroupStateV2 | null> => {
         const groupId = access.groupId as GroupId;
@@ -345,14 +346,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     const createIdentity = useCallback(async (displayName: string) => {
         const root = createRootIdentity(displayName);
-        const device = createDeviceIdentity(root.rootKeyPair, `${displayName}'s Browser`);
+        const device = createDeviceIdentity(root.rootKeyPair, deviceInfo.deviceName(displayName));
         const newIdentity = {
             displayName,
             rootKeyPair: root.rootKeyPair,
             device,
         };
         await persistIdentity(newIdentity);
-    }, [persistIdentity]);
+    }, [deviceInfo, persistIdentity]);
 
     const importIdentityFromJson = useCallback(async (jsonPayload: string) => {
         const data = JSON.parse(jsonPayload) as IdentityTransferV2;
@@ -364,14 +365,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         const { rootKeyPair, displayName } = data.identity;
         const accesses = data.groupAccess.map((access) => groupAccessV2Schema.parse(access));
 
-        const ua = navigator.userAgent;
-        const isIOS = /iPad|iPhone|iPod/.test(ua);
-        const isMac = /Mac OS X/.test(ua);
-        const isAndroid = /Android/.test(ua);
-        const isWindows = /Windows/.test(ua);
-        const platform = isIOS ? 'iOS Device' : isMac ? 'Mac' : isAndroid ? 'Android Device' : isWindows ? 'Windows PC' : 'Browser';
-
-        const deviceName = `${displayName}'s ${platform}`;
+        const deviceName = deviceInfo.deviceName(displayName);
         const device = createDeviceIdentity(rootKeyPair, deviceName);
         const newIdentity: IdentityState = { displayName, rootKeyPair, device };
 
@@ -402,12 +396,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
             }
         }
         await refreshGroups();
-    }, [groupServiceV2, operationStorageV2, persistIdentity, refreshGroups, syncGroupV2]);
-
-    const importIdentity = useCallback(async (transferPayload: string) => {
-        await importIdentityFromJson(transferPayload);
-        return true;
-    }, [importIdentityFromJson]);
+    }, [deviceInfo, groupServiceV2, operationStorageV2, persistIdentity, refreshGroups, syncGroupV2]);
 
     const exportIdentityTransferV2 = useCallback(async () => {
         if (!identity) throw new Error('Identity not ready');
@@ -424,8 +413,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         } satisfies IdentityTransferV2);
     }, [groupServiceV2, identity, operationStorageV2]);
 
-    const restoreIdentity = useCallback(async (imported: IdentityState) => {
-        await persistIdentity(imported);
+    const updateIdentity = useCallback(async (updated: IdentityState) => {
+        await persistIdentity(updated);
     }, [persistIdentity]);
 
     const deleteIdentity = useCallback(async () => {
@@ -731,7 +720,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const value: AppContextValue = {
         identity,
         createIdentity,
-        restoreIdentity,
+        updateIdentity,
         isOnboarded: identity !== null,
         identityReady,
         groups,
@@ -754,7 +743,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
         syncStatus,
         groupsWaitingForHistory,
         deleteGroup,
-        importIdentity,
         importIdentityFromJson,
         exportIdentityTransferV2,
         createGroup,

@@ -17,7 +17,7 @@ import { Download, KeyRound, Languages, Pencil, ShieldCheck, Trash2, Upload } fr
 
 export function Settings() {
     const {
-        identity, restoreIdentity, deleteIdentity, groups,
+        identity, updateIdentity, deleteIdentity, groups,
         getAuthorizedDevicesV2, revokeDeviceV2,
         exportIdentityTransferV2, importIdentityFromJson, preferredRelayUrl, setPreferredRelayUrl,
     } = useApp();
@@ -124,7 +124,7 @@ export function Settings() {
         try {
             // Update personal identity
             const newIdentity = { ...identity, displayName: newName };
-            await restoreIdentity(newIdentity);
+            await updateIdentity(newIdentity);
 
             setStatus({ type: 'success', msg: t.settings.renameSuccess || 'Name updated' });
             setIsEditingName(false);
