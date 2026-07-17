@@ -1,9 +1,10 @@
 import { lazy, Suspense, type ReactNode } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AppProvider, useApp } from './context/AppContext';
-import { I18nProvider } from './i18n';
+import { I18nProvider, useI18n } from './i18n';
 import { Layout } from './components/Layout';
 import { Footer } from './components/Footer';
+import { Loader2 } from 'lucide-react';
 
 const Onboarding = lazy(() => import('./pages/Onboarding').then(({ Onboarding }) => ({ default: Onboarding })));
 const Dashboard = lazy(() => import('./pages/Dashboard').then(({ Dashboard }) => ({ default: Dashboard })));
@@ -24,9 +25,10 @@ const PublicLayout = ({ children }: { children: ReactNode }) => (
 
 function AppRoutes() {
   const { isOnboarded, identityReady } = useApp();
+  const { t } = useI18n();
 
   if (!identityReady) {
-    return <div style={{ padding: '2rem', textAlign: 'center' }}>Loading secure identity storage…</div>;
+    return <div className="flex min-h-dvh items-center justify-center gap-2 text-sm text-[#716969]"><Loader2 className="size-5 animate-spin" />{t.common.loadingIdentity}</div>;
   }
 
   if (!isOnboarded) {
@@ -62,7 +64,8 @@ function AppRoutes() {
 }
 
 function RouteLoading() {
-  return <div className="flex min-h-48 items-center justify-center text-sm text-[#716969]">Loading…</div>;
+  const { t } = useI18n();
+  return <div className="flex min-h-48 items-center justify-center gap-2 text-sm text-[#716969]"><Loader2 className="size-5 animate-spin" />{t.common.loading}</div>;
 }
 
 export default function App() {

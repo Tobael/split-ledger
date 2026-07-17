@@ -105,13 +105,13 @@ export function Dashboard() {
 function BalanceDisplay({ amount, currency }: { amount: number; currency: string }) {
     const { t } = useI18n();
     const formatted = formatAmount(amount, currency);
-    const cls = amount > 0 ? 'amount--positive' : amount < 0 ? 'amount--negative' : 'amount--zero';
+    const cls = amount > 0 ? 'text-green-700' : amount < 0 ? 'text-red-700' : 'text-[#716969]';
     const label = amount > 0 ? t.common.youAreOwed : amount < 0 ? t.common.youOwe : t.common.settledUp;
 
     return (
-        <div style={{ textAlign: 'right' }}>
-            <div className={`amount ${cls}`} style={{ fontSize: 'var(--font-size-xl)' }}>{formatted}</div>
-            <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-tertiary)' }}>{label}</div>
+        <div className="text-right">
+            <div className={`text-xl font-semibold ${cls}`}>{formatted}</div>
+            <div className="text-xs text-[#716969]">{label}</div>
         </div>
     );
 }

@@ -8,6 +8,7 @@ export interface Translations {
         copy: string;
         copied: string;
         loading: string;
+        loadingIdentity: string;
         you: string;
         creator: string;
         active: string;
@@ -35,6 +36,7 @@ export interface Translations {
         scanQrTitle: string;
         importInvalid: string;
         cameraError: string;
+        cameraPermissionHelp: string;
     };
     dashboard: {
         title: string;
@@ -215,6 +217,7 @@ const en: Translations = {
         copy: 'Copy to Clipboard',
         copied: '✓ Copied!',
         loading: 'Loading…',
+        loadingIdentity: 'Loading secure identity storage…',
         you: 'you',
         creator: 'Creator',
         active: 'Active',
@@ -242,6 +245,7 @@ const en: Translations = {
         scanQrTitle: 'Scan Identity QR',
         importInvalid: 'Invalid QR Code. Please try again.',
         cameraError: 'Could not access camera. Please check permissions.',
+        cameraPermissionHelp: 'Allow camera access in your browser settings, or import an encrypted identity file instead.',
     },
     dashboard: {
         title: 'Your Groups',

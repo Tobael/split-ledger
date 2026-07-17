@@ -10,6 +10,7 @@ const de: Translations = {
         copy: 'In Zwischenablage kopieren',
         copied: '✓ Kopiert!',
         loading: 'Wird geladen…',
+        loadingIdentity: 'Sicherer Identitätsspeicher wird geladen…',
         you: 'du',
         creator: 'Ersteller',
         active: 'Aktiv',
@@ -37,6 +38,7 @@ const de: Translations = {
         scanQrTitle: 'QR-Code scannen',
         importInvalid: 'Ungültiger QR-Code. Bitte versuchen Sie es erneut.',
         cameraError: 'Kamera konnte nicht gestartet werden. Bitte Berechtigungen prüfen.',
+        cameraPermissionHelp: 'Erlaube den Kamerazugriff in deinen Browsereinstellungen oder importiere stattdessen eine verschlüsselte Identitätsdatei.',
     },
     dashboard: {
         title: 'Deine Gruppen',

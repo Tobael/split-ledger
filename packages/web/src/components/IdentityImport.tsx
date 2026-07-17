@@ -4,6 +4,10 @@ import { useApp } from '../context/AppContext';
 import { useI18n } from '../i18n';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { postAuthRoute } from '../utils/post-auth-route';
+import { Camera, Loader2, X } from 'lucide-react';
+import { Alert } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 export function IdentityImport({ onCancel }: { onCancel: () => void }) {
     const { importIdentity } = useApp();
     const { t } = useI18n();
@@ -26,7 +30,7 @@ export function IdentityImport({ onCancel }: { onCancel: () => void }) {
         // Config
         const config = {
             fps: 10,
-            qrbox: { width: 250, height: 250 },
+            qrbox: { width: 220, height: 220 },
             formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE]
         };
 
@@ -37,7 +41,7 @@ export function IdentityImport({ onCancel }: { onCancel: () => void }) {
                 const hasCamera = devices.some(d => d.kind === 'videoinput');
                 if (!hasCamera) {
                     setPermissionError(true);
-                    setError(t.onboarding?.cameraError ?? "No camera found. Please use JSON import.");
+                    setError(t.onboarding.cameraError);
                     return;
                 }
 
@@ -63,7 +67,7 @@ export function IdentityImport({ onCancel }: { onCancel: () => void }) {
                 } catch (e) {
                     console.error("Camera start failed completely", e);
                     setPermissionError(true);
-                    setError(t.onboarding?.cameraError ?? "Could not access camera.");
+                    setError(t.onboarding.cameraError);
                 }
             }
         };
@@ -91,7 +95,7 @@ export function IdentityImport({ onCancel }: { onCancel: () => void }) {
 
             } catch (err) {
                 console.error(err);
-                setError(t.onboarding?.importInvalid ?? 'Invalid QR Code. Please try again.');
+                setError(t.onboarding.importInvalid);
             }
         }
 
@@ -107,33 +111,30 @@ export function IdentityImport({ onCancel }: { onCancel: () => void }) {
     }, [importIdentity, navigate, t, location.pathname, location.search]);
 
     return (
-        <div className="glass-card glass-card--static animate-fade-in" style={{ padding: 'var(--space-6)', width: '100%', maxWidth: '400px' }}>
-            <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 600, marginBottom: 'var(--space-4)', textAlign: 'center' }}>
-                {t.onboarding?.scanQrTitle ?? 'Scan Identity QR'}
-            </h3>
-
-            <div id="reader" style={{ width: '100%', borderRadius: 'var(--radius-md)', overflow: 'hidden', marginBottom: 'var(--space-4)', minHeight: '300px', background: '#000' }}>
+        <Card className="w-full max-w-sm animate-fade-in p-4 sm:p-6">
+            <CardHeader className="items-center text-center">
+                <div className="flex size-10 items-center justify-center rounded-full bg-[#004502]/10 text-[#004502]"><Camera className="size-5" /></div>
+                <CardTitle className="text-lg normal-case tracking-normal text-[#004502]">{t.onboarding.scanQrTitle}</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+            <div id="reader" className="min-h-64 w-full overflow-hidden rounded-lg bg-black">
                 {/* Placeholder for camera loading state */}
                 {!error && !permissionError && (
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '300px', color: '#666' }}>
-                        {t.common?.loading ?? 'Starting camera...'}
+                    <div className="flex h-64 flex-col items-center justify-center gap-2 text-sm text-gray-400">
+                        <Loader2 className="size-5 animate-spin" />{t.common.loading}
                     </div>
                 )}
             </div>
 
             {error && (
-                <div style={{ color: 'var(--danger)', textAlign: 'center', marginBottom: 'var(--space-4)' }}>
-                    {error}
-                </div>
+                <Alert className="rounded-lg border border-red-700/15 bg-red-50 text-red-950">{error}</Alert>
             )}
 
             {permissionError && (
-                <div style={{ color: 'var(--text-secondary)', textAlign: 'center', marginBottom: 'var(--space-4)', fontSize: '0.9em' }}>
-                    Please ensure you have granted camera permissions.
-                </div>
+                <p className="text-center text-sm text-[#716969]">{t.onboarding.cameraPermissionHelp}</p>
             )}
 
-            <button className="btn btn--secondary btn--full" onClick={() => {
+            <Button variant="secondary" className="w-full" onClick={() => {
                 // Ensure we stop scanning before cancelling
                 if (scannerRef.current && scannerRef.current.isScanning) {
                     scannerRef.current.stop().catch(console.error).finally(onCancel);
@@ -141,8 +142,9 @@ export function IdentityImport({ onCancel }: { onCancel: () => void }) {
                     onCancel();
                 }
             }}>
-                {t.common.cancel}
-            </button>
-        </div>
+                <X className="size-4" />{t.common.cancel}
+            </Button>
+            </CardContent>
+        </Card>
     );
 }
