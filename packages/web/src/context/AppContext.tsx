@@ -26,6 +26,7 @@ import {
 import { IndexedDbIdentityStore } from '../storage/IndexedDbIdentityStore';
 import { IndexedDbOperationStorageV2 } from '../storage/IndexedDbOperationStorageV2';
 import { BrowserDeviceInfo } from '../platform/BrowserDeviceInfo';
+import { BrowserRelaySettings } from '../platform/BrowserRelaySettings';
 
 // ─── Types ───
 
@@ -100,38 +101,6 @@ export type { IdentityState };
 
 const AppContext = createContext<AppContextValue | null>(null);
 
-// ─── Relay URL ───
-
-function getRelayWsUrl(): string {
-    const configured = import.meta.env.VITE_RELAY_URL as string | undefined;
-    if (configured) return relayWebSocketUrl(configured);
-    // Local development uses Vite's /ws proxy. Production images inject the
-    // independently hosted relay URL at build time.
-    const proto = window.location.protocol === 'https:' ? 'wss' : 'ws';
-    return `${proto}://${window.location.host}/ws`;
-}
-
-function normalizedRelayUrl(): string {
-    return getRelayWsUrl();
-}
-
-const RELAY_PREFERENCE_KEY = 'fair-money-preferred-relay';
-
-function preferredRelayUrlFromStorage(): string {
-    return localStorage.getItem(RELAY_PREFERENCE_KEY) ?? normalizedRelayUrl();
-}
-
-function validateRelayUrl(value: string): string {
-    const url = new URL(value.trim());
-    const loopback = url.hostname === 'localhost' || url.hostname === '127.0.0.1' || url.hostname === '::1';
-    if (url.protocol !== 'wss:' && url.protocol !== 'https:' && !(loopback && (url.protocol === 'ws:' || url.protocol === 'http:'))) {
-        throw new Error('Relay URL must use wss:// or https://');
-    }
-    url.protocol = url.protocol === 'https:' ? 'wss:' : url.protocol === 'http:' ? 'ws:' : url.protocol;
-    if (url.pathname === '/' || url.pathname === '') url.pathname = '/ws';
-    return url.toString();
-}
-
 function base64UrlToBytes(value: string): Uint8Array {
     let base64 = value.replace(/-/g, '+').replace(/_/g, '/');
     while (base64.length % 4 !== 0) base64 += '=';
@@ -158,6 +127,7 @@ function relayWebSocketUrl(value: string): string {
 // ─── Provider ───
 
 export function AppProvider({ children }: { children: ReactNode }) {
+    const relaySettings = useMemo(() => new BrowserRelaySettings(import.meta.env.VITE_RELAY_URL as string | undefined), []);
     const [identity, setIdentity] = useState<IdentityState | null>(null);
     const [identityReady, setIdentityReady] = useState(false);
     const [persistenceWarning, setPersistenceWarning] = useState<string | null>(null);
@@ -166,7 +136,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const [syncStatus, setSyncStatus] = useState<SyncStatus>('disconnected');
     const [groupsWaitingForHistory, setGroupsWaitingForHistory] = useState<Set<GroupId>>(() => new Set());
     const [storageReady, setStorageReady] = useState(false);
-    const [preferredRelayUrl, setPreferredRelayUrlState] = useState(preferredRelayUrlFromStorage);
+    const [preferredRelayUrl, setPreferredRelayUrlState] = useState(() => relaySettings.preferredRelayUrl());
 
     const identityStore = useMemo(() => new IndexedDbIdentityStore(), []);
     const operationStorageV2 = useMemo(() => new IndexedDbOperationStorageV2(), []);
@@ -261,10 +231,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }, [identityStore]);
 
     const setPreferredRelayUrl = useCallback((value: string) => {
-        const normalized = validateRelayUrl(value);
-        localStorage.setItem(RELAY_PREFERENCE_KEY, normalized);
+        const normalized = relaySettings.savePreferredRelayUrl(value);
         setPreferredRelayUrlState(normalized);
-    }, []);
+    }, [relaySettings]);
 
     const refreshGroups = useCallback(async () => {
         if (!identity) return;
@@ -461,7 +430,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         const issued = await groupServiceV2.issueInviteForGroup(groupId, {
             actor: identity.rootKeyPair,
             participantId,
-            joinBaseUrl: window.location.origin,
+            joinBaseUrl: relaySettings.joinBaseUrl(),
             relayUrl: access.relayUrl,
             relayGroupCapability: access.relayGroupCapability,
             groupSecret: access.groupSecret,
@@ -469,7 +438,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         await syncGroupV2(access);
         setLastUpdate(Date.now());
         return issued.invite.url;
-    }, [groupServiceV2, identity, operationStorageV2, syncGroupV2]);
+    }, [groupServiceV2, identity, operationStorageV2, relaySettings, syncGroupV2]);
 
     const createOrReplaceGenericInviteV2 = useCallback(async (groupId: GroupId) => {
         if (!identity) throw new Error('Identity not ready');
@@ -489,7 +458,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         const issued = await groupServiceV2.issueInviteForGroup(groupId, {
             actor: identity.rootKeyPair,
             scope: 'any-unclaimed-slot',
-            joinBaseUrl: window.location.origin,
+            joinBaseUrl: relaySettings.joinBaseUrl(),
             relayUrl: access.relayUrl,
             relayGroupCapability: access.relayGroupCapability,
             groupSecret: access.groupSecret,
@@ -497,7 +466,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         await syncGroupV2(access);
         setLastUpdate(Date.now());
         return issued.invite.url;
-    }, [groupServiceV2, identity, operationStorageV2, syncGroupV2]);
+    }, [groupServiceV2, identity, operationStorageV2, relaySettings, syncGroupV2]);
 
     const prepareInviteV2 = useCallback(async (inviteLink: string) => {
         const invite = parseInviteV2(inviteLink);
