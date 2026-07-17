@@ -161,7 +161,7 @@ const de: Translations = {
         exporting: 'Wird verschlüsselt…',
         importing: 'Wird entschlüsselt…',
         exportSuccess: 'Identität erfolgreich exportiert!',
-        importSuccess: 'Identität erfolgreich importiert! Wird neu geladen…',
+        importSuccess: 'Identität erfolgreich importiert',
         renameSuccess: 'Name erfolgreich aktualisiert!',
         importWarning: 'Dies ersetzt deine aktuelle Identität. Stelle sicher, dass du ein Backup hast.',
         importError: 'Identität konnte nicht importiert werden',

@@ -68,16 +68,6 @@ export async function encryptIdentity(identityJson: string, password: string): P
     return JSON.stringify(envelope, null, 2);
 }
 
-export function downloadIdentityFile(content: string, filename = 'splitledger-identity.json'): void {
-    const blob = new Blob([content], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    a.click();
-    URL.revokeObjectURL(url);
-}
-
 // ─── Import ───
 
 export async function decryptIdentity(fileContent: string, password: string): Promise<string> {

@@ -1,9 +1,8 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
 import { useI18n, supportedLocales, localeLabels } from '../i18n';
 import {
     encryptIdentity,
-    downloadIdentityFile,
     decryptIdentity,
     readFileAsText,
 } from '../utils/identity-export';
@@ -14,6 +13,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert } from '@/components/ui/alert';
 import { Download, KeyRound, Languages, Pencil, ShieldCheck, Trash2, Upload } from 'lucide-react';
+import { BrowserFileDownload } from '../platform/BrowserFileDownload';
 
 export function Settings() {
     const {
@@ -22,6 +22,7 @@ export function Settings() {
         exportIdentityTransferV2, importIdentityFromJson, preferredRelayUrl, setPreferredRelayUrl,
     } = useApp();
     const { t, locale, setLocale } = useI18n();
+    const fileDownload = useMemo(() => new BrowserFileDownload(), []);
 
     // Export/Import state
     const [exportPassword, setExportPassword] = useState('');
@@ -76,7 +77,7 @@ export function Settings() {
         try {
             const transfer = await exportIdentityTransferV2();
             const encrypted = await encryptIdentity(transfer, exportPassword);
-            downloadIdentityFile(encrypted);
+            fileDownload.download('fair-money-identity.json', encrypted, 'application/json');
             setStatus({ type: 'success', msg: t.settings.exportSuccess });
             setShowExport(false);
             setExportPassword('');
@@ -100,9 +101,9 @@ export function Settings() {
             const decryptedJson = await decryptIdentity(fileContent, importPassword);
             await importIdentityFromJson(decryptedJson);
             setStatus({ type: 'success', msg: t.settings.importSuccess });
-
-            // Reload after a short delay so the user sees the success message
-            setTimeout(() => window.location.reload(), 1500);
+            setShowImport(false);
+            setImportFile(null);
+            setImportPassword('');
         } catch (err) {
             const msg = err instanceof Error && err.message === 'WRONG_PASSWORD'
                 ? t.settings.wrongPassword

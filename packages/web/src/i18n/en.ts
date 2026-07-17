@@ -362,7 +362,7 @@ const en: Translations = {
         exporting: 'Encrypting…',
         importing: 'Decrypting…',
         exportSuccess: 'Identity exported successfully!',
-        importSuccess: 'Identity imported successfully! Reloading…',
+        importSuccess: 'Identity imported successfully',
         renameSuccess: 'Name updated successfully!',
         importWarning: 'This will replace your current identity. Make sure you have a backup.',
         importError: 'Failed to import identity',
