@@ -119,21 +119,6 @@ export interface Translations {
         replaceGenericInvite: string;
         genericInviteHelp: string;
     };
-    chain: {
-        title: string;
-        genesis: string;
-        expense: string;
-        memberAdded: string;
-        memberRemoved: string;
-        deviceAuthorized: string;
-        deviceRevoked: string;
-        rootKeyRotation: string;
-        hash: string;
-        previousHash: string;
-        clock: string;
-        signedBy: string;
-        genesisBlock: string;
-    };
     addExpense: {
         backTo: string;
         title: string;
@@ -336,21 +321,6 @@ const en: Translations = {
         createGenericInvite: 'Create open invite',
         replaceGenericInvite: 'Replace open invite',
         genericInviteHelp: 'The recipient chooses one currently unclaimed participant.',
-    },
-    chain: {
-        title: 'Hash Chain',
-        genesis: 'Genesis',
-        expense: 'Expense',
-        memberAdded: 'Member Added',
-        memberRemoved: 'Member Removed',
-        deviceAuthorized: 'Device Authorized',
-        deviceRevoked: 'Device Revoked',
-        rootKeyRotation: 'Root Key Rotation',
-        hash: 'Hash',
-        previousHash: 'Previous',
-        clock: 'Clock',
-        signedBy: 'Signed by',
-        genesisBlock: 'Genesis Block',
     },
     addExpense: {
         backTo: '← Back to',

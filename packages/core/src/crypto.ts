@@ -17,7 +17,6 @@ import type {
     PublicKey,
     SecretKey,
     Signature,
-    UnsignedEntryFields,
 } from './types.js';
 
 // @noble/ed25519 v2 requires setting the sha512 hash function
@@ -101,42 +100,4 @@ export function canonicalize(obj: unknown): Uint8Array {
         throw new Error('Cannot canonicalize undefined');
     }
     return new TextEncoder().encode(json);
-}
-
-// =============================================================================
-// Entry ID Computation
-// =============================================================================
-
-/**
- * Compute the entry_id (SHA-256 hash) for a ledger entry.
- * Hashes the canonical serialization of all fields EXCEPT entryId and signature.
- */
-export function computeEntryId(fields: UnsignedEntryFields): Hash {
-    const content = {
-        previousHash: fields.previousHash,
-        lamportClock: fields.lamportClock,
-        timestamp: fields.timestamp,
-        entryType: fields.entryType,
-        payload: fields.payload,
-        creatorDevicePubkey: fields.creatorDevicePubkey,
-    };
-    return hash(canonicalize(content));
-}
-
-/**
- * Sign an entry_id with a device secret key, producing the entry signature.
- */
-export function signEntryId(entryId: Hash, deviceSecretKey: SecretKey): Signature {
-    return sign(new TextEncoder().encode(entryId), deviceSecretKey);
-}
-
-/**
- * Verify an entry's signature against its entry_id and creator device public key.
- */
-export function verifyEntrySignature(
-    entryId: Hash,
-    signature: Signature,
-    devicePublicKey: PublicKey,
-): boolean {
-    return verify(new TextEncoder().encode(entryId), signature, devicePublicKey);
 }

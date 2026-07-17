@@ -9,12 +9,8 @@ import {
     verify,
     hash,
     canonicalize,
-    computeEntryId,
-    signEntryId,
-    verifyEntrySignature,
 } from '../crypto.js';
-import { EntryType } from '../types.js';
-import type { PublicKey, SecretKey, Signature, Hash } from '../types.js';
+import type { Signature } from '../types.js';
 
 describe('CryptoService', () => {
     describe('generateKeyPair', () => {
@@ -104,50 +100,4 @@ describe('CryptoService', () => {
         });
     });
 
-    describe('computeEntryId', () => {
-        it('returns consistent hash for same input', () => {
-            const fields = {
-                previousHash: null,
-                lamportClock: 0,
-                timestamp: 1000,
-                entryType: EntryType.Genesis,
-                payload: { groupId: 'test', groupName: 'Test', creatorRootPubkey: 'abc', creatorDisplayName: 'Alice' },
-                creatorDevicePubkey: 'def' as PublicKey,
-            };
-            const id1 = computeEntryId(fields);
-            const id2 = computeEntryId(fields);
-            expect(id1).toBe(id2);
-            expect(id1).toMatch(/^[0-9a-f]{64}$/);
-        });
-
-        it('changes when any field changes', () => {
-            const base = {
-                previousHash: null,
-                lamportClock: 0,
-                timestamp: 1000,
-                entryType: EntryType.Genesis,
-                payload: { groupId: 'test', groupName: 'Test', creatorRootPubkey: 'abc', creatorDisplayName: 'Alice' },
-                creatorDevicePubkey: 'def' as PublicKey,
-            };
-            const modified = { ...base, lamportClock: 1 };
-            expect(computeEntryId(base)).not.toBe(computeEntryId(modified));
-        });
-    });
-
-    describe('signEntryId + verifyEntrySignature', () => {
-        it('roundtrips correctly', () => {
-            const kp = generateKeyPair();
-            const entryId = hash(new TextEncoder().encode('entry-content'));
-            const sig = signEntryId(entryId, kp.secretKey);
-            expect(verifyEntrySignature(entryId, sig, kp.publicKey)).toBe(true);
-        });
-
-        it('rejects wrong key', () => {
-            const kp1 = generateKeyPair();
-            const kp2 = generateKeyPair();
-            const entryId = hash(new TextEncoder().encode('entry-content'));
-            const sig = signEntryId(entryId, kp1.secretKey);
-            expect(verifyEntrySignature(entryId, sig, kp2.publicKey)).toBe(false);
-        });
-    });
 });

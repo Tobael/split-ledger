@@ -62,17 +62,3 @@ export function decryptFromRelay(encrypted: Uint8Array, groupKey: Uint8Array): U
     const cipher = gcm(groupKey, nonce);
     return cipher.decrypt(ciphertext);
 }
-
-/**
- * Serialize a ledger entry to bytes for encryption.
- */
-export function serializeEntry(entry: unknown): Uint8Array {
-    return new TextEncoder().encode(JSON.stringify(entry));
-}
-
-/**
- * Deserialize bytes back to a ledger entry.
- */
-export function deserializeEntry<T>(bytes: Uint8Array): T {
-    return JSON.parse(new TextDecoder().decode(bytes)) as T;
-}

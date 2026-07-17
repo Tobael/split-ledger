@@ -212,7 +212,7 @@ The active protocol-v2 runtime now provides:
 
 Current validation baseline:
 
-- 163 core tests pass.
+- 71 focused core tests pass after deleting the superseded linear-ledger test suites.
 - 11 protocol-v2 relay HTTP/WebSocket integration and configuration tests pass.
 - Web identity, operation-storage, platform-link, routing, and expense-split tests pass.
 - Full workspace lint passes.
@@ -331,6 +331,7 @@ Exit criterion: two independent implementations could produce identical hashes a
 - [x] Connect creator-defined participant slots and targeted lost-invite replacement to the active v2 group page.
 - [x] Connect participant management, targeted and generic invitations, expenses, corrections, settlements, and periodic per-group v2 relay synchronization to the active web UI.
 - [x] Delete the superseded v1 web runtime, deterministic personal-device groups, legacy synchronizer, combined ledger adapter, utilities, and tests after connecting the v2 paths.
+- [x] Delete the superseded v1 core ledger, GroupManager, invite token, storage, schema, balance projection, SyncManager, serialization helpers, public exports, and tests.
 - [x] Implement cryptographic DAG-set validation, deterministic replay ordering, expense/claim projections, and conflict-vector tests.
 - [x] Implement causal membership authorization for creator administration, targeted capabilities, claims, and device ownership.
 - [x] Implement causal expense/settlement authorization with an explicit configurable edit policy.

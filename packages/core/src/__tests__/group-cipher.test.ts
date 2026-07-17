@@ -7,8 +7,6 @@ import {
     deriveGroupKey,
     encryptForRelay,
     decryptFromRelay,
-    serializeEntry,
-    deserializeEntry,
 } from '../sync/group-cipher.js';
 import type { GroupId } from '../types.js';
 
@@ -103,31 +101,4 @@ describe('GroupCipher', () => {
         });
     });
 
-    describe('serializeEntry + deserializeEntry', () => {
-        it('roundtrips JSON objects', () => {
-            const obj = { foo: 'bar', num: 42, nested: { a: [1, 2, 3] } };
-            const bytes = serializeEntry(obj);
-            const deserialized = deserializeEntry(bytes);
-            expect(deserialized).toEqual(obj);
-        });
-    });
-
-    describe('full encrypt/decrypt cycle with serialized entry', () => {
-        it('roundtrips a mock ledger entry', () => {
-            const key = deriveGroupKey(sharedSecret, groupId);
-            const mockEntry = {
-                entryId: 'abc123',
-                entryType: 'ExpenseCreated',
-                lamportClock: 5,
-                timestamp: Date.now(),
-                payload: { description: 'Lunch', amountMinorUnits: 1500, currency: 'EUR' },
-            };
-
-            const plaintext = serializeEntry(mockEntry);
-            const encrypted = encryptForRelay(plaintext, key);
-            const decrypted = decryptFromRelay(encrypted, key);
-            const recovered = deserializeEntry(decrypted);
-            expect(recovered).toEqual(mockEntry);
-        });
-    });
 });

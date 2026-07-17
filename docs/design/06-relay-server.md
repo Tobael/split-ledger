@@ -39,7 +39,7 @@ Reads, writes, and subscriptions require an unguessable group capability or sign
 
 The first valid read, subscription, or publish using a previously unknown group ID and capability establishes that opaque namespace. Registration cannot require a publish because clients fetch before republishing local history, and an empty replacement relay must also accept a valid member that currently lacks the missing operations.
 
-The implemented v2 WebSocket boundary requires a 32-byte base64url group capability on every publish, read, and subscription message. The first valid publication binds the group UUID to `SHA-256(capability)`; later requests with another capability fail closed. Relay persistence deduplicates by `(group_id, operation_id)` and returns bounded pages ordered by an opaque integer cursor. It stores neither Lamport clocks nor sender public keys.
+The implemented v2 WebSocket boundary requires a 32-byte base64url group capability on every publish, read, and subscription message. The first valid authenticated use binds the group UUID to `SHA-256(capability)`; this permits read-before-republication bootstrap while later requests with another capability fail closed. Relay persistence deduplicates by `(group_id, operation_id)` and returns bounded pages ordered by an opaque integer cursor. It stores neither Lamport clocks nor sender public keys.
 
 The pre-release v1 database is unsupported. Operators delete it before starting v2; no schema migration is provided.
 
