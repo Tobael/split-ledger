@@ -43,6 +43,10 @@ export class RelayDatabase {
         capability_hash TEXT NOT NULL
       );
 
+      CREATE TABLE IF NOT EXISTS disposable_namespaces (
+        group_id TEXT PRIMARY KEY REFERENCES relay_groups(group_id) ON DELETE CASCADE
+      );
+
     `);
     }
 
@@ -78,10 +82,27 @@ export class RelayDatabase {
         return stmt.all(groupId, cursor, limit) as StoredOperation[];
     }
 
-    registerGroup(groupId: string, capabilityHash: string): boolean {
+    consumeGroup(groupId: string): StoredOperation[] {
+        return this.db.transaction(() => {
+            const operations = this.getOperationsAfter(groupId, 0, Number.MAX_SAFE_INTEGER);
+            this.db.prepare('DELETE FROM operations WHERE group_id = ?').run(groupId);
+            this.db.prepare('DELETE FROM relay_groups WHERE group_id = ?').run(groupId);
+            return operations;
+        })();
+    }
+
+    registerGroup(groupId: string, capabilityHash: string, disposable = false): boolean {
         this.db.prepare('INSERT OR IGNORE INTO relay_groups (group_id, capability_hash) VALUES (?, ?)')
             .run(groupId, capabilityHash);
+        if (disposable && this.authorizeGroup(groupId, capabilityHash)) {
+            this.db.prepare('INSERT OR IGNORE INTO disposable_namespaces (group_id) VALUES (?)').run(groupId);
+        }
         return this.authorizeGroup(groupId, capabilityHash);
+    }
+
+    authorizeDisposableGroup(groupId: string, capabilityHash: string): boolean {
+        return this.authorizeGroup(groupId, capabilityHash)
+            && this.db.prepare('SELECT 1 FROM disposable_namespaces WHERE group_id = ?').get(groupId) !== undefined;
     }
 
     authorizeGroup(groupId: string, capabilityHash: string): boolean {

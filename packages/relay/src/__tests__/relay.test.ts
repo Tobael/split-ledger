@@ -68,6 +68,24 @@ describe('protocol v2 relay', () => {
         const id = groupId(); const ws = new WebSocket(wsUrl); await waitForOpen(ws); send(ws, { type: 'PUBLISH_OPERATION', groupId: id, capability, operationId: operationId(), encryptedOperation: encrypted('root') });
         await new Promise((resolve) => setTimeout(resolve, 30)); const response = waitForMessage<{ code: string }>(ws); send(ws, { type: 'GET_OPERATIONS', groupId: id, capability: wrongCapability, cursor: 0 }); expect((await response).code).toBe('UNAUTHORIZED'); ws.close();
     });
+    it('atomically consumes a disposable namespace and rejects replay', async () => {
+        const id = groupId(); const ws = new WebSocket(wsUrl); await waitForOpen(ws); const op = operationId();
+        send(ws, { type: 'PUBLISH_DISPOSABLE', groupId: id, capability, operationId: op, encryptedOperation: encrypted('transfer') });
+        await new Promise((resolve) => setTimeout(resolve, 30));
+        const rejected = waitForMessage<{ code: string }>(ws); send(ws, { type: 'CONSUME_OPERATIONS', groupId: id, capability: wrongCapability });
+        expect((await rejected).code).toBe('UNAUTHORIZED');
+        const consumed = waitForMessage<{ type: string; operations: Array<{ operationId: string }> }>(ws); send(ws, { type: 'CONSUME_OPERATIONS', groupId: id, capability });
+        expect(await consumed).toMatchObject({ type: 'OPERATIONS_CONSUMED', operations: [{ operationId: op }] });
+        const replay = waitForMessage<{ code: string }>(ws); send(ws, { type: 'CONSUME_OPERATIONS', groupId: id, capability });
+        expect((await replay).code).toBe('UNAUTHORIZED'); ws.close();
+    });
+    it('never consumes a normal group namespace', async () => {
+        const id = groupId(); const ws = new WebSocket(wsUrl); await waitForOpen(ws);
+        send(ws, { type: 'PUBLISH_OPERATION', groupId: id, capability, operationId: operationId(), encryptedOperation: encrypted('group') });
+        await new Promise((resolve) => setTimeout(resolve, 30));
+        const response = waitForMessage<{ code: string }>(ws); send(ws, { type: 'CONSUME_OPERATIONS', groupId: id, capability });
+        expect((await response).code).toBe('UNAUTHORIZED'); ws.close();
+    });
     it('enforces the configured connection limit per client IP', async () => {
         const limited = startRelay({
             port: 0,

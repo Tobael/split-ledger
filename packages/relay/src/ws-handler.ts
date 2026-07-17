@@ -6,14 +6,17 @@ import type { RelayDatabase } from './db.js';
 
 interface AuthFields { groupId: string; capability: string }
 interface PublishOperationMsg extends AuthFields { type: 'PUBLISH_OPERATION'; operationId: string; encryptedOperation: string }
+interface PublishDisposableMsg extends AuthFields { type: 'PUBLISH_DISPOSABLE'; operationId: string; encryptedOperation: string }
 interface GetOperationsMsg extends AuthFields { type: 'GET_OPERATIONS'; cursor: number; limit?: number }
 interface SubscribeMsg extends AuthFields { type: 'SUBSCRIBE' }
+interface ConsumeOperationsMsg extends AuthFields { type: 'CONSUME_OPERATIONS' }
 interface PingMsg { type: 'PING' }
-type ClientMessage = PublishOperationMsg | GetOperationsMsg | SubscribeMsg | PingMsg;
+type ClientMessage = PublishOperationMsg | PublishDisposableMsg | GetOperationsMsg | SubscribeMsg | ConsumeOperationsMsg | PingMsg;
 
 type ServerMessage =
     | { type: 'OPERATION'; groupId: string; operationId: string; encryptedOperation: string; cursor?: number }
     | { type: 'OPERATIONS_RESPONSE'; groupId: string; operations: Array<{ cursor: number; operationId: string; encryptedOperation: string }>; nextCursor: number; hasMore: boolean }
+    | { type: 'OPERATIONS_CONSUMED'; groupId: string; operations: Array<{ operationId: string; encryptedOperation: string }> }
     | { type: 'PONG' }
     | { type: 'ERROR'; code: string; message: string };
 
@@ -40,11 +43,14 @@ const groupPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3
 const operationPattern = /^[0-9a-f]{64}$/;
 const capabilityPattern = /^[A-Za-z0-9_-]{43}$/;
 function capabilityHash(value: string): string { return createHash('sha256').update(value).digest('hex'); }
-function authorized(msg: AuthFields, db: RelayDatabase, create = false): boolean {
+function authorized(msg: AuthFields, db: RelayDatabase, mode: 'existing' | 'group' | 'disposable'): boolean {
     if (!groupPattern.test(msg.groupId) || !capabilityPattern.test(msg.capability)) return false;
     const digest = capabilityHash(msg.capability);
     const expected = Buffer.from(digest, 'hex');
-    const actual = Buffer.from(create ? (db.registerGroup(msg.groupId, digest) ? digest : '') : (db.authorizeGroup(msg.groupId, digest) ? digest : ''), 'hex');
+    const accepted = mode === 'group' ? db.registerGroup(msg.groupId, digest)
+        : mode === 'disposable' ? db.registerGroup(msg.groupId, digest, true)
+            : db.authorizeGroup(msg.groupId, digest);
+    const actual = Buffer.from(accepted ? digest : '', 'hex');
     return expected.length === actual.length && timingSafeEqual(expected, actual);
 }
 function send(ws: WebSocket, message: ServerMessage): void { if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(message)); }
@@ -59,18 +65,25 @@ export function createWsHandler(db: RelayDatabase, config: RelayConfig, rooms: R
             let msg: ClientMessage;
             try { msg = JSON.parse(raw.toString()) as ClientMessage; } catch { error(ws, 'PARSE_ERROR', 'Invalid JSON'); return; }
             if (msg.type === 'PING') { send(ws, { type: 'PONG' }); return; }
-            const supported = ['SUBSCRIBE', 'PUBLISH_OPERATION', 'GET_OPERATIONS'];
+            const supported = ['SUBSCRIBE', 'PUBLISH_OPERATION', 'PUBLISH_DISPOSABLE', 'GET_OPERATIONS', 'CONSUME_OPERATIONS'];
             if (!supported.includes(msg.type)) { error(ws, 'UNKNOWN_TYPE', 'Unknown message type'); return; }
-            if (msg.type === 'PUBLISH_OPERATION'
+            if ((msg.type === 'PUBLISH_OPERATION' || msg.type === 'PUBLISH_DISPOSABLE')
                 && (!operationPattern.test(msg.operationId) || typeof msg.encryptedOperation !== 'string')) {
                 error(ws, 'INVALID_PARAMS', 'Invalid operation envelope'); return;
             }
             // The first holder of an unguessable group capability establishes the
             // opaque relay namespace. Requiring a publish first deadlocks new groups:
             // clients fetch before advertising their local operation set.
-            if (!('groupId' in msg) || !authorized(msg, db, true)) { error(ws, 'UNAUTHORIZED', 'Invalid group capability'); return; }
+            if (!('groupId' in msg)) { error(ws, 'UNAUTHORIZED', 'Invalid group capability'); return; }
+            const mode = msg.type === 'PUBLISH_DISPOSABLE' ? 'disposable' : msg.type === 'CONSUME_OPERATIONS' ? 'existing' : 'group';
+            if (!authorized(msg, db, mode) || (msg.type === 'CONSUME_OPERATIONS' && !db.authorizeDisposableGroup(msg.groupId, capabilityHash(msg.capability)))) { error(ws, 'UNAUTHORIZED', 'Invalid group capability'); return; }
+            if (msg.type === 'CONSUME_OPERATIONS') {
+                const operations = db.consumeGroup(msg.groupId);
+                send(ws, { type: 'OPERATIONS_CONSUMED', groupId: msg.groupId, operations: operations.map((operation) => ({ operationId: operation.operationId, encryptedOperation: operation.encryptedData.toString('base64') })) });
+                return;
+            }
             if (msg.type === 'SUBSCRIBE') { rooms.subscribe(msg.groupId, ws); return; }
-            if (msg.type === 'PUBLISH_OPERATION') {
+            if (msg.type === 'PUBLISH_OPERATION' || msg.type === 'PUBLISH_DISPOSABLE') {
                 const bytes = Buffer.from(msg.encryptedOperation, 'base64');
                 if (!bytes.length || bytes.length > config.maxOperationSizeBytes) { error(ws, 'OPERATION_SIZE', 'Invalid operation size'); return; }
                 if (db.getOperationCount(msg.groupId) >= config.maxOperationsPerGroup

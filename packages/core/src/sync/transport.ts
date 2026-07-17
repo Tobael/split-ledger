@@ -38,8 +38,14 @@ export interface Transport {
     /** Publish an encrypted operation to a group. */
     publishEntry(groupId: GroupId, entry: TransportEntry): Promise<void>;
 
+    /** Publish one encrypted blob into a namespace that may be consumed exactly once. */
+    publishDisposableEntry(groupId: GroupId, entry: TransportEntry): Promise<void>;
+
     /** Fetch every currently available operation through cursor pagination. */
     getOperations(groupId: GroupId): Promise<TransportEntry[]>;
+
+    /** Atomically fetch and delete a disposable opaque namespace. */
+    consumeEntries(groupId: GroupId): Promise<TransportEntry[]>;
 
     /** Register a handler for incoming operations. */
     onEntry(handler: OnEntryHandler): void;

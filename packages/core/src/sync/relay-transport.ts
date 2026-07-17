@@ -31,6 +31,12 @@ interface ServerEntriesResponse {
     hasMore: boolean;
 }
 
+interface ServerOperationsConsumed {
+    type: 'OPERATIONS_CONSUMED';
+    groupId: string;
+    operations: Array<{ operationId: string; encryptedOperation: string }>;
+}
+
 interface ServerPong {
     type: 'PONG';
 }
@@ -41,7 +47,7 @@ interface ServerError {
     message: string;
 }
 
-type ServerMessage = ServerNewEntry | ServerEntriesResponse | ServerPong | ServerError;
+type ServerMessage = ServerNewEntry | ServerEntriesResponse | ServerOperationsConsumed | ServerPong | ServerError;
 
 // ─── Pending Request Tracker ───
 
@@ -85,6 +91,7 @@ export class RelayTransport implements Transport {
 
     // Pending request/response tracking
     private pendingGetEntries = new Map<string, PendingRequest<RelayPage>>();
+    private pendingConsumeEntries = new Map<string, PendingRequest<TransportEntry[]>>();
 
     constructor(options: RelayTransportOptions) {
         this.url = options.url;
@@ -157,6 +164,16 @@ export class RelayTransport implements Transport {
         });
     }
 
+    async publishDisposableEntry(groupId: GroupId, entry: TransportEntry): Promise<void> {
+        this.send({
+            type: 'PUBLISH_DISPOSABLE',
+            groupId,
+            capability: this.capability(groupId),
+            operationId: entry.operationId,
+            encryptedOperation: entry.encryptedOperation,
+        });
+    }
+
     async getOperations(groupId: GroupId): Promise<TransportEntry[]> {
         const entries: TransportEntry[] = [];
         let cursor = 0;
@@ -167,6 +184,17 @@ export class RelayTransport implements Transport {
             if (!page.hasMore) break;
         } while (true);
         return entries;
+    }
+
+    consumeEntries(groupId: GroupId): Promise<TransportEntry[]> {
+        return new Promise((resolve, reject) => {
+            const timeout = setTimeout(() => {
+                this.pendingConsumeEntries.delete(groupId);
+                reject(new Error('Timeout waiting for OPERATIONS_CONSUMED'));
+            }, this.requestTimeoutMs);
+            this.pendingConsumeEntries.set(groupId, { resolve, reject, timeout });
+            this.send({ type: 'CONSUME_OPERATIONS', groupId, capability: this.capability(groupId) });
+        });
     }
 
     private requestPage(groupId: GroupId, cursor: number): Promise<RelayPage> {
@@ -295,6 +323,16 @@ export class RelayTransport implements Transport {
                 break;
             }
 
+            case 'OPERATIONS_CONSUMED': {
+                const pending = this.pendingConsumeEntries.get(msg.groupId);
+                if (pending) {
+                    clearTimeout(pending.timeout);
+                    this.pendingConsumeEntries.delete(msg.groupId);
+                    pending.resolve(msg.operations);
+                }
+                break;
+            }
+
             case 'ERROR':
                 console.error(`[RelayTransport] Server error: ${msg.code}`);
                 break;
@@ -351,6 +389,11 @@ export class RelayTransport implements Transport {
             pending.reject(new Error('Connection closed'));
         }
         this.pendingGetEntries.clear();
+        for (const [, pending] of this.pendingConsumeEntries) {
+            clearTimeout(pending.timeout);
+            pending.reject(new Error('Connection closed'));
+        }
+        this.pendingConsumeEntries.clear();
     }
 
     private emitConnectionState(state: 'connected' | 'disconnected' | 'reconnecting'): void {
