@@ -27,6 +27,7 @@ import { IndexedDbIdentityStore } from '../storage/IndexedDbIdentityStore';
 import { IndexedDbOperationStorageV2 } from '../storage/IndexedDbOperationStorageV2';
 import { BrowserDeviceInfo } from '../platform/BrowserDeviceInfo';
 import { BrowserRelaySettings } from '../platform/BrowserRelaySettings';
+import { BrowserSyncLifecycle } from '../platform/BrowserSyncLifecycle';
 
 // ─── Types ───
 
@@ -142,6 +143,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const operationStorageV2 = useMemo(() => new IndexedDbOperationStorageV2(), []);
     const groupServiceV2 = useMemo(() => new GroupServiceV2(operationStorageV2), [operationStorageV2]);
     const deviceInfo = useMemo(() => new BrowserDeviceInfo(), []);
+    const syncLifecycle = useMemo(() => new BrowserSyncLifecycle(), []);
 
     const syncGroupV2 = useCallback(async (access: GroupAccessV2): Promise<GroupStateV2 | null> => {
         const groupId = access.groupId as GroupId;
@@ -666,21 +668,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
             }
         };
 
-        const synchronizeWhenOnline = () => void synchronizeAll();
-        const synchronizeWhenVisible = () => {
-            if (document.visibilityState === 'visible') void synchronizeAll();
-        };
-        window.addEventListener('online', synchronizeWhenOnline);
-        document.addEventListener('visibilitychange', synchronizeWhenVisible);
-        const interval = window.setInterval(() => void synchronizeAll(), 30_000);
-        queueMicrotask(() => void synchronizeAll());
+        const unsubscribe = syncLifecycle.subscribe(() => void synchronizeAll());
         return () => {
             stopped = true;
-            window.clearInterval(interval);
-            window.removeEventListener('online', synchronizeWhenOnline);
-            document.removeEventListener('visibilitychange', synchronizeWhenVisible);
+            unsubscribe();
         };
-    }, [groupServiceV2, identity, operationStorageV2, refreshGroups, storageReady, syncGroupV2]);
+    }, [groupServiceV2, identity, operationStorageV2, refreshGroups, storageReady, syncGroupV2, syncLifecycle]);
 
     useEffect(() => {
         if (identity) queueMicrotask(() => void refreshGroups());
