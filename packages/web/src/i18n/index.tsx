@@ -1,8 +1,9 @@
 /* eslint-disable react-refresh/only-export-components */
-import { createContext, useContext, useState, useCallback, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import en from './en';
 import de from './de';
 import type { Translations } from './en';
+import { BrowserLocaleSettings } from '../platform/BrowserLocaleSettings';
 
 // ─── Supported Locales ───
 
@@ -19,8 +20,7 @@ export const supportedLocales: Locale[] = ['en', 'de'];
 
 // ─── Detect default locale ───
 
-function detectLocale(): Locale {
-    const stored = localStorage.getItem('splitledger-locale');
+function detectLocale(stored: string | null): Locale {
     if (stored && stored in translations) return stored as Locale;
 
     // Default to German
@@ -38,13 +38,10 @@ interface I18nContextValue {
 const I18nContext = createContext<I18nContextValue | null>(null);
 
 export function I18nProvider({ children }: { children: ReactNode }) {
-    const [locale, setLocaleState] = useState<Locale>(detectLocale);
+    const localeSettings = useMemo(() => new BrowserLocaleSettings(), []);
+    const [locale, setLocale] = useState<Locale>(() => detectLocale(localeSettings.load()));
 
-    const setLocale = useCallback((l: Locale) => {
-        setLocaleState(l);
-        localStorage.setItem('splitledger-locale', l);
-        document.documentElement.lang = l;
-    }, []);
+    useEffect(() => localeSettings.save(locale), [locale, localeSettings]);
 
     const t = translations[locale];
 
