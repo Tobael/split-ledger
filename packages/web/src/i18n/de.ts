@@ -11,6 +11,8 @@ const de: Translations = {
         copied: '✓ Kopiert!',
         loading: 'Wird geladen…',
         loadingIdentity: 'Sicherer Identitätsspeicher wird geladen…',
+        confirmTitle: 'Bitte bestätigen',
+        confirm: 'Bestätigen',
         you: 'du',
         creator: 'Ersteller',
         active: 'Aktiv',

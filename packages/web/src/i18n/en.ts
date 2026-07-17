@@ -9,6 +9,8 @@ export interface Translations {
         copied: string;
         loading: string;
         loadingIdentity: string;
+        confirmTitle: string;
+        confirm: string;
         you: string;
         creator: string;
         active: string;
@@ -211,6 +213,8 @@ const en: Translations = {
         copied: '✓ Copied!',
         loading: 'Loading…',
         loadingIdentity: 'Loading secure identity storage…',
+        confirmTitle: 'Please confirm',
+        confirm: 'Confirm',
         you: 'you',
         creator: 'Creator',
         active: 'Active',

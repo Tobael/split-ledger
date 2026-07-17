@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { BrowserTextSharing } from '../platform/BrowserTextSharing';
+import { ConfirmationAction } from '../components/ConfirmationAction';
 
 export function GroupDetail() {
     const { id } = useParams<{ id: string }>();
@@ -36,7 +37,6 @@ export function GroupDetail() {
     }, [refresh, lastUpdate]);
 
     const handleDeleteGroup = async () => {
-        if (!confirm(t.groupDetail.confirmDelete)) return;
         try {
             await deleteGroup(groupId);
             navigate('/dashboard');
@@ -139,7 +139,6 @@ function ProtocolV2GroupDetail({ state, onDelete }: { state: GroupStateV2; onDel
     };
 
     const settle = async (currency: string, from: string, to: string, amount: number) => {
-        if (!window.confirm(t.groupDetail.confirmSettleUp)) return;
         const key = `${currency}:${from}:${to}`;
         setSettling(key);
         setSettlementError('');
@@ -166,7 +165,6 @@ function ProtocolV2GroupDetail({ state, onDelete }: { state: GroupStateV2; onDel
     };
 
     const disableParticipant = async (participantId: string) => {
-        if (!window.confirm(t.groupDetail.confirmDisableParticipant)) return;
         setBusyParticipantId(participantId);
         setParticipantError('');
         try {
@@ -179,7 +177,6 @@ function ProtocolV2GroupDetail({ state, onDelete }: { state: GroupStateV2; onDel
     };
 
     const resetParticipant = async (participantId: string) => {
-        if (!window.confirm(t.groupDetail.confirmResetParticipant)) return;
         setBusyParticipantId(participantId);
         setParticipantError('');
         try {
@@ -192,7 +189,6 @@ function ProtocolV2GroupDetail({ state, onDelete }: { state: GroupStateV2; onDel
     };
 
     const voidExpense = async (expenseId: string) => {
-        if (!window.confirm(t.groupDetail.confirmVoidExpense)) return;
         await voidExpenseV2(state.groupId as GroupId, expenseId, t.groupDetail.voidExpenseReason);
     };
 
@@ -225,10 +221,14 @@ function ProtocolV2GroupDetail({ state, onDelete }: { state: GroupStateV2; onDel
                                         setEditedParticipantName(participant.displayName);
                                     }}><Pencil className="size-4" /></Button>
                                     {participant.participantId !== state.creatorParticipantId && participant.status === 'claimed' && (
-                                        <Button variant="secondary" size="icon" title={t.groupDetail.resetParticipant} aria-label={t.groupDetail.resetParticipant} disabled={busyParticipantId !== null} onClick={() => void resetParticipant(participant.participantId)}><RotateCcw className="size-4" /></Button>
+                                        <ConfirmationAction description={t.groupDetail.confirmResetParticipant} onConfirm={() => resetParticipant(participant.participantId)} destructive>
+                                            <Button variant="secondary" size="icon" title={t.groupDetail.resetParticipant} aria-label={t.groupDetail.resetParticipant} disabled={busyParticipantId !== null}><RotateCcw className="size-4" /></Button>
+                                        </ConfirmationAction>
                                     )}
                                     {participant.participantId !== state.creatorParticipantId && (
-                                        <Button variant="destructive" size="icon" title={t.groupDetail.disableParticipant} aria-label={t.groupDetail.disableParticipant} disabled={busyParticipantId !== null} onClick={() => void disableParticipant(participant.participantId)}><UserMinus className="size-4" /></Button>
+                                        <ConfirmationAction description={t.groupDetail.confirmDisableParticipant} onConfirm={() => disableParticipant(participant.participantId)} destructive>
+                                            <Button variant="destructive" size="icon" title={t.groupDetail.disableParticipant} aria-label={t.groupDetail.disableParticipant} disabled={busyParticipantId !== null}><UserMinus className="size-4" /></Button>
+                                        </ConfirmationAction>
                                     )}
                                 </div>
                             )}
@@ -291,9 +291,9 @@ function ProtocolV2GroupDetail({ state, onDelete }: { state: GroupStateV2; onDel
                                         <div key={key} className="rounded-lg bg-[#004502]/[0.03] p-2 text-sm">
                                             <div className="flex flex-wrap items-center gap-1"><span>{state.participants[suggestion.from]?.displayName}</span><ArrowRight className="size-3.5" /><span>{state.participants[suggestion.to]?.displayName}</span><strong className="ml-auto">{currency} {(suggestion.amount / 100).toFixed(2)}</strong></div>
                                             {canRecord ? (
-                                                <Button variant="secondary" size="sm" className="mt-2 w-full" disabled={settling !== null} onClick={() => void settle(currency, suggestion.from, suggestion.to, suggestion.amount)}>
-                                                    {settling === key ? t.groupDetail.settling : t.groupDetail.markAsPaid}
-                                                </Button>
+                                                <ConfirmationAction description={t.groupDetail.confirmSettleUp} onConfirm={() => settle(currency, suggestion.from, suggestion.to, suggestion.amount)}>
+                                                    <Button variant="secondary" size="sm" className="mt-2 w-full" disabled={settling !== null}>{settling === key ? t.groupDetail.settling : t.groupDetail.markAsPaid}</Button>
+                                                </ConfirmationAction>
                                             ) : <div className="mt-1 text-xs text-gray-400">{t.groupDetail.payerMustSettle}</div>}
                                         </div>
                                     );
@@ -318,13 +318,17 @@ function ProtocolV2GroupDetail({ state, onDelete }: { state: GroupStateV2; onDel
                         </div>
                         <div className="flex shrink-0 gap-1 self-end sm:self-auto">
                             <Button asChild variant="ghost" size="icon"><Link title={t.groupDetail.editExpense} aria-label={t.groupDetail.editExpense} to={`/group/${state.groupId}/expense?edit=${expense.expenseId}`}><Pencil className="size-4" /></Link></Button>
-                            <Button variant="destructive" size="icon" title={t.groupDetail.voidExpense} aria-label={t.groupDetail.voidExpense} onClick={() => void voidExpense(expense.expenseId)}><Trash2 className="size-4" /></Button>
+                            <ConfirmationAction description={t.groupDetail.confirmVoidExpense} onConfirm={() => voidExpense(expense.expenseId)} destructive>
+                                <Button variant="destructive" size="icon" title={t.groupDetail.voidExpense} aria-label={t.groupDetail.voidExpense}><Trash2 className="size-4" /></Button>
+                            </ConfirmationAction>
                         </div>
                     </div>
                 ))}
                 </CardContent>
             </Card>
-            <Button variant="destructive" className="w-full sm:w-auto" onClick={() => void onDelete()}><Trash2 className="size-4" />{t.groupDetail.deleteGroup}</Button>
+            <ConfirmationAction description={t.groupDetail.confirmDelete} onConfirm={onDelete} destructive>
+                <Button variant="destructive" className="w-full sm:w-auto"><Trash2 className="size-4" />{t.groupDetail.deleteGroup}</Button>
+            </ConfirmationAction>
         </div>
     );
 }

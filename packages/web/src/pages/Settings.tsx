@@ -14,6 +14,7 @@ import { Label } from '@/components/ui/label';
 import { Alert } from '@/components/ui/alert';
 import { Download, KeyRound, Languages, Pencil, ShieldCheck, Trash2, Upload } from 'lucide-react';
 import { BrowserFileDownload } from '../platform/BrowserFileDownload';
+import { ConfirmationAction } from '../components/ConfirmationAction';
 
 export function Settings() {
     const {
@@ -48,7 +49,6 @@ export function Settings() {
     }, [groups, identity, getAuthorizedDevicesV2]);
 
     const handleRevoke = async (deviceKey: string) => {
-        if (!confirm(t.settings.confirmRevoke)) return;
         setBusy(true);
         setStatus(null);
         try {
@@ -248,12 +248,9 @@ export function Settings() {
                                         <code className="block text-xs text-[#716969]">{key.slice(0, 8)}…{key.slice(-8)}</code>
                                         <div className="text-xs text-[#716969]">{t.settings.groupAccessCount(data.groups.length)}</div>
                                     </div>
-                                    <Button variant="secondary" size="sm" className="text-red-700"
-                                        onClick={() => handleRevoke(key)}
-                                        disabled={busy}
-                                    >
-                                        {t.settings.revoke}
-                                    </Button>
+                                    <ConfirmationAction description={t.settings.confirmRevoke} onConfirm={() => handleRevoke(key)} destructive>
+                                        <Button variant="secondary" size="sm" className="text-red-700" disabled={busy}>{t.settings.revoke}</Button>
+                                    </ConfirmationAction>
                                 </div>
                             ))}
                         </div>
@@ -357,15 +354,9 @@ export function Settings() {
             <Card className="animate-fade-in border-red-200">
                 <CardHeader><CardTitle className="text-red-700">{t.settings.dangerZone}</CardTitle><CardDescription>{t.settings.dangerZoneDesc}</CardDescription></CardHeader>
                 <CardContent>
-                <Button variant="destructive"
-                    onClick={async () => {
-                        if (confirm(t.settings.deleteConfirm)) {
-                            await deleteIdentity();
-                        }
-                    }}
-                >
-                    <Trash2 className="size-4" />{t.settings.deleteAccount}
-                </Button>
+                <ConfirmationAction description={t.settings.deleteConfirm} onConfirm={deleteIdentity} destructive>
+                    <Button variant="destructive"><Trash2 className="size-4" />{t.settings.deleteAccount}</Button>
+                </ConfirmationAction>
                 </CardContent>
             </Card>
         </div>
