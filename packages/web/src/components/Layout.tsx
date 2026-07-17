@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useApp } from '../context/AppContext';
 import { useI18n, supportedLocales, localeLabels } from '../i18n';
 
@@ -8,23 +8,16 @@ import { Footer } from './Footer';
 import { ConnectionStatus } from './ConnectionStatus';
 import { Alert } from '@/components/ui/alert';
 import { Settings, UsersRound } from 'lucide-react';
+import { BrowserConnectivity } from '../platform/BrowserConnectivity';
 
 export function Layout({ children }: { children: ReactNode }) {
     const { isOnboarded, identity, persistenceWarning, syncStatus } = useApp();
     const { t, locale, setLocale } = useI18n();
     const location = useLocation();
-    const [online, setOnline] = useState(() => navigator.onLine);
+    const connectivity = useMemo(() => new BrowserConnectivity(), []);
+    const [online, setOnline] = useState(() => connectivity.isOnline());
 
-    useEffect(() => {
-        const handleOnline = () => setOnline(true);
-        const handleOffline = () => setOnline(false);
-        window.addEventListener('online', handleOnline);
-        window.addEventListener('offline', handleOffline);
-        return () => {
-            window.removeEventListener('online', handleOnline);
-            window.removeEventListener('offline', handleOffline);
-        };
-    }, []);
+    useEffect(() => connectivity.subscribe(setOnline), [connectivity]);
 
     const storageWarning = persistenceWarning ? (
         <Alert className="border-red-700/15 bg-red-50 text-red-950">
