@@ -202,10 +202,10 @@ Do not describe this as a blockchain unless the implementation truly provides bl
 
 Entries remain immutable. Editing is one `ExpenseCorrection`/`ExpenseCorrected` operation referencing the stable original expense and containing complete replacement data. Voiding is a separate tombstone operation.
 
-The current branch already contains the first vertical slice:
+The active protocol-v2 runtime now provides:
 
-- `GroupManager.correctExpense()` creates one correction operation.
-- The React edit form no longer performs void-then-create.
+- `GroupServiceV2.correctExpense()` creates one signed correction operation.
+- The React edit form is v2-only and never performs void-then-create.
 - The expense feed displays effective expenses and hides voided entries.
 - Expense cards expose an Edit action.
 - Core tests cover the manager correction path.
@@ -214,7 +214,7 @@ Current validation baseline:
 
 - 163 core tests pass.
 - 11 protocol-v2 relay HTTP/WebSocket integration and configuration tests pass.
-- 12 web platform/storage tests pass.
+- Web identity, operation-storage, platform-link, routing, and expense-split tests pass.
 - Full workspace lint passes.
 - Full production build passes.
 - `better-sqlite3` is upgraded to 12.11.1 for Node 26 compatibility.
@@ -301,6 +301,7 @@ Exit criterion: clean CI and a reproducible baseline before protocol migration.
 - [x] Stop treating `localStorage` as the primary ledger store; the temporary legacy-ledger migration was subsequently deleted.
 - [x] Add an IndexedDB adapter contract test covering entries, ordering, state, identities, isolation, and deletion.
 - [x] Move active identity persistence from `localStorage` to the identity storage interface; the temporary legacy-identity migration was subsequently deleted.
+- [x] Replace the combined v1 ledger/identity IndexedDB adapter with a dedicated identity-only store and contract test.
 - Add parity/contract tests for future Tauri storage implementations.
 - [x] Extract invitation reception behind `LinkReceiver` and support canonical `/invite/<token>` web routes.
 
@@ -329,7 +330,7 @@ Exit criterion: two independent implementations could produce identical hashes a
 - [x] Connect v2 group creation, durable reload, dashboard summaries, read-only detail projection, and deletion to the active web context.
 - [x] Connect creator-defined participant slots and targeted lost-invite replacement to the active v2 group page.
 - [x] Connect participant management, targeted and generic invitations, expenses, corrections, settlements, and periodic per-group v2 relay synchronization to the active web UI.
-- Delete each superseded v1 runtime slice and its tests as soon as the corresponding v2 path is connected.
+- [x] Delete the superseded v1 web runtime, deterministic personal-device groups, legacy synchronizer, combined ledger adapter, utilities, and tests after connecting the v2 paths.
 - [x] Implement cryptographic DAG-set validation, deterministic replay ordering, expense/claim projections, and conflict-vector tests.
 - [x] Implement causal membership authorization for creator administration, targeted capabilities, claims, and device ownership.
 - [x] Implement causal expense/settlement authorization with an explicit configurable edit policy.
