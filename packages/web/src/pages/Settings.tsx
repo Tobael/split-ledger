@@ -8,7 +8,7 @@ import {
     readFileAsText,
 } from '../utils/identity-export';
 import { IdentityExport } from '../components/IdentityExport';
-import type { GroupId, PublicKey } from '@splitledger/core';
+import type { GroupId } from '@splitledger/core';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -16,8 +16,8 @@ import { Label } from '@/components/ui/label';
 
 export function Settings() {
     const {
-        identity, restoreIdentity, deleteIdentity, groups, getGroupState, manager, broadcastEntry,
-        refreshGroups, personalGroupId, getAuthorizedDevicesV2, revokeDeviceV2,
+        identity, restoreIdentity, deleteIdentity, groups,
+        getAuthorizedDevicesV2, revokeDeviceV2,
         exportIdentityTransferV2, importIdentityFromJson, preferredRelayUrl, setPreferredRelayUrl,
     } = useApp();
     const { t, locale, setLocale } = useI18n();
@@ -40,47 +40,18 @@ export function Settings() {
         if (!identity || !groups) return;
         const loadDevices = async () => {
             const devices = await getAuthorizedDevicesV2();
-            for (const g of groups.filter(({ protocolVersion }) => protocolVersion === 1)) {
-                const state = await getGroupState(g.groupId);
-                if (!state) continue;
-                const me = state.members.get(identity.rootKeyPair.publicKey);
-                if (me) {
-                    me.authorizedDevices.forEach(dKey => {
-                        const existing = devices.get(dKey) || {
-                            name: dKey === identity.device.deviceKeyPair.publicKey
-                                ? identity.device.deviceName
-                                : (me.deviceNames?.get(dKey) || t.settings.unknownDevice),
-                            groups: [] as GroupId[]
-                        };
-                        if (dKey === identity.device.deviceKeyPair.publicKey) existing.name = identity.device.deviceName; // Ensure my device name is correct
-                        if (!existing.groups.includes(g.groupId)) existing.groups.push(g.groupId);
-                        devices.set(dKey, existing);
-                    });
-                }
-            }
             setAuthorizedDevices(devices);
         };
         loadDevices();
-    }, [groups, identity, getAuthorizedDevicesV2, getGroupState, t.settings.unknownDevice]);
+    }, [groups, identity, getAuthorizedDevicesV2]);
 
-    const handleRevoke = async (deviceKey: string, groupIds: GroupId[]) => {
-        if (!manager || !confirm(t.settings.confirmRevoke)) return;
+    const handleRevoke = async (deviceKey: string) => {
+        if (!confirm(t.settings.confirmRevoke)) return;
         setBusy(true);
         setStatus(null);
         try {
             await revokeDeviceV2(deviceKey);
-            const legacyGroupIds = groupIds.filter((groupId) =>
-                groups.some((group) => group.groupId === groupId && group.protocolVersion === 1));
-            const allGroupsToRevoke = personalGroupId ? [...legacyGroupIds, personalGroupId] : legacyGroupIds;
-            for (const gid of Array.from(new Set(allGroupsToRevoke))) {
-                try {
-                    const entry = await manager.revokeDevice(gid, deviceKey as PublicKey, 'Revoked by user');
-                    await broadcastEntry(gid, entry);
-                } catch (e) {
-                    console.error(`Failed to revoke in group ${gid}`, e);
-                }
-            }
-            await refreshGroups(); // will trigger useEffect to reload devices
+            setAuthorizedDevices(await getAuthorizedDevicesV2());
             setStatus({ type: 'success', msg: 'Device revoked' });
         } catch {
             setStatus({ type: 'error', msg: 'Failed to revoke device' });
@@ -153,21 +124,6 @@ export function Settings() {
             // Update personal identity
             const newIdentity = { ...identity, displayName: newName };
             await restoreIdentity(newIdentity);
-
-            // Broadcast to all active groups
-            if (manager) {
-                const activeGroupIds = await manager.listGroups();
-                for (const gid of activeGroupIds) {
-                    if (gid !== personalGroupId) {
-                        try {
-                            const entry = await manager.renameMember(gid, newName);
-                            await broadcastEntry(gid, entry);
-                        } catch (e) {
-                            console.error(`Failed to rename in group ${gid}`, e);
-                        }
-                    }
-                }
-            }
 
             setStatus({ type: 'success', msg: t.settings.renameSuccess || 'Name updated' });
             setIsEditingName(false);
@@ -310,7 +266,7 @@ export function Settings() {
                                     <button
                                         className="btn btn--secondary btn--sm"
                                         style={{ color: 'var(--danger)', borderColor: 'var(--danger-dim)' }}
-                                        onClick={() => handleRevoke(key, data.groups)}
+                                        onClick={() => handleRevoke(key)}
                                         disabled={busy}
                                     >
                                         {t.settings.revoke}

@@ -105,6 +105,7 @@ export interface Translations {
         copyInvite: string;
         inviteCopied: string;
         voidExpense: string;
+        voidExpenseReason: string;
         editExpense: string;
         payerMustSettle: string;
         settling: string;
@@ -322,6 +323,7 @@ const en: Translations = {
         copyInvite: 'Copy invite',
         inviteCopied: 'Invite copied',
         voidExpense: 'Remove',
+        voidExpenseReason: 'Expense removed',
         editExpense: 'Edit expense',
         payerMustSettle: 'The paying participant must record this payment.',
         settling: 'Recording…',

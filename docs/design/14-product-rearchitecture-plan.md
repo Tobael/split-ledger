@@ -345,6 +345,7 @@ Exit criterion: two independent implementations could produce identical hashes a
 - [x] Connect targeted confirmation, generic-invite slot selection, signed claiming, device authorization, and missing-history handling to the active join UI.
 - [x] Connect v2 expense creation, participant-ID splits, immutable corrections, voids, projection, balances, and relay republication to the active web UI.
 - [x] Delete the legacy ledger construction and correction fallback from the active expense editor; it now accepts only protocol-v2 groups and uses localized save states.
+- [x] Delete legacy group-detail, linear-chain visualization, device-revocation, member-rename, and personal-group fallbacks from the active GroupDetail and Settings pages.
 - [x] Make custom expense splits start from equal shares, allow participants to be included or excluded by clicking them, redistribute across the remaining participants, and keep every included share directly editable.
 - [x] Connect deterministic per-currency settlement suggestions and payer-signed settlement operations to the active v2 group UI.
 - [x] Connect creator-authorized participant rename, disable, and explicit lost-identity slot reassignment to the active v2 group UI.
