@@ -304,6 +304,7 @@ Exit criterion: clean CI and a reproducible baseline before protocol migration.
 - [x] Replace the combined v1 ledger/identity IndexedDB adapter with a dedicated identity-only store and contract test.
 - Add parity/contract tests for future Tauri storage implementations.
 - [x] Extract invitation reception behind `LinkReceiver` and support canonical `/invite/<token>` web routes.
+- [x] Extract device metadata, relay preferences, synchronization lifecycle, connectivity state, and text sharing behind tested browser platform adapters.
 
 Exit criterion: the browser behaves exactly as before through adapters and survives reload/offline use.
 

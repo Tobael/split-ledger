@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { useI18n } from '../i18n';
@@ -12,6 +12,7 @@ import { ArrowLeft, ArrowRight, Check, Clock3, Copy, Link2, Pencil, Plus, Rotate
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { BrowserTextSharing } from '../platform/BrowserTextSharing';
 
 export function GroupDetail() {
     const { id } = useParams<{ id: string }>();
@@ -85,6 +86,7 @@ function ProtocolV2GroupDetail({ state, onDelete }: { state: GroupStateV2; onDel
     const [editingParticipantId, setEditingParticipantId] = useState<string | null>(null);
     const [editedParticipantName, setEditedParticipantName] = useState('');
     const [participantError, setParticipantError] = useState('');
+    const textSharing = useMemo(() => new BrowserTextSharing(), []);
     const participants = Object.values(state.participants).filter(({ status }) => status !== 'disabled');
     const expenses = Object.values(state.expenses).filter((expense) => expense.status === 'effective');
     const currencies = Object.keys(state.balances).sort();
@@ -117,7 +119,7 @@ function ProtocolV2GroupDetail({ state, onDelete }: { state: GroupStateV2; onDel
     };
 
     const copyInvite = async (participantId: string) => {
-        await navigator.clipboard.writeText(inviteLinks[participantId]);
+        await textSharing.copy(inviteLinks[participantId]);
         setCopiedParticipantId(participantId);
     };
 
@@ -132,7 +134,7 @@ function ProtocolV2GroupDetail({ state, onDelete }: { state: GroupStateV2; onDel
     };
 
     const copyGenericInvite = async () => {
-        await navigator.clipboard.writeText(genericInviteLink);
+        await textSharing.copy(genericInviteLink);
         setCopiedParticipantId('generic');
     };
 
