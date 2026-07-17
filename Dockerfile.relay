@@ -6,6 +6,7 @@
 FROM node:20-alpine AS builder
 
 RUN apk add --no-cache python3 make g++
+ENV npm_config_nodedir=/usr/local
 
 WORKDIR /build
 
@@ -27,19 +28,24 @@ COPY packages/relay/ packages/relay/
 RUN npm run build --workspace=packages/core && \
     npm run build --workspace=packages/relay
 
+# Keep the native addon built against this exact Node/Alpine image, then
+# remove build-only dependencies before copying it into the runtime stage.
+RUN npm prune --omit=dev --workspaces --include-workspace-root
+
 # Stage 2: Runtime
 FROM node:20-alpine AS runtime
 
-RUN apk add --no-cache tini python3 make g++
+RUN apk add --no-cache tini
 WORKDIR /app
 
 # Copy root package files for workspace resolution
-COPY package.json package-lock.json ./
+COPY package.json ./
 COPY packages/core/package.json packages/core/
 COPY packages/relay/package.json packages/relay/
 
-# Install production-only deps
-RUN npm ci --workspace=packages/core --workspace=packages/relay --include-workspace-root --omit=dev
+# Reuse the pruned dependency tree, including the already-compiled
+# better-sqlite3 binary. The runtime image performs no installs or builds.
+COPY --from=builder /build/node_modules/ node_modules/
 
 # Copy built artifacts
 COPY --from=builder /build/packages/core/dist/ packages/core/dist/
