@@ -154,6 +154,9 @@ export interface Translations {
         invalidLedger: string;
         adding: string;
         addButton: string;
+        saving: string;
+        saveButton: string;
+        correctionReason: string;
     };
     settings: {
         title: string;
@@ -369,6 +372,9 @@ const en: Translations = {
         invalidLedger: 'Invalid ledger state',
         adding: 'Adding…',
         addButton: 'Add Expense',
+        saving: 'Saving…',
+        saveButton: 'Save changes',
+        correctionReason: 'Expense edited',
     },
     settings: {
         title: 'Settings',

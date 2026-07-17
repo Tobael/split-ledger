@@ -4,13 +4,7 @@ import { useApp } from '../context/AppContext';
 import { useI18n } from '../i18n';
 import {
     type GroupId,
-    type GroupState,
     type GroupStateV2,
-    type PublicKey,
-    type Hash,
-    EntryType,
-    buildEntry,
-    getEffectiveExpenses,
 } from '@splitledger/core';
 import { equalParticipantSplits } from '../utils/expense-splits';
 import { ArrowLeft, Check, CircleDollarSign, X } from 'lucide-react';
@@ -27,13 +21,11 @@ export function AddExpense() {
     const editId = searchParams.get('edit');
 
     const {
-        manager, getGroupState, getGroupStateV2, storage, identity, refreshGroup, broadcastEntry,
-        correctExpense, createExpenseV2, correctExpenseV2,
+        getGroupStateV2, identity, createExpenseV2, correctExpenseV2,
     } = useApp();
     const { t } = useI18n();
     const groupId = id as GroupId;
 
-    const [state, setState] = useState<GroupState | null>(null);
     const [stateV2, setStateV2] = useState<GroupStateV2 | null>(null);
     const [description, setDescription] = useState('');
     const [amount, setAmount] = useState('');
@@ -46,84 +38,43 @@ export function AddExpense() {
 
     useEffect(() => {
         void (async () => {
-            const v2 = await getGroupStateV2(groupId);
-            if (v2) {
-                setStateV2(v2);
-                if (editId) {
-                    const projected = v2.expenses[editId];
-                    if (projected?.status === 'effective') {
-                        const expense = projected.expense;
-                        setDescription(String(expense.description));
-                        setAmount((Number(expense.amountMinorUnits) / 100).toFixed(2));
-                        setPaidBy(String(expense.paidBy));
-                        setSplitMode('custom');
-                        setCustomSplits(Object.fromEntries(
-                            Object.entries(expense.splits as Record<string, number>)
-                                .map(([participantId, share]) => [participantId, (share / 100).toFixed(2)]),
-                        ));
-                        setExcludedParticipants(new Set(
-                            Object.entries(expense.splits as Record<string, number>)
-                                .filter(([, share]) => share === 0)
-                                .map(([participantId]) => participantId),
-                        ));
-                    }
-                } else if (identity) {
-                    const mine = Object.values(v2.participants).find(
-                        ({ claimedRootPublicKey }) => claimedRootPublicKey === identity.rootKeyPair.publicKey,
-                    );
-                    if (mine) setPaidBy(mine.participantId);
+            const state = await getGroupStateV2(groupId);
+            if (!state) return;
+            setStateV2(state);
+            if (editId) {
+                const projected = state.expenses[editId];
+                if (projected?.status === 'effective') {
+                    const expense = projected.expense;
+                    setDescription(String(expense.description));
+                    setAmount((Number(expense.amountMinorUnits) / 100).toFixed(2));
+                    setPaidBy(String(expense.paidBy));
+                    setSplitMode('custom');
+                    setCustomSplits(Object.fromEntries(
+                        Object.entries(expense.splits as Record<string, number>)
+                            .map(([participantId, share]) => [participantId, (share / 100).toFixed(2)]),
+                    ));
+                    setExcludedParticipants(new Set(
+                        Object.entries(expense.splits as Record<string, number>)
+                            .filter(([, share]) => share === 0)
+                            .map(([participantId]) => participantId),
+                    ));
                 }
-                return;
-            }
-            const legacy = await getGroupState(groupId);
-            if (legacy) {
-                setState(legacy);
-                if (!editId && identity) setPaidBy(identity.rootKeyPair.publicKey);
+            } else if (identity) {
+                const mine = Object.values(state.participants).find(
+                    ({ claimedRootPublicKey }) => claimedRootPublicKey === identity.rootKeyPair.publicKey,
+                );
+                if (mine) setPaidBy(mine.participantId);
             }
         })();
-    }, [groupId, getGroupState, getGroupStateV2, identity, editId]);
+    }, [groupId, getGroupStateV2, identity, editId]);
 
-    // Load entry if editing
-    useEffect(() => {
-        if (stateV2) return;
-        if (!editId || !storage) return;
-        storage.getAllEntries(groupId).then(entries => {
-            const entry = entries.find(candidate => candidate.entryId === editId);
-            if (entry && entry.entryType === EntryType.ExpenseCreated) {
-                const p = getEffectiveExpenses(entries).get(entry.entryId) ?? entry.payload;
-                setDescription(p.description);
-                setAmount((p.amountMinorUnits / 100).toFixed(2));
-                setPaidBy(p.paidByRootPubkey);
-
-                // Determine split mode
-                // (Simplification: if custom splits match equal logic, we could set equal, but keeping custom is safer for exact reproduction)
-                // Actually, let's try to detect if it's equal to default behaviors, but 'custom' is safe.
-                setSplitMode('custom');
-                const humanSplits: Record<string, string> = {};
-                for (const [k, v] of Object.entries(p.splits)) {
-                    humanSplits[k] = (v / 100).toFixed(2);
-                }
-                setCustomSplits(humanSplits);
-                setExcludedParticipants(new Set(
-                    Object.entries(p.splits)
-                        .filter(([, share]) => share === 0)
-                        .map(([participantId]) => participantId),
-                ));
-            }
-        });
-    }, [editId, storage, groupId, stateV2]);
-
-    if ((!state && !stateV2) || !identity) {
+    if (!stateV2 || !identity) {
         return <div style={{ padding: 'var(--space-8)', color: 'var(--text-secondary)' }}>{t.common.loading}</div>;
     }
 
-    const activeMembers = stateV2
-        ? Object.values(stateV2.participants)
-            .filter(({ status }) => status !== 'disabled')
-            .map((participant) => ({ id: participant.participantId, displayName: participant.displayName, isMe: participant.claimedRootPublicKey === identity.rootKeyPair.publicKey }))
-        : [...state!.members.values()]
-            .filter((member) => member.isActive)
-            .map((member) => ({ id: member.rootPubkey, displayName: member.displayName, isMe: member.rootPubkey === identity.rootKeyPair.publicKey }));
+    const activeMembers = Object.values(stateV2.participants)
+        .filter(({ status }) => status !== 'disabled')
+        .map((participant) => ({ id: participant.participantId, displayName: participant.displayName, isMe: participant.claimedRootPublicKey === identity.rootKeyPair.publicKey }));
 
     const prefillCustomSplits = (excluded: ReadonlySet<string>, nextAmount = amount) => {
         const amountMinor = Math.round(parseFloat(nextAmount || '0') * 100);
@@ -156,7 +107,7 @@ export function AddExpense() {
     };
 
     const handleSubmit = async () => {
-        if (!manager || !description.trim() || !amount || !paidBy) return;
+        if (!description.trim() || !amount || !paidBy) return;
         setError('');
         setSubmitting(true);
 
@@ -186,61 +137,15 @@ export function AddExpense() {
                 }
             }
 
-            if (stateV2) {
-                const expense = {
-                    description: description.trim(),
-                    amountMinorUnits: amountMinor,
-                    currency: 'EUR',
-                    paidBy,
-                    splits,
-                };
-                if (editId) await correctExpenseV2(groupId, editId, expense, 'Expense edited');
-                else await createExpenseV2(groupId, expense);
-                navigate(`/group/${groupId}`);
-                return;
-            }
-
-            const entries = await storage.getAllEntries(groupId);
-            const { orderEntries, validateFullChain } = await import('@splitledger/core');
-            const ordered = orderEntries([...entries]);
-            const latestEntry = ordered[ordered.length - 1]!;
-            const result = validateFullChain(entries);
-            if (!result.valid || !result.finalState) {
-                setError(t.addExpense.invalidLedger);
-                setSubmitting(false);
-                return;
-            }
-
-            if (editId) {
-                await correctExpense(groupId, editId as Hash, {
-                    description: description.trim(),
-                    amountMinorUnits: amountMinor,
-                    currency: 'EUR',
-                    paidByRootPubkey: paidBy as PublicKey,
-                    splits,
-                });
-                navigate(`/group/${groupId}`);
-                return;
-            }
-
-            const entry = buildEntry(
-                EntryType.ExpenseCreated,
-                {
-                    description: description.trim(),
-                    amountMinorUnits: amountMinor,
-                    currency: 'EUR',
-                    paidByRootPubkey: paidBy as PublicKey,
-                    splits,
-                },
-                latestEntry.entryId,
-                result.finalState.currentLamportClock + 1,
-                identity.device.deviceKeyPair.publicKey,
-                identity.device.deviceKeyPair.secretKey,
-            );
-
-            await storage.appendEntry(groupId, entry);
-            await broadcastEntry(groupId, entry);
-            await refreshGroup(groupId); // Optimistic/Local refresh only
+            const expense = {
+                description: description.trim(),
+                amountMinorUnits: amountMinor,
+                currency: 'EUR',
+                paidBy,
+                splits,
+            };
+            if (editId) await correctExpenseV2(groupId, editId, expense, t.addExpense.correctionReason);
+            else await createExpenseV2(groupId, expense);
             navigate(`/group/${groupId}`);
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed to add expense');
@@ -250,7 +155,7 @@ export function AddExpense() {
 
     return (
         <div className="mx-auto max-w-xl">
-            <Link to={`/group/${groupId}`} className="mb-3 inline-flex items-center gap-1 text-sm text-[#716969] hover:text-[#004502]"><ArrowLeft className="size-4" />{t.addExpense.backTo} {stateV2?.groupName ?? state?.groupName}</Link>
+            <Link to={`/group/${groupId}`} className="mb-3 inline-flex items-center gap-1 text-sm text-[#716969] hover:text-[#004502]"><ArrowLeft className="size-4" />{t.addExpense.backTo} {stateV2.groupName}</Link>
             <Card className="animate-fade-in">
                 <CardHeader>
                     <div className="mb-2 flex size-10 items-center justify-center rounded-lg bg-[#004502]/10"><CircleDollarSign className="size-5" /></div>
@@ -326,7 +231,9 @@ export function AddExpense() {
                 <div className="flex gap-2">
                     <Button variant="ghost" onClick={() => navigate(`/group/${groupId}`)}>{t.common.cancel}</Button>
                     <Button className="flex-1" onClick={handleSubmit} disabled={!description.trim() || !amount || submitting}>
-                        {submitting ? t.addExpense.adding : t.addExpense.addButton}
+                        {submitting
+                            ? (editId ? t.addExpense.saving : t.addExpense.adding)
+                            : (editId ? t.addExpense.saveButton : t.addExpense.addButton)}
                     </Button>
                 </div>
                 </CardContent>

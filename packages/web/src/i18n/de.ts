@@ -156,6 +156,9 @@ const de: Translations = {
         invalidLedger: 'Ledger-Integritätsprüfung fehlgeschlagen. Bitte neu synchronisieren.',
         adding: 'Füge hinzu...',
         addButton: 'Hinzufügen',
+        saving: 'Speichere…',
+        saveButton: 'Änderungen speichern',
+        correctionReason: 'Ausgabe bearbeitet',
     },
     settings: {
         title: 'Einstellungen',

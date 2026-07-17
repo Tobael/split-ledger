@@ -223,7 +223,6 @@ The production build still reports a large-chunk warning and mixed static/dynami
 
 Remaining edit work:
 
-- Add localized Edit/Save strings instead of hard-coded English.
 - Add permission rules for who may correct an expense.
 - Define and test concurrent-correction resolution.
 - Show correction history/audit information.
@@ -345,6 +344,7 @@ Exit criterion: two independent implementations could produce identical hashes a
 - [x] Implement generic, revocable, single-use invitation capabilities and creator-side links that let the recipient choose one currently unclaimed participant slot.
 - [x] Connect targeted confirmation, generic-invite slot selection, signed claiming, device authorization, and missing-history handling to the active join UI.
 - [x] Connect v2 expense creation, participant-ID splits, immutable corrections, voids, projection, balances, and relay republication to the active web UI.
+- [x] Delete the legacy ledger construction and correction fallback from the active expense editor; it now accepts only protocol-v2 groups and uses localized save states.
 - [x] Make custom expense splits start from equal shares, allow participants to be included or excluded by clicking them, redistribute across the remaining participants, and keep every included share directly editable.
 - [x] Connect deterministic per-currency settlement suggestions and payer-signed settlement operations to the active v2 group UI.
 - [x] Connect creator-authorized participant rename, disable, and explicit lost-identity slot reassignment to the active v2 group UI.
