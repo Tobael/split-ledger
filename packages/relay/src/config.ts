@@ -10,6 +10,10 @@ export interface RelayConfig {
     // Rate limits
     maxOperationSizeBytes: number;
     maxOperationsPerGroup: number;
+    maxGroupStorageBytes: number;
+    maxTotalStorageBytes: number;
+    maxNamespaces: number;
+    maxWsMessageSizeBytes: number;
     wsIdleTimeoutMs: number;
     maxConnectionsPerIp: number;
     trustProxy: boolean;
@@ -48,6 +52,10 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
 
         maxOperationSizeBytes: integerSetting(env, 'MAX_OPERATION_SIZE_BYTES', 65536, 1),
         maxOperationsPerGroup: integerSetting(env, 'MAX_OPERATIONS_PER_GROUP', 1000000, 1),
+        maxGroupStorageBytes: integerSetting(env, 'MAX_GROUP_STORAGE_BYTES', 67108864, 1),
+        maxTotalStorageBytes: integerSetting(env, 'MAX_TOTAL_STORAGE_BYTES', 1073741824, 1),
+        maxNamespaces: integerSetting(env, 'MAX_NAMESPACES', 10000, 1),
+        maxWsMessageSizeBytes: integerSetting(env, 'MAX_WS_MESSAGE_SIZE_BYTES', 131072, 1),
         wsIdleTimeoutMs: integerSetting(env, 'WS_IDLE_TIMEOUT_MS', 300000, 1),
         maxConnectionsPerIp: integerSetting(env, 'MAX_CONNECTIONS_PER_IP', 50, 1),
         trustProxy: booleanSetting(env, 'TRUST_PROXY', false),

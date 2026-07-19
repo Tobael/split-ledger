@@ -68,6 +68,10 @@ npx wscat -c wss://relay.example.org/ws
 | `RELAY_PORT` | `8443` | Loopback host port in the reference Compose file |
 | `MAX_OPERATION_SIZE_BYTES` | `65536` | Maximum decoded ciphertext bytes in one operation envelope |
 | `MAX_OPERATIONS_PER_GROUP` | `1000000` | Stored-operation ceiling for one opaque group namespace |
+| `MAX_GROUP_STORAGE_BYTES` | `67108864` | Maximum stored ciphertext bytes in one group namespace |
+| `MAX_TOTAL_STORAGE_BYTES` | `1073741824` | Maximum stored ciphertext bytes across the relay |
+| `MAX_NAMESPACES` | `10000` | Maximum registered ordinary and disposable namespaces |
+| `MAX_WS_MESSAGE_SIZE_BYTES` | `131072` | Maximum raw WebSocket message size before parsing |
 | `MAX_CONNECTIONS_PER_IP` | `50` | Concurrent WebSocket limit per resolved client address |
 | `TRUST_PROXY` | `true` in Compose | Trust the first `X-Forwarded-For` address for connection limiting |
 | `WS_IDLE_TIMEOUT_MS` | `300000` | Close WebSockets that send no messages during this interval |
@@ -75,6 +79,8 @@ npx wscat -c wss://relay.example.org/ws
 | `OPERATION_RETENTION_DAYS` | `0` | `0` retains ciphertext indefinitely; a positive value enables permanent hourly pruning |
 
 `TRUST_PROXY=true` is safe only when the relay port is reachable exclusively through a trusted proxy that replaces or sanitizes `X-Forwarded-For`. Keep it false for direct exposure. If multiple proxies are involved, enforce connection limits at the edge instead of trusting an ambiguous forwarded chain.
+
+Capabilities prevent unauthorized access to an existing namespace, but anyone can invent a new UUID and capability. The relay cannot distinguish Fair Money ciphertext from unrelated opaque data. The storage and namespace limits bound disk consumption; they do not provide fair allocation or content moderation. Do not expose a relay as an unrestricted public service until per-source creation/upload rate limits and an abuse-resistant namespace-admission mechanism are deployed. Monitor the SQLite database and its filesystem and alert well before the configured total ceiling is reached.
 
 Retention is deliberately disabled by default while complete reconnect anti-entropy is still being connected. The target protocol republishes a member's retained encrypted operation set whenever that member comes online, allowing an empty or pruned relay to recover. Until that behavior is implemented for every group, enabling retention can strand a device that is missing history.
 

@@ -75,7 +75,7 @@ export function startRelay(configOverrides?: Partial<RelayConfig>): RelayServer 
     });
 
     // WebSocket server on same HTTP server
-    const wss = new WebSocketServer({ server: httpServer });
+    const wss = new WebSocketServer({ server: httpServer, maxPayload: config.maxWsMessageSizeBytes });
     const wsHandler = createWsHandler(db, config, rooms);
     const connectionsByIp = new Map<string, number>();
     wss.on('connection', (ws, req) => {

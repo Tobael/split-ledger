@@ -14,12 +14,15 @@ export interface StoredOperation {
 
 export class RelayDatabase {
     private db: Database.Database;
+    private totalStoredBytes = 0;
+    private readonly groupStoredBytes = new Map<string, number>();
 
     constructor(dbPath: string) {
         this.db = new Database(dbPath);
         this.db.pragma('journal_mode = WAL');
         this.db.pragma('foreign_keys = ON');
         this.migrate();
+        this.refreshStorageUsage();
     }
 
     // ─── Schema Migration ───
@@ -62,6 +65,10 @@ export class RelayDatabase {
       VALUES (?, ?, ?)
     `);
         const result = stmt.run(groupId, operationId, encryptedData);
+        if (result.changes > 0) {
+            this.totalStoredBytes += encryptedData.length;
+            this.groupStoredBytes.set(groupId, this.getGroupStoredBytes(groupId) + encryptedData.length);
+        }
         return result.changes > 0;
     }
 
@@ -87,6 +94,9 @@ export class RelayDatabase {
             const operations = this.getOperationsAfter(groupId, 0, Number.MAX_SAFE_INTEGER);
             this.db.prepare('DELETE FROM operations WHERE group_id = ?').run(groupId);
             this.db.prepare('DELETE FROM relay_groups WHERE group_id = ?').run(groupId);
+            const removedBytes = this.getGroupStoredBytes(groupId);
+            this.totalStoredBytes -= removedBytes;
+            this.groupStoredBytes.delete(groupId);
             return operations;
         })();
     }
@@ -123,13 +133,45 @@ export class RelayDatabase {
         return row?.count ?? 0;
     }
 
+    getNamespaceCount(): number {
+        const row = this.db.prepare('SELECT COUNT(*) AS count FROM relay_groups').get() as { count: number };
+        return row.count;
+    }
+
+    hasGroup(groupId: string): boolean {
+        return this.db.prepare('SELECT 1 FROM relay_groups WHERE group_id = ?').get(groupId) !== undefined;
+    }
+
+    getGroupStoredBytes(groupId: string): number {
+        return this.groupStoredBytes.get(groupId) ?? 0;
+    }
+
+    getTotalStoredBytes(): number {
+        return this.totalStoredBytes;
+    }
+
     // ─── Maintenance ───
 
     pruneOldOperations(retentionDays: number): number {
         const stmt = this.db.prepare(
             `DELETE FROM operations WHERE received_at < datetime('now', '-' || ? || ' days')`,
         );
-        return stmt.run(retentionDays).changes;
+        const changes = stmt.run(retentionDays).changes;
+        if (changes > 0) this.refreshStorageUsage();
+        return changes;
+    }
+
+    private refreshStorageUsage(): void {
+        const rows = this.db.prepare(`
+            SELECT group_id AS groupId, COALESCE(SUM(length(encrypted_data)), 0) AS bytes
+            FROM operations GROUP BY group_id
+        `).all() as Array<{ groupId: string; bytes: number }>;
+        this.groupStoredBytes.clear();
+        this.totalStoredBytes = 0;
+        for (const row of rows) {
+            this.groupStoredBytes.set(row.groupId, row.bytes);
+            this.totalStoredBytes += row.bytes;
+        }
     }
 
     close(): void {

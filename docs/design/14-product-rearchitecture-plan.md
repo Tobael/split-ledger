@@ -373,6 +373,9 @@ Exit criterion: complete local group lifecycle and property tests pass without n
 - [x] Let each web client select the relay used for newly created groups; invitations continue to carry the selected group relay for recipients.
 - [x] Show a prominent offline or relay-unavailable notice while preserving local group use.
 - [x] Hide deterministic personal device-sync groups from the product group list, including remnants created by earlier local identities.
+- [x] Bound opaque relay abuse with WebSocket-frame, per-group byte, total byte, and namespace ceilings; document that arbitrary ciphertext cannot be classified.
+- [ ] Add per-source namespace-creation and upload-rate limits plus an abuse-resistant namespace-admission mechanism before unrestricted public relay operation.
+- [ ] Add operator-visible database-size monitoring and targeted namespace removal without payload inspection.
 
 Exit criterion: web clients on separate devices can use either the project relay or a clean self-hosted relay and converge deterministically.
 

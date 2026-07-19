@@ -13,6 +13,10 @@ services:
       DB_PATH: "/app/data/relay.db"
       OPERATION_RETENTION_DAYS: "0"
       MAX_OPERATIONS_PER_GROUP: "1000000"
+      MAX_GROUP_STORAGE_BYTES: "67108864"
+      MAX_TOTAL_STORAGE_BYTES: "1073741824"
+      MAX_NAMESPACES: "10000"
+      MAX_WS_MESSAGE_SIZE_BYTES: "131072"
       MAX_CONNECTIONS_PER_IP: "50"
       TRUST_PROXY: "true"
     restart: unless-stopped

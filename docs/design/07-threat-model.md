@@ -18,6 +18,7 @@
 | Invite thief | Use a bearer claim secret before revocation or expiry |
 | Compromised device | Read locally accessible secrets and act as that device |
 | Resource attacker | Flood connections, groups, or oversized envelopes |
+| Opaque-content abuser | Store unrelated encrypted or encoded material that the relay cannot classify |
 
 ## Security guarantees
 
@@ -36,7 +37,10 @@
 - Bearer invite secrets can be stolen before use.
 - The browser cannot guarantee storage isolation equivalent to an OS secure store.
 - No production-security claim should be made before external review.
+- A syntactically valid new namespace and ciphertext envelope are not proof that the data was produced by Fair Money. A public relay cannot content-scan end-to-end encrypted payloads and must assume arbitrary opaque uploads.
 
 ## Mitigations
 
 Use TLS, encrypted payloads, scoped capabilities, strict schemas, quotas, local durable storage, reconnect anti-entropy, explicit missing-member UX, device revocation, short-lived single-use invites, minimal logs, dependency review, and adversarial/property testing.
+
+Storage ceilings limit disk exhaustion but can themselves be exhausted by the first abusive client. Before unrestricted public operation, add per-source namespace and upload-rate limits plus an abuse-resistant namespace-admission mechanism. Operators also need database-size alerts and a way to remove abusive namespaces without inspecting their contents.

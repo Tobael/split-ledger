@@ -75,6 +75,10 @@ export function createWsHandler(db: RelayDatabase, config: RelayConfig, rooms: R
             // opaque relay namespace. Requiring a publish first deadlocks new groups:
             // clients fetch before advertising their local operation set.
             if (!('groupId' in msg)) { error(ws, 'UNAUTHORIZED', 'Invalid group capability'); return; }
+            if (groupPattern.test(msg.groupId) && !db.hasGroup(msg.groupId)
+                && db.getNamespaceCount() >= config.maxNamespaces) {
+                error(ws, 'RELAY_FULL', 'Relay namespace limit reached'); return;
+            }
             const mode = msg.type === 'PUBLISH_DISPOSABLE' ? 'disposable' : msg.type === 'CONSUME_OPERATIONS' ? 'existing' : 'group';
             if (!authorized(msg, db, mode) || (msg.type === 'CONSUME_OPERATIONS' && !db.authorizeDisposableGroup(msg.groupId, capabilityHash(msg.capability)))) { error(ws, 'UNAUTHORIZED', 'Invalid group capability'); return; }
             if (msg.type === 'CONSUME_OPERATIONS') {
@@ -89,6 +93,14 @@ export function createWsHandler(db: RelayDatabase, config: RelayConfig, rooms: R
                 if (db.getOperationCount(msg.groupId) >= config.maxOperationsPerGroup
                     && !db.hasOperation(msg.groupId, msg.operationId)) {
                     error(ws, 'GROUP_FULL', 'Group is full'); return;
+                }
+                if (!db.hasOperation(msg.groupId, msg.operationId)
+                    && db.getGroupStoredBytes(msg.groupId) + bytes.length > config.maxGroupStorageBytes) {
+                    error(ws, 'GROUP_STORAGE_FULL', 'Group storage limit reached'); return;
+                }
+                if (!db.hasOperation(msg.groupId, msg.operationId)
+                    && db.getTotalStoredBytes() + bytes.length > config.maxTotalStorageBytes) {
+                    error(ws, 'RELAY_STORAGE_FULL', 'Relay storage limit reached'); return;
                 }
                 if (db.storeOperation(msg.groupId, msg.operationId, bytes)) {
                     rooms.subscribe(msg.groupId, ws);

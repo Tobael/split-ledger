@@ -127,6 +127,48 @@ describe('protocol v2 relay', () => {
         ws.close();
         await quotaRelay.close();
     });
+    it('bounds stored ciphertext per group and across the relay', async () => {
+        const quotaRelay = startRelay({
+            port: 0,
+            dbPath: join(tmpdir(), `relay-${randomUUID()}.db`),
+            maxGroupStorageBytes: 5,
+            maxTotalStorageBytes: 8,
+        });
+        const ws = new WebSocket(await wsAddress(quotaRelay));
+        await waitForOpen(ws);
+        const firstGroup = groupId();
+        send(ws, { type: 'PUBLISH_OPERATION', groupId: firstGroup, capability, operationId: operationId(), encryptedOperation: encrypted('1234') });
+        await new Promise((resolve) => setTimeout(resolve, 30));
+        const groupFull = waitForMessage<{ code: string }>(ws);
+        send(ws, { type: 'PUBLISH_OPERATION', groupId: firstGroup, capability, operationId: operationId(), encryptedOperation: encrypted('12') });
+        expect((await groupFull).code).toBe('GROUP_STORAGE_FULL');
+
+        const secondGroup = groupId();
+        send(ws, { type: 'PUBLISH_OPERATION', groupId: secondGroup, capability, operationId: operationId(), encryptedOperation: encrypted('1234') });
+        await new Promise((resolve) => setTimeout(resolve, 30));
+        const relayFull = waitForMessage<{ code: string }>(ws);
+        send(ws, { type: 'PUBLISH_OPERATION', groupId: secondGroup, capability, operationId: operationId(), encryptedOperation: encrypted('1') });
+        expect((await relayFull).code).toBe('RELAY_STORAGE_FULL');
+        ws.close();
+        await quotaRelay.close();
+    });
+    it('bounds the number of attacker-created namespaces', async () => {
+        const quotaRelay = startRelay({
+            port: 0,
+            dbPath: join(tmpdir(), `relay-${randomUUID()}.db`),
+            maxNamespaces: 1,
+        });
+        const ws = new WebSocket(await wsAddress(quotaRelay));
+        await waitForOpen(ws);
+        const registered = waitForMessage<{ type: string }>(ws);
+        send(ws, { type: 'GET_OPERATIONS', groupId: groupId(), capability, cursor: 0 });
+        expect((await registered).type).toBe('OPERATIONS_RESPONSE');
+        const full = waitForMessage<{ code: string }>(ws);
+        send(ws, { type: 'GET_OPERATIONS', groupId: groupId(), capability, cursor: 0 });
+        expect((await full).code).toBe('RELAY_FULL');
+        ws.close();
+        await quotaRelay.close();
+    });
     it('recovers an empty replacement relay from one member durable operation set', async () => {
         const id = groupId();
         const localOperations = ['root', 'expense-a', 'expense-b'].map((value) => ({
