@@ -5,7 +5,7 @@ import type { RelayConfig } from './config.js';
 import type { RelayDatabase } from './db.js';
 import { SourceRateLimiter } from './rate-limiter.js';
 
-interface AuthFields { groupId: string; capability: string }
+interface AuthFields { groupId: string; capability: string; admissionProof?: string }
 interface PublishOperationMsg extends AuthFields { type: 'PUBLISH_OPERATION'; operationId: string; encryptedOperation: string }
 interface PublishDisposableMsg extends AuthFields { type: 'PUBLISH_DISPOSABLE'; operationId: string; encryptedOperation: string }
 interface GetOperationsMsg extends AuthFields { type: 'GET_OPERATIONS'; cursor: number; limit?: number }
@@ -19,7 +19,7 @@ type ServerMessage =
     | { type: 'OPERATIONS_RESPONSE'; groupId: string; operations: Array<{ cursor: number; operationId: string; encryptedOperation: string }>; nextCursor: number; hasMore: boolean }
     | { type: 'OPERATIONS_CONSUMED'; groupId: string; operations: Array<{ operationId: string; encryptedOperation: string }> }
     | { type: 'PONG' }
-    | { type: 'ERROR'; code: string; message: string };
+    | { type: 'ERROR'; code: string; message: string; groupId?: string; admissionDifficulty?: number };
 
 export class RoomManager {
     private rooms = new Map<string, Set<WebSocket>>();
@@ -44,6 +44,19 @@ const groupPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3
 const operationPattern = /^[0-9a-f]{64}$/;
 const capabilityPattern = /^[A-Za-z0-9_-]{43}$/;
 function capabilityHash(value: string): string { return createHash('sha256').update(value).digest('hex'); }
+function validAdmissionProof(msg: AuthFields, difficulty: number): boolean {
+    if (!msg.admissionProof || !/^[0-9a-f]{1,16}$/.test(msg.admissionProof)) return false;
+    const digest = createHash('sha256')
+        .update(`fair-money-relay-admission-v1:${msg.groupId}:${msg.capability}:${msg.admissionProof}`)
+        .digest();
+    let zeroBits = 0;
+    for (const byte of digest) {
+        if (byte === 0) { zeroBits += 8; continue; }
+        zeroBits += Math.clz32(byte) - 24;
+        break;
+    }
+    return zeroBits >= difficulty;
+}
 function authorized(msg: AuthFields, db: RelayDatabase, mode: 'existing' | 'group' | 'disposable'): boolean {
     if (!groupPattern.test(msg.groupId) || !capabilityPattern.test(msg.capability)) return false;
     const digest = capabilityHash(msg.capability);
@@ -86,6 +99,13 @@ export function createWsHandler(db: RelayDatabase, config: RelayConfig, rooms: R
             const isNewNamespace = groupPattern.test(msg.groupId) && capabilityPattern.test(msg.capability)
                 && !db.hasGroup(msg.groupId);
             if (isNewNamespace) {
+                if (config.admissionDifficultyBits > 0 && !validAdmissionProof(msg, config.admissionDifficultyBits)) {
+                    send(ws, {
+                        type: 'ERROR', code: 'ADMISSION_REQUIRED', message: 'Namespace admission proof required',
+                        groupId: msg.groupId, admissionDifficulty: config.admissionDifficultyBits,
+                    });
+                    return;
+                }
                 if (!namespaceLimiter.consume(sourceIp)) {
                     error(ws, 'RATE_LIMITED', 'Namespace creation rate exceeded'); return;
                 }

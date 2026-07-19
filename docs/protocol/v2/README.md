@@ -117,6 +117,10 @@ The product default remains provisional, but each group's selected policy is sig
 
 Root keys identify people; device keys sign routine operations. Device authorization is scoped to one root identity. Revocation applies prospectively in causal state and cannot invalidate historically valid operations. A revoked device public key MUST NOT be authorized again; enrollment uses a new device key.
 
+## Relay namespace admission
+
+Relay capabilities authorize access to an existing opaque namespace but do not prove that a new namespace was created by Fair Money. When a relay responds with `ADMISSION_REQUIRED`, the client computes the announced leading-zero-bit SHA-256 proof over the versioned admission domain, group UUID, group capability, and hexadecimal nonce, then retries the rejected message with that nonce. The proof is required only while the namespace is unknown to that relay. It is an allocation-abuse control, not a group operation, identity credential, or content-validity proof.
+
 ## Encrypted invitation package
 
 The canonical invitation URL is `https://<join-domain>/invite/<ciphertext>#key=<decryption-key>`.

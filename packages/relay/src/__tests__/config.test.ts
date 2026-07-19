@@ -16,6 +16,7 @@ describe('relay configuration', () => {
         expect(config.maxNamespaceCreationsPerIpPerMinute).toBe(30);
         expect(config.maxPublishesPerIpPerMinute).toBe(3000);
         expect(config.maxUploadBytesPerIpPerMinute).toBe(16 * 1024 * 1024);
+        expect(config.admissionDifficultyBits).toBe(16);
     });
 
     it('rejects malformed and unsafe numeric settings', () => {
@@ -23,6 +24,7 @@ describe('relay configuration', () => {
         expect(() => loadConfig({ MAX_CONNECTIONS_PER_IP: '0' })).toThrow(/MAX_CONNECTIONS_PER_IP/);
         expect(() => loadConfig({ OPERATION_RETENTION_DAYS: '-1' })).toThrow(/OPERATION_RETENTION_DAYS/);
         expect(() => loadConfig({ TRUST_PROXY: 'yes' })).toThrow(/TRUST_PROXY/);
+        expect(() => loadConfig({ ADMISSION_DIFFICULTY_BITS: '33' })).toThrow(/ADMISSION_DIFFICULTY_BITS/);
         expect(() => loadConfig({ RELAY_ADMIN_TOKEN: 'too-short' })).toThrow(/RELAY_ADMIN_TOKEN/);
     });
 

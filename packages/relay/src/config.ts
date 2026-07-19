@@ -19,6 +19,7 @@ export interface RelayConfig {
     maxPublishesPerIpPerMinute: number;
     maxUploadBytesPerIpPerMinute: number;
     maxRateLimitSources: number;
+    admissionDifficultyBits: number;
     wsIdleTimeoutMs: number;
     maxConnectionsPerIp: number;
     trustProxy: boolean;
@@ -54,6 +55,8 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     if (adminToken && adminToken.length < 32) {
         throw new Error('RELAY_ADMIN_TOKEN must contain at least 32 characters');
     }
+    const admissionDifficultyBits = integerSetting(env, 'ADMISSION_DIFFICULTY_BITS', 16, 0);
+    if (admissionDifficultyBits > 32) throw new Error('ADMISSION_DIFFICULTY_BITS must not exceed 32');
     return {
         port: integerSetting(env, 'PORT', 8443, 0),
         host: env['HOST'] ?? '0.0.0.0',
@@ -70,6 +73,7 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
         maxPublishesPerIpPerMinute: integerSetting(env, 'MAX_PUBLISHES_PER_IP_PER_MINUTE', 3000, 1),
         maxUploadBytesPerIpPerMinute: integerSetting(env, 'MAX_UPLOAD_BYTES_PER_IP_PER_MINUTE', 16777216, 1),
         maxRateLimitSources: integerSetting(env, 'MAX_RATE_LIMIT_SOURCES', 10000, 1),
+        admissionDifficultyBits,
         wsIdleTimeoutMs: integerSetting(env, 'WS_IDLE_TIMEOUT_MS', 300000, 1),
         maxConnectionsPerIp: integerSetting(env, 'MAX_CONNECTIONS_PER_IP', 50, 1),
         trustProxy: booleanSetting(env, 'TRUST_PROXY', false),

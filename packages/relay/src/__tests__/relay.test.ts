@@ -1,19 +1,33 @@
-import { randomBytes, randomUUID } from 'node:crypto';
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { WebSocket } from 'ws';
-import { startRelay, type RelayServer } from '../server.js';
+import { startRelay as createRelay, type RelayServer } from '../server.js';
 
 const capability = 'A'.repeat(43);
 const wrongCapability = 'B'.repeat(43);
 const groupId = () => randomUUID();
 const operationId = () => randomBytes(32).toString('hex');
 const encrypted = (value: string) => Buffer.from(value).toString('base64');
+const startTestRelay = (overrides: Parameters<typeof createRelay>[0] = {}) => createRelay({ admissionDifficultyBits: 0, ...overrides });
 function waitForOpen(ws: WebSocket): Promise<void> { return new Promise((resolve, reject) => { ws.once('open', resolve); ws.once('error', reject); }); }
 function waitForMessage<T>(ws: WebSocket): Promise<T> { return new Promise((resolve, reject) => { const timer = setTimeout(() => reject(new Error('Timeout')), 3000); ws.once('message', (data) => { clearTimeout(timer); resolve(JSON.parse(data.toString()) as T); }); }); }
 function waitForClose(ws: WebSocket): Promise<{ code: number; reason: string }> { return new Promise((resolve, reject) => { const timer = setTimeout(() => reject(new Error('Timeout')), 3000); ws.once('close', (code, reason) => { clearTimeout(timer); resolve({ code, reason: reason.toString() }); }); }); }
 function send(ws: WebSocket, message: unknown): void { ws.send(JSON.stringify(message)); }
+function admissionProof(id: string, cap: string, difficulty: number): string {
+    for (let nonce = 0; nonce < Number.MAX_SAFE_INTEGER; nonce += 1) {
+        const candidate = nonce.toString(16);
+        const digest = createHash('sha256').update(`fair-money-relay-admission-v1:${id}:${cap}:${candidate}`).digest();
+        let bits = 0;
+        for (const byte of digest) {
+            if (byte === 0) { bits += 8; continue; }
+            bits += Math.clz32(byte) - 24; break;
+        }
+        if (bits >= difficulty) return candidate;
+    }
+    throw new Error('Proof not found');
+}
 async function wsAddress(relay: RelayServer): Promise<string> {
     await new Promise((resolve) => setTimeout(resolve, 100));
     const address = relay.address();
@@ -26,7 +40,7 @@ describe('protocol v2 relay', () => {
     let baseUrl: string;
     let wsUrl: string;
     beforeAll(async () => {
-        relay = startRelay({ port: 0, dbPath: join(tmpdir(), `relay-${randomUUID()}.db`), pageSize: 2 });
+        relay = startTestRelay({ port: 0, dbPath: join(tmpdir(), `relay-${randomUUID()}.db`), pageSize: 2 });
         await new Promise((resolve) => setTimeout(resolve, 300));
         const address = relay.address();
         const host = address.host === '0.0.0.0' ? '127.0.0.1' : address.host;
@@ -37,6 +51,21 @@ describe('protocol v2 relay', () => {
     it('reports health', async () => { expect((await fetch(`${baseUrl}/api/v2/health`)).status).toBe(200); });
     it('does not expose administration when no token is configured', async () => {
         expect((await fetch(`${baseUrl}/api/v2/admin/storage`)).status).toBe(404);
+    });
+    it('requires proof of work before registering a new namespace', async () => {
+        const difficulty = 8;
+        const admissionRelay = createRelay({ port: 0, dbPath: join(tmpdir(), `relay-${randomUUID()}.db`), admissionDifficultyBits: difficulty });
+        const ws = new WebSocket(await wsAddress(admissionRelay));
+        await waitForOpen(ws);
+        const id = groupId();
+        const challenged = waitForMessage<{ code: string; groupId: string; admissionDifficulty: number }>(ws);
+        send(ws, { type: 'GET_OPERATIONS', groupId: id, capability, cursor: 0 });
+        expect(await challenged).toMatchObject({ code: 'ADMISSION_REQUIRED', groupId: id, admissionDifficulty: difficulty });
+        const accepted = waitForMessage<{ type: string; operations: unknown[] }>(ws);
+        send(ws, { type: 'GET_OPERATIONS', groupId: id, capability, cursor: 0, admissionProof: admissionProof(id, capability, difficulty) });
+        expect(await accepted).toMatchObject({ type: 'OPERATIONS_RESPONSE', operations: [] });
+        ws.close();
+        await admissionRelay.close();
     });
     it('answers PING without group authorization', async () => {
         const ws = new WebSocket(wsUrl); await waitForOpen(ws); const response = waitForMessage<{ type: string }>(ws); send(ws, { type: 'PING' }); expect((await response).type).toBe('PONG'); ws.close();
@@ -90,7 +119,7 @@ describe('protocol v2 relay', () => {
         expect((await response).code).toBe('UNAUTHORIZED'); ws.close();
     });
     it('enforces the configured connection limit per client IP', async () => {
-        const limited = startRelay({
+        const limited = startTestRelay({
             port: 0,
             dbPath: join(tmpdir(), `relay-${randomUUID()}.db`),
             maxConnectionsPerIp: 1,
@@ -108,7 +137,7 @@ describe('protocol v2 relay', () => {
         await limited.close();
     });
     it('accepts idempotent republication after a group reaches its quota', async () => {
-        const quotaRelay = startRelay({
+        const quotaRelay = startTestRelay({
             port: 0,
             dbPath: join(tmpdir(), `relay-${randomUUID()}.db`),
             maxOperationsPerGroup: 1,
@@ -131,7 +160,7 @@ describe('protocol v2 relay', () => {
         await quotaRelay.close();
     });
     it('bounds stored ciphertext per group and across the relay', async () => {
-        const quotaRelay = startRelay({
+        const quotaRelay = startTestRelay({
             port: 0,
             dbPath: join(tmpdir(), `relay-${randomUUID()}.db`),
             maxGroupStorageBytes: 5,
@@ -156,7 +185,7 @@ describe('protocol v2 relay', () => {
         await quotaRelay.close();
     });
     it('bounds the number of attacker-created namespaces', async () => {
-        const quotaRelay = startRelay({
+        const quotaRelay = startTestRelay({
             port: 0,
             dbPath: join(tmpdir(), `relay-${randomUUID()}.db`),
             maxNamespaces: 1,
@@ -173,7 +202,7 @@ describe('protocol v2 relay', () => {
         await quotaRelay.close();
     });
     it('shares namespace creation limits across connections from one IP', async () => {
-        const quotaRelay = startRelay({
+        const quotaRelay = startTestRelay({
             port: 0,
             dbPath: join(tmpdir(), `relay-${randomUUID()}.db`),
             maxNamespaceCreationsPerIpPerMinute: 1,
@@ -193,7 +222,7 @@ describe('protocol v2 relay', () => {
     });
     it('reports opaque usage and deletes a namespace through authenticated administration', async () => {
         const adminToken = 'relay-admin-token-that-is-at-least-32-characters';
-        const adminRelay = startRelay({
+        const adminRelay = startTestRelay({
             port: 0,
             dbPath: join(tmpdir(), `relay-${randomUUID()}.db`),
             adminToken,
@@ -232,7 +261,7 @@ describe('protocol v2 relay', () => {
             operationId: operationId(),
             encryptedOperation: encrypted(value),
         }));
-        const original = startRelay({ port: 0, dbPath: join(tmpdir(), `relay-${randomUUID()}.db`) });
+        const original = startTestRelay({ port: 0, dbPath: join(tmpdir(), `relay-${randomUUID()}.db`) });
         const originalMember = new WebSocket(await wsAddress(original));
         await waitForOpen(originalMember);
         for (const operation of localOperations) {
@@ -244,7 +273,7 @@ describe('protocol v2 relay', () => {
         await originalClosed;
         await original.close();
 
-        const replacement = startRelay({ port: 0, dbPath: join(tmpdir(), `relay-${randomUUID()}.db`) });
+        const replacement = startTestRelay({ port: 0, dbPath: join(tmpdir(), `relay-${randomUUID()}.db`) });
         const replacementUrl = await wsAddress(replacement);
         const seedingMember = new WebSocket(replacementUrl);
         const recoveringMember = new WebSocket(replacementUrl);

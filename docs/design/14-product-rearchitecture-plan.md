@@ -375,7 +375,7 @@ Exit criterion: complete local group lifecycle and property tests pass without n
 - [x] Hide deterministic personal device-sync groups from the product group list, including remnants created by earlier local identities.
 - [x] Bound opaque relay abuse with WebSocket-frame, per-group byte, total byte, and namespace ceilings; document that arbitrary ciphertext cannot be classified.
 - [x] Add shared per-source namespace-creation, publish-count, and upload-byte rate limits across WebSocket connections.
-- [ ] Add an abuse-resistant namespace-admission mechanism before unrestricted public relay operation.
+- [x] Add configurable proof-of-work namespace admission bound to the group UUID and capability, without requiring relay accounts.
 - [x] Add optional token-authenticated storage monitoring and targeted namespace deletion/denylisting without payload inspection.
 
 Exit criterion: web clients on separate devices can use either the project relay or a clean self-hosted relay and converge deterministically.

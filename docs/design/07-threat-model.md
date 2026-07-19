@@ -43,4 +43,4 @@
 
 Use TLS, encrypted payloads, scoped capabilities, strict schemas, quotas, local durable storage, reconnect anti-entropy, explicit missing-member UX, device revocation, short-lived single-use invites, minimal logs, dependency review, and adversarial/property testing.
 
-Storage ceilings limit disk exhaustion but can themselves be exhausted by the first abusive client. Before unrestricted public operation, add per-source namespace and upload-rate limits plus an abuse-resistant namespace-admission mechanism. Operators also need database-size alerts and a way to remove abusive namespaces without inspecting their contents.
+Storage ceilings can themselves be exhausted by abusive clients. The relay combines per-source namespace/upload limits with proof-of-work admission for unknown namespaces, while authenticated operators can inspect opaque usage metadata and block namespaces without inspecting their contents. These controls raise cost and bound damage; they do not stop distributed resource attacks, so edge limits and disk alerts remain necessary.

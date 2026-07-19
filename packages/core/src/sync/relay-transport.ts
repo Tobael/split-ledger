@@ -13,6 +13,7 @@ import type {
     OnEntryHandler,
     OnConnectionStateHandler,
 } from './transport.js';
+import { solveRelayAdmissionProof } from './admission-proof.js';
 
 // ─── Server Message Types (matching ws-handler.ts) ───
 
@@ -45,6 +46,8 @@ interface ServerError {
     type: 'ERROR';
     code: string;
     message: string;
+    groupId?: string;
+    admissionDifficulty?: number;
 }
 
 type ServerMessage = ServerNewEntry | ServerEntriesResponse | ServerOperationsConsumed | ServerPong | ServerError;
@@ -80,6 +83,9 @@ export class RelayTransport implements Transport {
     private readonly pingIntervalMs: number;
     private readonly requestTimeoutMs: number;
     private readonly groupCapabilities = new Map<string, string>();
+    private readonly admissionProofs = new Map<string, string>();
+    private readonly admissionSolves = new Map<string, Promise<string>>();
+    private readonly pendingAdmissionMessages = new Map<string, Record<string, unknown>>();
 
     private entryHandlers: OnEntryHandler[] = [];
     private connectionStateHandlers: OnConnectionStateHandler[] = [];
@@ -334,13 +340,42 @@ export class RelayTransport implements Transport {
             }
 
             case 'ERROR':
+                if (msg.code === 'ADMISSION_REQUIRED' && msg.groupId && msg.admissionDifficulty !== undefined) {
+                    void this.handleAdmissionRequired(msg.groupId as GroupId, msg.admissionDifficulty);
+                    break;
+                }
                 console.error(`[RelayTransport] Server error: ${msg.code}`);
                 break;
         }
     }
 
+    private async handleAdmissionRequired(groupId: GroupId, difficulty: number): Promise<void> {
+        const capability = this.capability(groupId);
+        let solve = this.admissionSolves.get(groupId);
+        if (!solve) {
+            solve = solveRelayAdmissionProof(groupId, capability, difficulty);
+            this.admissionSolves.set(groupId, solve);
+        }
+        try {
+            this.admissionProofs.set(groupId, await solve);
+            const pending = this.pendingAdmissionMessages.get(groupId);
+            if (pending) this.send(pending);
+        } catch {
+            console.error('[RelayTransport] Failed to solve relay admission proof');
+        } finally {
+            this.admissionSolves.delete(groupId);
+        }
+    }
+
     private send(msg: unknown): void {
         if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+            if (typeof msg === 'object' && msg !== null && 'groupId' in msg && typeof msg.groupId === 'string') {
+                const groupId = msg.groupId;
+                this.pendingAdmissionMessages.set(groupId, msg as Record<string, unknown>);
+                const admissionProof = this.admissionProofs.get(groupId);
+                this.ws.send(JSON.stringify(admissionProof ? { ...msg, admissionProof } : msg));
+                return;
+            }
             this.ws.send(JSON.stringify(msg));
         }
     }
