@@ -6,8 +6,9 @@ Run this checklist on the deployed HTTPS web application before starting Tauri i
 
 1. Open the web domain and confirm onboarding loads without console errors.
 2. Open `https://<relay-domain>/api/v2/health` and confirm a successful v2 health response.
-3. Confirm the browser connects to `wss://<relay-domain>/ws`, not the web domain.
-4. Reload after creating an identity and confirm the identity survives.
+3. Confirm an unauthenticated request to `/api/v2/admin/storage` returns `401` in the project deployment, then authenticate with the operator token and confirm the response contains only counts, byte totals, timestamps, and opaque namespace IDs.
+4. Confirm the browser connects to `wss://<relay-domain>/ws`, not the web domain.
+5. Reload after creating an identity and confirm the identity survives.
 
 ## Targeted invitation
 

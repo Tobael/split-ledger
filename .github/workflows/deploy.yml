@@ -34,12 +34,30 @@ jobs:
       - name: Deploy with rsync
         run: rsync -avz --delete --exclude .git --exclude .env --exclude node_modules --exclude dist ./ ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/home/${{ secrets.SSH_USER }}/splitledger/
       - name: Build and start services
+        env:
+          SPLITLEDGER_DOMAIN: ${{ secrets.SPLITLEDGER_DOMAIN }}
+          SPLITLEDGER_RELAY_DOMAIN: ${{ secrets.SPLITLEDGER_RELAY_DOMAIN }}
+          RELAY_ADMIN_TOKEN: ${{ secrets.RELAY_ADMIN_TOKEN }}
         run: |
-          ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "cd splitledger && printf '%s\n' 'SPLITLEDGER_DOMAIN=${{ secrets.SPLITLEDGER_DOMAIN }}' 'SPLITLEDGER_RELAY_DOMAIN=${{ secrets.SPLITLEDGER_RELAY_DOMAIN }}' > .env && docker compose up -d --build --remove-orphans && docker compose ps"
+          set -euo pipefail
+          test "${#RELAY_ADMIN_TOKEN}" -ge 32
+          {
+            printf 'SPLITLEDGER_DOMAIN=%s\n' "$SPLITLEDGER_DOMAIN"
+            printf 'SPLITLEDGER_RELAY_DOMAIN=%s\n' "$SPLITLEDGER_RELAY_DOMAIN"
+            printf 'RELAY_ADMIN_TOKEN=%s\n' "$RELAY_ADMIN_TOKEN"
+          } | ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} \
+            "cd splitledger && umask 077 && cat > .env && chmod 600 .env && docker compose up -d --build --remove-orphans && docker compose ps"
       - name: Verify public routes
+        env:
+          SPLITLEDGER_DOMAIN: ${{ secrets.SPLITLEDGER_DOMAIN }}
+          SPLITLEDGER_RELAY_DOMAIN: ${{ secrets.SPLITLEDGER_RELAY_DOMAIN }}
+          RELAY_ADMIN_TOKEN: ${{ secrets.RELAY_ADMIN_TOKEN }}
         run: |
           set -euo pipefail
           curl --fail --show-error --silent --retry 12 --retry-all-errors --retry-delay 5 \
-            "https://${{ secrets.SPLITLEDGER_DOMAIN }}/" > /dev/null
+            "https://${SPLITLEDGER_DOMAIN}/" > /dev/null
           curl --fail --show-error --silent --retry 12 --retry-all-errors --retry-delay 5 \
-            "https://${{ secrets.SPLITLEDGER_RELAY_DOMAIN }}/api/v2/health" > /dev/null
+            "https://${SPLITLEDGER_RELAY_DOMAIN}/api/v2/health" > /dev/null
+          printf 'header = "Authorization: Bearer %s"\n' "$RELAY_ADMIN_TOKEN" \
+            | curl --fail --show-error --silent --retry 12 --retry-all-errors --retry-delay 5 \
+              --config - "https://${SPLITLEDGER_RELAY_DOMAIN}/api/v2/admin/storage?limit=1" > /dev/null

@@ -93,6 +93,8 @@ Rate limits are process-local and reset when the relay restarts. `TRUST_PROXY` d
 
 Administration is absent from the HTTP surface unless `RELAY_ADMIN_TOKEN` contains at least 32 characters. Generate a random value, keep it outside version control, and expose the relay only through TLS. The API never returns ciphertext or capabilities.
 
+The project deployment workflow requires a GitHub Actions secret named `RELAY_ADMIN_TOKEN`, writes the generated `.env` with owner-only permissions, and verifies the authenticated metadata endpoint after deployment. Independent operators may leave administration disabled or inject the token through their own secret manager.
+
 Inspect aggregate usage and the largest opaque namespaces:
 
 ```bash
