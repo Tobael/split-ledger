@@ -80,6 +80,9 @@ export function createWsHandler(db: RelayDatabase, config: RelayConfig, rooms: R
             // opaque relay namespace. Requiring a publish first deadlocks new groups:
             // clients fetch before advertising their local operation set.
             if (!('groupId' in msg)) { error(ws, 'UNAUTHORIZED', 'Invalid group capability'); return; }
+            if (groupPattern.test(msg.groupId) && db.isNamespaceBlocked(msg.groupId)) {
+                error(ws, 'NAMESPACE_BLOCKED', 'Namespace was removed by the relay operator'); return;
+            }
             const isNewNamespace = groupPattern.test(msg.groupId) && capabilityPattern.test(msg.capability)
                 && !db.hasGroup(msg.groupId);
             if (isNewNamespace) {

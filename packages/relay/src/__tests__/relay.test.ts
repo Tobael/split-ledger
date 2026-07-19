@@ -35,6 +35,9 @@ describe('protocol v2 relay', () => {
     afterAll(async () => relay.close());
 
     it('reports health', async () => { expect((await fetch(`${baseUrl}/api/v2/health`)).status).toBe(200); });
+    it('does not expose administration when no token is configured', async () => {
+        expect((await fetch(`${baseUrl}/api/v2/admin/storage`)).status).toBe(404);
+    });
     it('answers PING without group authorization', async () => {
         const ws = new WebSocket(wsUrl); await waitForOpen(ws); const response = waitForMessage<{ type: string }>(ws); send(ws, { type: 'PING' }); expect((await response).type).toBe('PONG'); ws.close();
     });
@@ -187,6 +190,41 @@ describe('protocol v2 relay', () => {
         expect((await limited).code).toBe('RATE_LIMITED');
         first.close(); second.close();
         await quotaRelay.close();
+    });
+    it('reports opaque usage and deletes a namespace through authenticated administration', async () => {
+        const adminToken = 'relay-admin-token-that-is-at-least-32-characters';
+        const adminRelay = startRelay({
+            port: 0,
+            dbPath: join(tmpdir(), `relay-${randomUUID()}.db`),
+            adminToken,
+        });
+        const url = await wsAddress(adminRelay);
+        const ws = new WebSocket(url);
+        await waitForOpen(ws);
+        const id = groupId();
+        send(ws, { type: 'PUBLISH_OPERATION', groupId: id, capability, operationId: operationId(), encryptedOperation: encrypted('opaque') });
+        await new Promise((resolve) => setTimeout(resolve, 30));
+        const address = adminRelay.address();
+        const host = address.host === '0.0.0.0' ? '127.0.0.1' : address.host;
+        const adminUrl = `http://${host}:${address.port}/api/v2/admin`;
+        expect((await fetch(`${adminUrl}/storage`)).status).toBe(401);
+        const headers = { authorization: `Bearer ${adminToken}` };
+        const usageResponse = await fetch(`${adminUrl}/storage`, { headers });
+        expect(usageResponse.status).toBe(200);
+        expect(await usageResponse.json()).toMatchObject({
+            storedBytes: 6,
+            operationCount: 1,
+            namespaceCount: 1,
+            namespaces: [{ groupId: id, storedBytes: 6, operationCount: 1 }],
+        });
+        expect((await fetch(`${adminUrl}/namespaces/${id}`, { method: 'DELETE', headers })).status).toBe(204);
+        const afterDelete = await fetch(`${adminUrl}/storage`, { headers });
+        expect(await afterDelete.json()).toMatchObject({ storedBytes: 0, operationCount: 0, namespaceCount: 0 });
+        const blocked = waitForMessage<{ code: string }>(ws);
+        send(ws, { type: 'PUBLISH_OPERATION', groupId: id, capability, operationId: operationId(), encryptedOperation: encrypted('again') });
+        expect((await blocked).code).toBe('NAMESPACE_BLOCKED');
+        ws.close();
+        await adminRelay.close();
     });
     it('recovers an empty replacement relay from one member durable operation set', async () => {
         const id = groupId();

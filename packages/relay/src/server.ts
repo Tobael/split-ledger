@@ -25,7 +25,7 @@ export function startRelay(configOverrides?: Partial<RelayConfig>): RelayServer 
     const rooms = new RoomManager();
 
     // Hono app for REST
-    const app = createRestApi(db, rooms);
+    const app = createRestApi(db, rooms, config);
 
     // Node HTTP server — dispatches REST to Hono, WS via upgrade
     const httpServer = createServer(async (req: IncomingMessage, res: ServerResponse) => {

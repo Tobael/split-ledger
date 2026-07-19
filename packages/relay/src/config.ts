@@ -6,6 +6,7 @@ export interface RelayConfig {
     port: number;
     host: string;
     dbPath: string;
+    adminToken?: string;
 
     // Rate limits
     maxOperationSizeBytes: number;
@@ -49,10 +50,15 @@ function booleanSetting(env: Record<string, string | undefined>, name: string, f
 }
 
 export function loadConfig(env: Record<string, string | undefined> = process.env): RelayConfig {
+    const adminToken = env['RELAY_ADMIN_TOKEN']?.trim() || undefined;
+    if (adminToken && adminToken.length < 32) {
+        throw new Error('RELAY_ADMIN_TOKEN must contain at least 32 characters');
+    }
     return {
         port: integerSetting(env, 'PORT', 8443, 0),
         host: env['HOST'] ?? '0.0.0.0',
         dbPath: env['DB_PATH'] ?? './relay.db',
+        adminToken,
 
         maxOperationSizeBytes: integerSetting(env, 'MAX_OPERATION_SIZE_BYTES', 65536, 1),
         maxOperationsPerGroup: integerSetting(env, 'MAX_OPERATIONS_PER_GROUP', 1000000, 1),

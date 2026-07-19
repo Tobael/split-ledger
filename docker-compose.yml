@@ -11,6 +11,7 @@ services:
       PORT: "8443"
       HOST: "0.0.0.0"
       DB_PATH: "/app/data/relay.db"
+      RELAY_ADMIN_TOKEN: "${RELAY_ADMIN_TOKEN:-}"
       OPERATION_RETENTION_DAYS: "0"
       MAX_OPERATIONS_PER_GROUP: "1000000"
       MAX_GROUP_STORAGE_BYTES: "67108864"

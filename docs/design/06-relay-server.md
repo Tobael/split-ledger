@@ -10,6 +10,7 @@ The relay is a self-hostable encrypted rendezvous cache and real-time notificati
 - Atomically fetch and delete explicitly disposable namespaces used for encrypted, single-use device handoffs.
 - Enforce envelope-size, per-group storage, per-IP connection, idle-connection, pagination, and optional retention limits.
 - Expose a health endpoint.
+- Expose optional token-authenticated aggregate storage inspection and opaque namespace blocking for operators.
 - Support documented backup and upgrade procedures.
 
 ## Non-responsibilities
@@ -53,3 +54,5 @@ The pre-release v1 database is unsupported. Operators delete it before starting 
 The reference deployment uses Node.js, Hono, WebSockets, and SQLite for a single instance. Horizontal scaling is a later optimization and must preserve the same public protocol. Container images and Compose examples must work without project-operated infrastructure.
 
 The operational contract, reference Compose file, configuration, backup, restore, retention, reverse-proxy, and upgrade procedures are documented in [Self-hosting a relay](../relay-self-hosting.md). Automatic retention remains disabled until reconnect anti-entropy is connected across all groups. After that, any sufficiently complete online member can repopulate an empty or pruned relay.
+
+When administration is explicitly enabled, operators can view namespace identifiers, byte/operation counts, and first/last receipt times. They can delete and denylist an opaque namespace without receiving its ciphertext through the admin API. This is an availability control, not content classification: the operator cannot infer what the encrypted bytes represent, and a blocked group remains locally usable by its members.

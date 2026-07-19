@@ -66,6 +66,7 @@ npx wscat -c wss://relay.example.org/ws
 | Variable | Default | Meaning |
 |---|---:|---|
 | `RELAY_PORT` | `8443` | Loopback host port in the reference Compose file |
+| `RELAY_ADMIN_TOKEN` | disabled | At least 32 characters; enables authenticated storage inspection and namespace blocking |
 | `MAX_OPERATION_SIZE_BYTES` | `65536` | Maximum decoded ciphertext bytes in one operation envelope |
 | `MAX_OPERATIONS_PER_GROUP` | `1000000` | Stored-operation ceiling for one opaque group namespace |
 | `MAX_GROUP_STORAGE_BYTES` | `67108864` | Maximum stored ciphertext bytes in one group namespace |
@@ -87,6 +88,27 @@ npx wscat -c wss://relay.example.org/ws
 Capabilities prevent unauthorized access to an existing namespace, but anyone can invent a new UUID and capability. The relay cannot distinguish Fair Money ciphertext from unrelated opaque data. Storage, namespace, and per-IP rate limits bound disk consumption and slow a single source; they do not provide content moderation or stop a distributed attacker. Do not expose a relay as an unrestricted public service until an abuse-resistant namespace-admission mechanism is deployed. Monitor the SQLite database and its filesystem and alert well before the configured total ceiling is reached.
 
 Rate limits are process-local and reset when the relay restarts. `TRUST_PROXY` determines whether the source is the direct socket address or the first forwarded address. If the relay is scaled horizontally, enforce equivalent shared limits at the trusted edge.
+
+## Abuse administration
+
+Administration is absent from the HTTP surface unless `RELAY_ADMIN_TOKEN` contains at least 32 characters. Generate a random value, keep it outside version control, and expose the relay only through TLS. The API never returns ciphertext or capabilities.
+
+Inspect aggregate usage and the largest opaque namespaces:
+
+```bash
+printf 'header = "Authorization: Bearer %s"\n' "$RELAY_ADMIN_TOKEN" \
+  | curl --fail --config - 'https://relay.example.org/api/v2/admin/storage?limit=25'
+```
+
+Block and permanently remove one opaque namespace and all ciphertext currently stored under it:
+
+```bash
+GROUP_ID=00000000-0000-4000-8000-000000000000
+printf 'header = "Authorization: Bearer %s"\n' "$RELAY_ADMIN_TOKEN" \
+  | curl --fail --request DELETE --config - "https://relay.example.org/api/v2/admin/namespaces/$GROUP_ID"
+```
+
+Blocking is local to this relay and cannot identify a person or determine whether the content was actually abusive. Clients retaining the group can continue using it locally or move to another relay, but cannot recreate that namespace on the blocking relay. Rotate the admin token immediately if it is disclosed.
 
 Retention is deliberately disabled by default while complete reconnect anti-entropy is still being connected. The target protocol republishes a member's retained encrypted operation set whenever that member comes online, allowing an empty or pruned relay to recover. Until that behavior is implemented for every group, enabling retention can strand a device that is missing history.
 
@@ -133,6 +155,6 @@ Read release notes before upgrading. Protocol-v2 pre-release deployments do not 
 
 - Run one relay process per SQLite volume. Do not mount the same database into multiple containers.
 - Monitor disk space, restart count, health failures, connection count, and database growth.
-- Put request-rate and bandwidth limits at the reverse proxy. The relay currently enforces envelope size, per-group storage, per-IP connection, idle connection, and page-size limits, but not publish requests per time window.
+- Put additional request-rate and bandwidth limits at the reverse proxy. The relay also enforces process-local namespace, publish-count, and upload-byte limits per resolved client IP.
 - Do not log query strings, WebSocket payloads, invite URLs, capabilities, or decrypted client data.
 - Losing the relay database loses only the server's ciphertext copy. Any member retaining the required local history can republish it; clients missing history must explain that such a member needs to come online.

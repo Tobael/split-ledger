@@ -12,6 +12,15 @@ export interface StoredOperation {
     receivedAt: string;
 }
 
+export interface NamespaceUsage {
+    groupId: string;
+    operationCount: number;
+    storedBytes: number;
+    firstReceivedAt: string | null;
+    lastReceivedAt: string | null;
+    disposable: boolean;
+}
+
 export class RelayDatabase {
     private db: Database.Database;
     private totalStoredBytes = 0;
@@ -48,6 +57,11 @@ export class RelayDatabase {
 
       CREATE TABLE IF NOT EXISTS disposable_namespaces (
         group_id TEXT PRIMARY KEY REFERENCES relay_groups(group_id) ON DELETE CASCADE
+      );
+
+      CREATE TABLE IF NOT EXISTS blocked_namespaces (
+        group_id   TEXT PRIMARY KEY,
+        blocked_at TEXT NOT NULL DEFAULT (datetime('now'))
       );
 
     `);
@@ -142,12 +156,52 @@ export class RelayDatabase {
         return this.db.prepare('SELECT 1 FROM relay_groups WHERE group_id = ?').get(groupId) !== undefined;
     }
 
+    isNamespaceBlocked(groupId: string): boolean {
+        return this.db.prepare('SELECT 1 FROM blocked_namespaces WHERE group_id = ?').get(groupId) !== undefined;
+    }
+
     getGroupStoredBytes(groupId: string): number {
         return this.groupStoredBytes.get(groupId) ?? 0;
     }
 
     getTotalStoredBytes(): number {
         return this.totalStoredBytes;
+    }
+
+    getTotalOperationCount(): number {
+        const row = this.db.prepare('SELECT COUNT(*) AS count FROM operations').get() as { count: number };
+        return row.count;
+    }
+
+    listNamespaceUsage(limit: number): NamespaceUsage[] {
+        const rows = this.db.prepare(`
+            SELECT groups.group_id AS groupId,
+                   COUNT(operations.cursor) AS operationCount,
+                   COALESCE(SUM(length(operations.encrypted_data)), 0) AS storedBytes,
+                   MIN(operations.received_at) AS firstReceivedAt,
+                   MAX(operations.received_at) AS lastReceivedAt,
+                   CASE WHEN disposable.group_id IS NULL THEN 0 ELSE 1 END AS disposable
+            FROM relay_groups AS groups
+            LEFT JOIN operations ON operations.group_id = groups.group_id
+            LEFT JOIN disposable_namespaces AS disposable ON disposable.group_id = groups.group_id
+            GROUP BY groups.group_id, disposable.group_id
+            ORDER BY storedBytes DESC, operationCount DESC, groups.group_id ASC
+            LIMIT ?
+        `).all(limit) as Array<Omit<NamespaceUsage, 'disposable'> & { disposable: number }>;
+        return rows.map((row) => ({ ...row, disposable: row.disposable === 1 }));
+    }
+
+    deleteNamespace(groupId: string): boolean {
+        return this.db.transaction(() => {
+            if (!this.hasGroup(groupId)) return false;
+            this.db.prepare('INSERT OR IGNORE INTO blocked_namespaces (group_id) VALUES (?)').run(groupId);
+            this.db.prepare('DELETE FROM operations WHERE group_id = ?').run(groupId);
+            this.db.prepare('DELETE FROM relay_groups WHERE group_id = ?').run(groupId);
+            const removedBytes = this.getGroupStoredBytes(groupId);
+            this.totalStoredBytes -= removedBytes;
+            this.groupStoredBytes.delete(groupId);
+            return true;
+        })();
     }
 
     // ─── Maintenance ───
