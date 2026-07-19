@@ -3,6 +3,7 @@ import type { IncomingMessage } from 'node:http';
 import { WebSocket } from 'ws';
 import type { RelayConfig } from './config.js';
 import type { RelayDatabase } from './db.js';
+import { SourceRateLimiter } from './rate-limiter.js';
 
 interface AuthFields { groupId: string; capability: string }
 interface PublishOperationMsg extends AuthFields { type: 'PUBLISH_OPERATION'; operationId: string; encryptedOperation: string }
@@ -57,7 +58,11 @@ function send(ws: WebSocket, message: ServerMessage): void { if (ws.readyState =
 function error(ws: WebSocket, code: string, message: string): void { send(ws, { type: 'ERROR', code, message }); }
 
 export function createWsHandler(db: RelayDatabase, config: RelayConfig, rooms: RoomManager) {
-    return function handleConnection(ws: WebSocket, _req: IncomingMessage): void {
+    const minute = 60_000;
+    const namespaceLimiter = new SourceRateLimiter(config.maxNamespaceCreationsPerIpPerMinute, minute, config.maxRateLimitSources);
+    const publishLimiter = new SourceRateLimiter(config.maxPublishesPerIpPerMinute, minute, config.maxRateLimitSources);
+    const uploadLimiter = new SourceRateLimiter(config.maxUploadBytesPerIpPerMinute, minute, config.maxRateLimitSources);
+    return function handleConnection(ws: WebSocket, _req: IncomingMessage, sourceIp = 'unknown'): void {
         let idle = setTimeout(() => ws.close(1000, 'Idle timeout'), config.wsIdleTimeoutMs);
         const reset = () => { clearTimeout(idle); idle = setTimeout(() => ws.close(1000, 'Idle timeout'), config.wsIdleTimeoutMs); };
         ws.on('message', (raw) => {
@@ -75,9 +80,15 @@ export function createWsHandler(db: RelayDatabase, config: RelayConfig, rooms: R
             // opaque relay namespace. Requiring a publish first deadlocks new groups:
             // clients fetch before advertising their local operation set.
             if (!('groupId' in msg)) { error(ws, 'UNAUTHORIZED', 'Invalid group capability'); return; }
-            if (groupPattern.test(msg.groupId) && !db.hasGroup(msg.groupId)
-                && db.getNamespaceCount() >= config.maxNamespaces) {
-                error(ws, 'RELAY_FULL', 'Relay namespace limit reached'); return;
+            const isNewNamespace = groupPattern.test(msg.groupId) && capabilityPattern.test(msg.capability)
+                && !db.hasGroup(msg.groupId);
+            if (isNewNamespace) {
+                if (!namespaceLimiter.consume(sourceIp)) {
+                    error(ws, 'RATE_LIMITED', 'Namespace creation rate exceeded'); return;
+                }
+                if (db.getNamespaceCount() >= config.maxNamespaces) {
+                    error(ws, 'RELAY_FULL', 'Relay namespace limit reached'); return;
+                }
             }
             const mode = msg.type === 'PUBLISH_DISPOSABLE' ? 'disposable' : msg.type === 'CONSUME_OPERATIONS' ? 'existing' : 'group';
             if (!authorized(msg, db, mode) || (msg.type === 'CONSUME_OPERATIONS' && !db.authorizeDisposableGroup(msg.groupId, capabilityHash(msg.capability)))) { error(ws, 'UNAUTHORIZED', 'Invalid group capability'); return; }
@@ -90,6 +101,9 @@ export function createWsHandler(db: RelayDatabase, config: RelayConfig, rooms: R
             if (msg.type === 'PUBLISH_OPERATION' || msg.type === 'PUBLISH_DISPOSABLE') {
                 const bytes = Buffer.from(msg.encryptedOperation, 'base64');
                 if (!bytes.length || bytes.length > config.maxOperationSizeBytes) { error(ws, 'OPERATION_SIZE', 'Invalid operation size'); return; }
+                if (!publishLimiter.consume(sourceIp) || !uploadLimiter.consume(sourceIp, bytes.length)) {
+                    error(ws, 'RATE_LIMITED', 'Publish rate exceeded'); return;
+                }
                 if (db.getOperationCount(msg.groupId) >= config.maxOperationsPerGroup
                     && !db.hasOperation(msg.groupId, msg.operationId)) {
                     error(ws, 'GROUP_FULL', 'Group is full'); return;

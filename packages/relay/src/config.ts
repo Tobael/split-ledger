@@ -14,6 +14,10 @@ export interface RelayConfig {
     maxTotalStorageBytes: number;
     maxNamespaces: number;
     maxWsMessageSizeBytes: number;
+    maxNamespaceCreationsPerIpPerMinute: number;
+    maxPublishesPerIpPerMinute: number;
+    maxUploadBytesPerIpPerMinute: number;
+    maxRateLimitSources: number;
     wsIdleTimeoutMs: number;
     maxConnectionsPerIp: number;
     trustProxy: boolean;
@@ -56,6 +60,10 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
         maxTotalStorageBytes: integerSetting(env, 'MAX_TOTAL_STORAGE_BYTES', 1073741824, 1),
         maxNamespaces: integerSetting(env, 'MAX_NAMESPACES', 10000, 1),
         maxWsMessageSizeBytes: integerSetting(env, 'MAX_WS_MESSAGE_SIZE_BYTES', 131072, 1),
+        maxNamespaceCreationsPerIpPerMinute: integerSetting(env, 'MAX_NAMESPACE_CREATIONS_PER_IP_PER_MINUTE', 30, 1),
+        maxPublishesPerIpPerMinute: integerSetting(env, 'MAX_PUBLISHES_PER_IP_PER_MINUTE', 3000, 1),
+        maxUploadBytesPerIpPerMinute: integerSetting(env, 'MAX_UPLOAD_BYTES_PER_IP_PER_MINUTE', 16777216, 1),
+        maxRateLimitSources: integerSetting(env, 'MAX_RATE_LIMIT_SOURCES', 10000, 1),
         wsIdleTimeoutMs: integerSetting(env, 'WS_IDLE_TIMEOUT_MS', 300000, 1),
         maxConnectionsPerIp: integerSetting(env, 'MAX_CONNECTIONS_PER_IP', 50, 1),
         trustProxy: booleanSetting(env, 'TRUST_PROXY', false),

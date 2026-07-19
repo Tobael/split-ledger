@@ -94,7 +94,7 @@ export function startRelay(configOverrides?: Partial<RelayConfig>): RelayServer 
             if (remaining > 0) connectionsByIp.set(ip, remaining);
             else connectionsByIp.delete(ip);
         });
-        wsHandler(ws, req);
+        wsHandler(ws, req, ip);
     });
 
     // Start listening

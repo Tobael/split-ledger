@@ -13,6 +13,9 @@ describe('relay configuration', () => {
         expect(config.maxTotalStorageBytes).toBe(1024 * 1024 * 1024);
         expect(config.maxNamespaces).toBe(10000);
         expect(config.maxWsMessageSizeBytes).toBe(128 * 1024);
+        expect(config.maxNamespaceCreationsPerIpPerMinute).toBe(30);
+        expect(config.maxPublishesPerIpPerMinute).toBe(3000);
+        expect(config.maxUploadBytesPerIpPerMinute).toBe(16 * 1024 * 1024);
     });
 
     it('rejects malformed and unsafe numeric settings', () => {

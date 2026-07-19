@@ -72,6 +72,10 @@ npx wscat -c wss://relay.example.org/ws
 | `MAX_TOTAL_STORAGE_BYTES` | `1073741824` | Maximum stored ciphertext bytes across the relay |
 | `MAX_NAMESPACES` | `10000` | Maximum registered ordinary and disposable namespaces |
 | `MAX_WS_MESSAGE_SIZE_BYTES` | `131072` | Maximum raw WebSocket message size before parsing |
+| `MAX_NAMESPACE_CREATIONS_PER_IP_PER_MINUTE` | `30` | New opaque namespaces allowed per resolved client IP each minute |
+| `MAX_PUBLISHES_PER_IP_PER_MINUTE` | `3000` | Publish attempts allowed per resolved client IP each minute |
+| `MAX_UPLOAD_BYTES_PER_IP_PER_MINUTE` | `16777216` | Decoded publish bytes allowed per resolved client IP each minute |
+| `MAX_RATE_LIMIT_SOURCES` | `10000` | Maximum client-IP buckets retained by each in-memory rate limiter |
 | `MAX_CONNECTIONS_PER_IP` | `50` | Concurrent WebSocket limit per resolved client address |
 | `TRUST_PROXY` | `true` in Compose | Trust the first `X-Forwarded-For` address for connection limiting |
 | `WS_IDLE_TIMEOUT_MS` | `300000` | Close WebSockets that send no messages during this interval |
@@ -80,7 +84,9 @@ npx wscat -c wss://relay.example.org/ws
 
 `TRUST_PROXY=true` is safe only when the relay port is reachable exclusively through a trusted proxy that replaces or sanitizes `X-Forwarded-For`. Keep it false for direct exposure. If multiple proxies are involved, enforce connection limits at the edge instead of trusting an ambiguous forwarded chain.
 
-Capabilities prevent unauthorized access to an existing namespace, but anyone can invent a new UUID and capability. The relay cannot distinguish Fair Money ciphertext from unrelated opaque data. The storage and namespace limits bound disk consumption; they do not provide fair allocation or content moderation. Do not expose a relay as an unrestricted public service until per-source creation/upload rate limits and an abuse-resistant namespace-admission mechanism are deployed. Monitor the SQLite database and its filesystem and alert well before the configured total ceiling is reached.
+Capabilities prevent unauthorized access to an existing namespace, but anyone can invent a new UUID and capability. The relay cannot distinguish Fair Money ciphertext from unrelated opaque data. Storage, namespace, and per-IP rate limits bound disk consumption and slow a single source; they do not provide content moderation or stop a distributed attacker. Do not expose a relay as an unrestricted public service until an abuse-resistant namespace-admission mechanism is deployed. Monitor the SQLite database and its filesystem and alert well before the configured total ceiling is reached.
+
+Rate limits are process-local and reset when the relay restarts. `TRUST_PROXY` determines whether the source is the direct socket address or the first forwarded address. If the relay is scaled horizontally, enforce equivalent shared limits at the trusted edge.
 
 Retention is deliberately disabled by default while complete reconnect anti-entropy is still being connected. The target protocol republishes a member's retained encrypted operation set whenever that member comes online, allowing an empty or pruned relay to recover. Until that behavior is implemented for every group, enabling retention can strand a device that is missing history.
 

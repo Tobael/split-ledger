@@ -169,6 +169,25 @@ describe('protocol v2 relay', () => {
         ws.close();
         await quotaRelay.close();
     });
+    it('shares namespace creation limits across connections from one IP', async () => {
+        const quotaRelay = startRelay({
+            port: 0,
+            dbPath: join(tmpdir(), `relay-${randomUUID()}.db`),
+            maxNamespaceCreationsPerIpPerMinute: 1,
+        });
+        const url = await wsAddress(quotaRelay);
+        const first = new WebSocket(url);
+        const second = new WebSocket(url);
+        await Promise.all([waitForOpen(first), waitForOpen(second)]);
+        const registered = waitForMessage<{ type: string }>(first);
+        send(first, { type: 'GET_OPERATIONS', groupId: groupId(), capability, cursor: 0 });
+        expect((await registered).type).toBe('OPERATIONS_RESPONSE');
+        const limited = waitForMessage<{ code: string }>(second);
+        send(second, { type: 'GET_OPERATIONS', groupId: groupId(), capability, cursor: 0 });
+        expect((await limited).code).toBe('RATE_LIMITED');
+        first.close(); second.close();
+        await quotaRelay.close();
+    });
     it('recovers an empty replacement relay from one member durable operation set', async () => {
         const id = groupId();
         const localOperations = ['root', 'expense-a', 'expense-b'].map((value) => ({
