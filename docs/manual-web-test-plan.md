@@ -51,7 +51,7 @@ Run this checklist on the deployed HTTPS web application before starting Tauri i
 
 ## Identity and device transfer
 
-1. Export the v2 identity-transfer QR or password-encrypted file from device A.
+1. Export the password-encrypted identity-transfer file from device A; confirm no full identity package is offered as a QR code.
 2. Import it into a clean device B profile.
 3. Confirm B generates a distinct device public key and regains every transferred group.
 4. From A, revoke B and confirm B can no longer publish valid operations.
@@ -67,4 +67,4 @@ Run this checklist on the deployed HTTPS web application before starting Tauri i
 
 ## Release evidence
 
-Record the web and relay commit, devices, OS/browser versions, relay host, pass/fail result, console errors, and screenshots for every failure. Do not begin Tauri deep-link work until targeted invites, generic selection, transfer, corrections, and empty-relay recovery pass on physical devices.
+Record the web and relay commit, devices, OS/browser versions, relay host, pass/fail result, console errors, and screenshots for every failure in [the release-results record](manual-web-test-results.md). Do not begin Tauri deep-link work until targeted invites, generic selection, transfer, corrections, and empty-relay recovery pass on physical devices.
