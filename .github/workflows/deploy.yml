@@ -33,27 +33,39 @@ jobs:
           ref: ${{ github.event.workflow_run.head_sha }}
       - name: Deploy with rsync
         run: rsync -avz --delete --exclude .git --exclude .env --exclude node_modules --exclude dist ./ ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/home/${{ secrets.SSH_USER }}/splitledger/
-      - name: Build and start services
+      - name: Write production configuration
         env:
-          SPLITLEDGER_DOMAIN: ${{ secrets.SPLITLEDGER_DOMAIN }}
-          SPLITLEDGER_RELAY_DOMAIN: ${{ secrets.SPLITLEDGER_RELAY_DOMAIN }}
-          RELAY_ADMIN_TOKEN: ${{ secrets.RELAY_ADMIN_TOKEN }}
+          DEPLOY_ENV_FILE: ${{ secrets.ENV_FILE }}
         run: |
           set -euo pipefail
-          test "${#RELAY_ADMIN_TOKEN}" -ge 32
-          {
-            printf 'SPLITLEDGER_DOMAIN=%s\n' "$SPLITLEDGER_DOMAIN"
-            printf 'SPLITLEDGER_RELAY_DOMAIN=%s\n' "$SPLITLEDGER_RELAY_DOMAIN"
-            printf 'RELAY_ADMIN_TOKEN=%s\n' "$RELAY_ADMIN_TOKEN"
-          } | ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} \
-            "cd splitledger && umask 077 && cat > .env && chmod 600 .env && docker compose up -d --build --remove-orphans && docker compose ps"
+          test -n "$DEPLOY_ENV_FILE"
+          printf '%s' "$DEPLOY_ENV_FILE" | ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} \
+            "umask 077; cat > '/home/${{ secrets.SSH_USER }}/splitledger/.env'; chmod 600 '/home/${{ secrets.SSH_USER }}/splitledger/.env'"
+      - name: Build and start services
+        run: |
+          set -euo pipefail
+          ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "cd splitledger && \
+            test -s .env && \
+            grep -Eq '^SPLITLEDGER_DOMAIN=.+' .env && \
+            grep -Eq '^SPLITLEDGER_RELAY_DOMAIN=.+' .env && \
+            awk 'index(\$0, \"RELAY_ADMIN_TOKEN=\") == 1 && length(substr(\$0, 19)) >= 32 { found=1 } END { exit !found }' .env && \
+            docker compose --env-file .env config --quiet && \
+            docker compose --env-file .env up -d --build --remove-orphans && \
+            docker compose --env-file .env ps"
       - name: Verify public routes
         env:
-          SPLITLEDGER_DOMAIN: ${{ secrets.SPLITLEDGER_DOMAIN }}
-          SPLITLEDGER_RELAY_DOMAIN: ${{ secrets.SPLITLEDGER_RELAY_DOMAIN }}
-          RELAY_ADMIN_TOKEN: ${{ secrets.RELAY_ADMIN_TOKEN }}
+          DEPLOY_ENV_FILE: ${{ secrets.ENV_FILE }}
         run: |
           set -euo pipefail
+          env_value() {
+            printf '%s\n' "$DEPLOY_ENV_FILE" | awk -v key="$1" 'index($0, key "=") == 1 { print substr($0, length(key) + 2); exit }'
+          }
+          SPLITLEDGER_DOMAIN="$(env_value SPLITLEDGER_DOMAIN)"
+          SPLITLEDGER_RELAY_DOMAIN="$(env_value SPLITLEDGER_RELAY_DOMAIN)"
+          RELAY_ADMIN_TOKEN="$(env_value RELAY_ADMIN_TOKEN)"
+          test -n "$SPLITLEDGER_DOMAIN"
+          test -n "$SPLITLEDGER_RELAY_DOMAIN"
+          test "${#RELAY_ADMIN_TOKEN}" -ge 32
           curl --fail --show-error --silent --retry 12 --retry-all-errors --retry-delay 5 \
             "https://${SPLITLEDGER_DOMAIN}/" > /dev/null
           curl --fail --show-error --silent --retry 12 --retry-all-errors --retry-delay 5 \
