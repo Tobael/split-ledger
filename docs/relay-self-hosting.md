@@ -93,7 +93,7 @@ Rate limits are process-local and reset when the relay restarts. `TRUST_PROXY` d
 
 Administration is absent from the HTTP surface unless `RELAY_ADMIN_TOKEN` contains at least 32 characters. Generate a random value, keep it outside version control, and expose the relay only through TLS. The API never returns ciphertext or capabilities.
 
-The project deployment workflow follows the same whole-file pattern as the homelab deployment: a GitHub Actions secret named `ENV_FILE` contains the complete production `.env`, including both domains and `RELAY_ADMIN_TOKEN`. The workflow writes it with owner-only permissions, validates required keys through `docker compose config`, and verifies the authenticated metadata endpoint after deployment. Independent operators may leave administration disabled or inject the token through their own secret manager.
+The project deployment workflow follows the same whole-file pattern as the homelab deployment: a GitHub Actions secret named `ENV_FILE` contains the complete production `.env`, including both domains, `RELAY_ADMIN_TOKEN`, and every relay limit shown in `.env.example`. The workflow writes it with owner-only permissions, rejects incomplete configuration, validates it through `docker compose config`, and verifies the authenticated metadata endpoint after deployment. Independent operators may leave administration disabled or inject the token through their own secret manager.
 
 Inspect aggregate usage and the largest opaque namespaces:
 

@@ -44,14 +44,45 @@ jobs:
       - name: Build and start services
         run: |
           set -euo pipefail
-          ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "cd splitledger && \
-            test -s .env && \
-            grep -Eq '^SPLITLEDGER_DOMAIN=.+' .env && \
-            grep -Eq '^SPLITLEDGER_RELAY_DOMAIN=.+' .env && \
-            awk 'index(\$0, \"RELAY_ADMIN_TOKEN=\") == 1 && length(substr(\$0, 19)) >= 32 { found=1 } END { exit !found }' .env && \
-            docker compose --env-file .env config --quiet && \
-            docker compose --env-file .env up -d --build --remove-orphans && \
-            docker compose --env-file .env ps"
+          ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} 'bash -s' <<'REMOTE'
+            set -euo pipefail
+            cd /home/${{ secrets.SSH_USER }}/splitledger
+            test -s .env
+            required_env="
+            SPLITLEDGER_DOMAIN
+            SPLITLEDGER_RELAY_DOMAIN
+            RELAY_ADMIN_TOKEN
+            MAX_OPERATION_SIZE_BYTES
+            MAX_OPERATIONS_PER_GROUP
+            MAX_GROUP_STORAGE_BYTES
+            MAX_TOTAL_STORAGE_BYTES
+            MAX_NAMESPACES
+            MAX_WS_MESSAGE_SIZE_BYTES
+            MAX_NAMESPACE_CREATIONS_PER_IP_PER_MINUTE
+            MAX_PUBLISHES_PER_IP_PER_MINUTE
+            MAX_UPLOAD_BYTES_PER_IP_PER_MINUTE
+            MAX_RATE_LIMIT_SOURCES
+            MAX_CONNECTIONS_PER_IP
+            TRUST_PROXY
+            WS_IDLE_TIMEOUT_MS
+            PAGE_SIZE
+            OPERATION_RETENTION_DAYS
+            "
+            missing_env=""
+            for key in $required_env; do
+              if ! grep -Eq "^${key}=.+" .env; then
+                missing_env="$missing_env $key"
+              fi
+            done
+            if [[ -n "$missing_env" ]]; then
+              echo "ENV_FILE is incomplete; missing required keys:$missing_env" >&2
+              exit 1
+            fi
+            awk 'index($0, "RELAY_ADMIN_TOKEN=") == 1 && length(substr($0, 19)) >= 32 { found=1 } END { exit !found }' .env
+            docker compose --env-file .env config --quiet
+            docker compose --env-file .env up -d --build --remove-orphans
+            docker compose --env-file .env ps
+          REMOTE
       - name: Verify public routes
         env:
           DEPLOY_ENV_FILE: ${{ secrets.ENV_FILE }}
