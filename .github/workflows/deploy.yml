@@ -12,11 +12,18 @@ jobs:
     if: github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     steps:
-      - run: sudo apt-get update && sudo apt-get install --yes wireguard
-      - run: echo "${{ secrets.WIREGUARD_CONF }}" > wireguard.conf
-      - run: sudo ln -s /usr/bin/resolvectl /usr/local/bin/resolvconf
-      - run: sudo wg-quick up ./wireguard.conf
-      - run: sudo wg show
+      - name: Connect WireGuard
+        env:
+          WIREGUARD_CONF: ${{ secrets.WIREGUARD_CONF }}
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y wireguard-tools
+          sudo ln -sf "$(command -v resolvectl)" /usr/local/bin/resolvconf
+          # Ubuntu 26.04 confines wg-quick to /etc/wireguard via AppArmor.
+          sudo install -d -m 700 /etc/wireguard
+          printf '%s\n' "$WIREGUARD_CONF" | sudo install -m 600 /dev/stdin /etc/wireguard/wg0.conf
+          sudo wg-quick up wg0
 
       - name: Install SSH key
         uses: shimataro/ssh-key-action@v2
@@ -105,3 +112,11 @@ jobs:
           printf 'header = "Authorization: Bearer %s"\n' "$RELAY_ADMIN_TOKEN" \
             | curl --fail --show-error --silent --retry 12 --retry-all-errors --retry-delay 5 \
               --config - "https://${SPLITLEDGER_RELAY_DOMAIN}/api/v2/admin/storage?limit=1" > /dev/null
+
+      - name: Disconnect WireGuard
+        if: always()
+        run: |
+          if sudo test -f /etc/wireguard/wg0.conf; then
+            sudo wg-quick down wg0 || true
+            sudo rm -f /etc/wireguard/wg0.conf
+          fi
