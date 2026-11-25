@@ -5,6 +5,7 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { WebSocketServer } from 'ws';
 import { loadConfig, type RelayConfig } from './config.js';
+import { clientIp } from './client-ip.js';
 import { RelayDatabase } from './db.js';
 import { createRestApi } from './rest-api.js';
 import { createWsHandler, RoomManager } from './ws-handler.js';
@@ -79,10 +80,7 @@ export function startRelay(configOverrides?: Partial<RelayConfig>): RelayServer 
     const wsHandler = createWsHandler(db, config, rooms);
     const connectionsByIp = new Map<string, number>();
     wss.on('connection', (ws, req) => {
-        const forwarded = req.headers['x-forwarded-for'];
-        const ip = config.trustProxy && typeof forwarded === 'string'
-            ? (forwarded.split(',')[0]?.trim() || req.socket.remoteAddress || 'unknown')
-            : (req.socket.remoteAddress ?? 'unknown');
+        const ip = clientIp(req, config);
         const count = connectionsByIp.get(ip) ?? 0;
         if (count >= config.maxConnectionsPerIp) {
             ws.close(1013, 'Connection limit exceeded');

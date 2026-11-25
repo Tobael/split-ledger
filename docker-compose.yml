@@ -25,6 +25,7 @@ services:
       ADMISSION_DIFFICULTY_BITS: "${ADMISSION_DIFFICULTY_BITS:-16}"
       MAX_CONNECTIONS_PER_IP: "${MAX_CONNECTIONS_PER_IP:-50}"
       TRUST_PROXY: "${TRUST_PROXY:-true}"
+      TRUST_PROXY_CLIENT_IP_HEADER: "cf-connecting-ip"
       WS_IDLE_TIMEOUT_MS: "${WS_IDLE_TIMEOUT_MS:-300000}"
       PAGE_SIZE: "${PAGE_SIZE:-500}"
       OPERATION_RETENTION_DAYS: "${OPERATION_RETENTION_DAYS:-0}"
@@ -43,7 +44,7 @@ services:
       - traefik.http.routers.splitledger-relay.priority=100
       - traefik.http.routers.splitledger-relay.tls=true
       - traefik.http.routers.splitledger-relay.tls.certresolver=externalresolver
-      - traefik.http.routers.splitledger-relay.middlewares=security-headers@file
+      - traefik.http.routers.splitledger-relay.middlewares=public-api@file
       - traefik.http.routers.splitledger-relay.service=splitledger-relay
       - traefik.http.services.splitledger-relay.loadbalancer.server.port=8443
       - traefik.docker.network=external_network
@@ -66,7 +67,7 @@ services:
       - traefik.http.routers.splitledger.priority=100
       - traefik.http.routers.splitledger.tls=true
       - traefik.http.routers.splitledger.tls.certresolver=externalresolver
-      - traefik.http.routers.splitledger.middlewares=splitledger-nocache,security-headers@file
+      - traefik.http.routers.splitledger.middlewares=splitledger-nocache,public-browser@file
       - traefik.http.services.splitledger.loadbalancer.server.port=80
       - traefik.docker.network=external_network
 

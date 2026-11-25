@@ -23,6 +23,7 @@ export interface RelayConfig {
     wsIdleTimeoutMs: number;
     maxConnectionsPerIp: number;
     trustProxy: boolean;
+    trustProxyClientIpHeader: 'x-forwarded-for' | 'cf-connecting-ip';
     pageSize: number;
 
     // Retention
@@ -51,6 +52,10 @@ function booleanSetting(env: Record<string, string | undefined>, name: string, f
 }
 
 export function loadConfig(env: Record<string, string | undefined> = process.env): RelayConfig {
+    const clientIpHeader = env['TRUST_PROXY_CLIENT_IP_HEADER'] ?? 'x-forwarded-for';
+    if (clientIpHeader !== 'x-forwarded-for' && clientIpHeader !== 'cf-connecting-ip') {
+        throw new Error('TRUST_PROXY_CLIENT_IP_HEADER must be x-forwarded-for or cf-connecting-ip');
+    }
     const adminToken = env['RELAY_ADMIN_TOKEN']?.trim() || undefined;
     if (adminToken && adminToken.length < 32) {
         throw new Error('RELAY_ADMIN_TOKEN must contain at least 32 characters');
@@ -77,6 +82,7 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
         wsIdleTimeoutMs: integerSetting(env, 'WS_IDLE_TIMEOUT_MS', 300000, 1),
         maxConnectionsPerIp: integerSetting(env, 'MAX_CONNECTIONS_PER_IP', 50, 1),
         trustProxy: booleanSetting(env, 'TRUST_PROXY', false),
+        trustProxyClientIpHeader: clientIpHeader,
         pageSize: integerSetting(env, 'PAGE_SIZE', 500, 1),
 
         operationRetentionDays: integerSetting(env, 'OPERATION_RETENTION_DAYS', 0, 0),

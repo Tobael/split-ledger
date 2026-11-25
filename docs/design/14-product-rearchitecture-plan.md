@@ -453,3 +453,13 @@ Do not silently decide these:
 5. Keep the development web build green while replacing v1 directly; do not preserve obsolete behavior or data.
 6. Avoid a big-bang Tauri or Rust rewrite.
 7. Record protocol decisions as design documents/ADRs and update this status section after each completed vertical slice.
+
+## Proxy integration security (2026-11-25)
+
+The homelab relay route verifies Cloudflare peers before accepting
+`CF-Connecting-IP`. The relay selects this header through
+`TRUST_PROXY_CLIENT_IP_HEADER=cf-connecting-ip` for per-client WebSocket
+connection and protocol limits; an attacker-supplied first `X-Forwarded-For`
+address cannot select the limit bucket. Standalone proxies keep explicit
+`TRUST_PROXY` configuration and must sanitize the selected header.
+The proxy rate limits do not replace relay protocol, size or admission limits.
