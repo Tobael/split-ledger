@@ -60,20 +60,9 @@ services:
     restart: unless-stopped
     networks:
       - external_network
+    # Only the browser frontend is behind Anubis; the relay remains app-facing.
     labels:
-      - traefik.enable=true
-      - traefik.http.routers.splitledger.rule=Host(`${SPLITLEDGER_DOMAIN}`)
-      - traefik.http.routers.splitledger.entrypoints=websecure
-      - traefik.http.routers.splitledger.priority=100
-      - traefik.http.routers.splitledger.tls=true
-      - traefik.http.routers.splitledger.tls.certresolver=externalresolver
-      - traefik.http.routers.splitledger.middlewares=splitledger-nocache,public-browser@file
-      - traefik.http.services.splitledger.loadbalancer.server.port=80
-      - traefik.docker.network=external_network
-
-      # ─── Cache Control Middleware ───
-      # Prevent browser caching of index.html so updates are visible immediately
-      - "traefik.http.middlewares.splitledger-nocache.headers.customresponseheaders.Cache-Control=no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0"
+      - traefik.enable=false
 
 networks:
   external_network:
