@@ -79,7 +79,8 @@ npx wscat -c wss://relay.example.org/ws
 | `MAX_RATE_LIMIT_SOURCES` | `10000` | Maximum client-IP buckets retained by each in-memory rate limiter |
 | `ADMISSION_DIFFICULTY_BITS` | `16` | Proof-of-work difficulty for establishing a previously unknown namespace; `0` disables admission work |
 | `MAX_CONNECTIONS_PER_IP` | `50` | Concurrent WebSocket limit per resolved client address |
-| `TRUST_PROXY` | `true` in Compose | Trust the first `X-Forwarded-For` address for connection limiting |
+| `TRUST_PROXY` | `true` in Compose | Trust the selected proxy visitor-IP header for connection and protocol limits |
+| `TRUST_PROXY_CLIENT_IP_HEADER` | `x-forwarded-for` standalone; `cf-connecting-ip` in homelab Compose | Select the verified visitor-IP source |
 | `WS_IDLE_TIMEOUT_MS` | `300000` | Close WebSockets that send no messages during this interval |
 | `PAGE_SIZE` | `500` | Maximum operations returned by one cursor page |
 | `OPERATION_RETENTION_DAYS` | `0` | `0` retains ciphertext indefinitely; a positive value enables permanent hourly pruning |
@@ -88,7 +89,7 @@ npx wscat -c wss://relay.example.org/ws
 
 Capabilities prevent unauthorized access to an existing namespace, but anyone can invent a new UUID and capability. The relay cannot distinguish Fair Money ciphertext from unrelated opaque data. Storage, namespace, and per-IP rate limits bound disk consumption and slow a single source; they do not provide content moderation or stop a distributed attacker. Do not expose a relay as an unrestricted public service until an abuse-resistant namespace-admission mechanism is deployed. Monitor the SQLite database and its filesystem and alert well before the configured total ceiling is reached.
 
-Rate limits are process-local and reset when the relay restarts. `TRUST_PROXY` determines whether the source is the direct socket address or the first forwarded address. If the relay is scaled horizontally, enforce equivalent shared limits at the trusted edge.
+Rate limits are process-local and reset when the relay restarts. `TRUST_PROXY` determines whether the source is the direct socket address or the configured forwarding header. The homelab deployment uses `CF-Connecting-IP` after the Cloudflare peer check; standalone proxies must replace or sanitize their selected header. If the relay is scaled horizontally, enforce equivalent shared limits at the trusted edge.
 
 New namespaces also require proof of work bound to their UUID and capability. The relay announces its configured difficulty, and the client solves it before retrying registration. Existing namespaces require no repeated proof. This raises the cost of bulk anonymous allocation without introducing relay accounts or a project-operated issuer. It does not stop a well-funded or distributed attacker; keep the storage, rate, and edge limits enabled as independent controls.
 

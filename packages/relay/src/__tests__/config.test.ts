@@ -24,6 +24,7 @@ describe('relay configuration', () => {
         expect(() => loadConfig({ MAX_CONNECTIONS_PER_IP: '0' })).toThrow(/MAX_CONNECTIONS_PER_IP/);
         expect(() => loadConfig({ OPERATION_RETENTION_DAYS: '-1' })).toThrow(/OPERATION_RETENTION_DAYS/);
         expect(() => loadConfig({ TRUST_PROXY: 'yes' })).toThrow(/TRUST_PROXY/);
+        expect(() => loadConfig({ TRUST_PROXY_CLIENT_IP_HEADER: 'x-untrusted' })).toThrow(/TRUST_PROXY_CLIENT_IP_HEADER/);
         expect(() => loadConfig({ ADMISSION_DIFFICULTY_BITS: '33' })).toThrow(/ADMISSION_DIFFICULTY_BITS/);
         expect(() => loadConfig({ RELAY_ADMIN_TOKEN: 'too-short' })).toThrow(/RELAY_ADMIN_TOKEN/);
     });
