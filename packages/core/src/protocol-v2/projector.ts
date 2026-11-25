@@ -6,6 +6,7 @@ import type { ExpenseDataV2, OperationPayloadV2, SignedOperationV2 } from './sch
 export interface ProjectionOperationV2 {
     operationId: string;
     lamportClock: number;
+    createdAt?: number;
     payload: Pick<OperationPayloadV2, 'type'> & Record<string, unknown>;
 }
 
@@ -19,6 +20,7 @@ export interface EffectiveExpenseProjectionV2 {
     expenseId: string;
     status: 'effective';
     effectiveOperationId: string;
+    createdAt?: number;
     expense: Record<string, unknown>;
 }
 
@@ -134,10 +136,12 @@ export function projectExpensesV2(
         effectiveEntries.sort(compareTuple);
         const effective = effectiveEntries.at(-1);
         if (effective) {
+            const createdAt = effectiveEntries.find(({ payload }) => payload.type === 'ExpenseCreated')?.createdAt;
             result.set(expenseId, {
                 expenseId,
                 status: 'effective',
                 effectiveOperationId: effective.operationId,
+                ...(createdAt === undefined ? {} : { createdAt }),
                 expense: effective.payload.expense as Record<string, unknown>,
             });
         }

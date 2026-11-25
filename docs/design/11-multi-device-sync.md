@@ -17,6 +17,8 @@ flowchart TD
 
 Password-encrypted file transfer copies the root identity, per-group relay capabilities and encryption secrets, and each group's complete locally retained signed operation history. Transfer format version 3 carries protocol-v2 operations. Access-only exports are superseded; generate a fresh export from the source device.
 
+If the source session is gone, the [standalone recovery tool](../identity-export-recovery.md) can turn an older access-only export and available relay history into a new version 3 file. The app continues to import only version 3.
+
 Import validates the root key pair, device ownership, all operation signatures and authorization, group IDs, participant ownership, directory records, and access schemas before replacing local data. Identity, device, group histories, access, and directory records are replaced in one IndexedDB transaction. The receiving session creates a fresh device key and signs its authorization locally with the transferred root. Groups are visible and editable without a relay; the source session remains usable. Reconnect synchronization exchanges both sessions' encrypted operation sets, including device authorization and revocation.
 
 Group enumeration includes access-only records so missing history can be retried. A new export fails if required owned-group history or access is missing instead of silently exporting fewer groups. Unclaimed invitation previews are excluded from identity exports.

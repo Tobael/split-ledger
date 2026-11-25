@@ -6,7 +6,7 @@ import {
     type GroupId,
     type GroupStateV2,
 } from '@splitledger/core';
-import { equalParticipantSplits } from '../utils/expense-splits';
+import { amountToMinorUnits, equalParticipantSplits, rebalanceCustomSplits } from '../utils/expense-splits';
 import { ArrowLeft, Check, CircleDollarSign, X } from 'lucide-react';
 import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -32,6 +32,7 @@ export function AddExpense() {
     const [paidBy, setPaidBy] = useState<string>('');
     const [splitMode, setSplitMode] = useState<'equal' | 'custom'>('equal');
     const [customSplits, setCustomSplits] = useState<Record<string, string>>({});
+    const [manualSplits, setManualSplits] = useState<Set<string>>(() => new Set());
     const [excludedParticipants, setExcludedParticipants] = useState<Set<string>>(() => new Set());
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState('');
@@ -49,6 +50,7 @@ export function AddExpense() {
                     setAmount((Number(expense.amountMinorUnits) / 100).toFixed(2));
                     setPaidBy(String(expense.paidBy));
                     setSplitMode('custom');
+                    setManualSplits(new Set());
                     setCustomSplits(Object.fromEntries(
                         Object.entries(expense.splits as Record<string, number>)
                             .map(([participantId, share]) => [participantId, (share / 100).toFixed(2)]),
@@ -76,22 +78,24 @@ export function AddExpense() {
         .filter(({ status }) => status !== 'disabled')
         .map((participant) => ({ id: participant.participantId, displayName: participant.displayName, isMe: participant.claimedRootPublicKey === identity.rootKeyPair.publicKey }));
 
-    const prefillCustomSplits = (excluded: ReadonlySet<string>, nextAmount = amount) => {
-        const amountMinor = Math.round(parseFloat(nextAmount || '0') * 100);
-        const eligible = activeMembers.filter(({ id: participantId }) => !excluded.has(participantId));
-        if (!Number.isFinite(amountMinor) || amountMinor <= 0 || eligible.length === 0) {
-            setCustomSplits(Object.fromEntries(activeMembers.map(({ id }) => [id, '0.00'])));
-            return;
-        }
-        const shares = equalParticipantSplits(activeMembers.map(({ id }) => id), amountMinor, excluded);
-        setCustomSplits(Object.fromEntries(
-            Object.entries(shares).map(([participantId, share]) => [participantId, (share / 100).toFixed(2)]),
-        ));
-    };
+    const participantIds = activeMembers.map(({ id }) => id);
+    const editExpense = editId ? stateV2.expenses[editId] : undefined;
+    const currency = editExpense?.status === 'effective' ? String(editExpense.expense.currency) : 'EUR';
+    const currencyLabel = currency === 'EUR' ? '€' : currency;
 
     const chooseCustomMode = () => {
         setSplitMode('custom');
-        if (Object.keys(customSplits).length === 0) prefillCustomSplits(excludedParticipants);
+        if (Object.keys(customSplits).length === 0) {
+            setCustomSplits(rebalanceCustomSplits(participantIds, amount, excludedParticipants, manualSplits, customSplits));
+        }
+    };
+
+    const editShare = (participantId: string, value: string) => {
+        const manual = new Set(manualSplits).add(participantId);
+        setManualSplits(manual);
+        setCustomSplits(rebalanceCustomSplits(participantIds, amount, excludedParticipants, manual, {
+            ...customSplits, [participantId]: value,
+        }));
     };
 
     const toggleParticipantEligibility = (participantId: string) => {
@@ -102,8 +106,11 @@ export function AddExpense() {
             if (eligibleCount <= 1) return;
             next.add(participantId);
         }
+        const manual = new Set(manualSplits);
+        manual.delete(participantId);
+        setManualSplits(manual);
         setExcludedParticipants(next);
-        prefillCustomSplits(next);
+        setCustomSplits(rebalanceCustomSplits(participantIds, amount, next, manual, customSplits));
     };
 
     const handleSubmit = async () => {
@@ -112,8 +119,8 @@ export function AddExpense() {
         setSubmitting(true);
 
         try {
-            const amountMinor = Math.round(parseFloat(amount) * 100);
-            if (amountMinor <= 0 || isNaN(amountMinor)) {
+            const amountMinor = amountToMinorUnits(amount);
+            if (!(amountMinor > 0)) {
                 setError(t.addExpense.invalidAmount);
                 setSubmitting(false);
                 return;
@@ -126,7 +133,12 @@ export function AddExpense() {
                 splits = {};
                 let total = 0;
                 for (const m of activeMembers) {
-                    const val = Math.round(parseFloat(customSplits[m.id] || '0') * 100);
+                    const val = amountToMinorUnits(customSplits[m.id] ?? '');
+                    if (!Number.isSafeInteger(val)) {
+                        setError(t.addExpense.invalidAmount);
+                        setSubmitting(false);
+                        return;
+                    }
                     splits[m.id] = val;
                     total += val;
                 }
@@ -140,7 +152,7 @@ export function AddExpense() {
             const expense = {
                 description: description.trim(),
                 amountMinorUnits: amountMinor,
-                currency: 'EUR',
+                currency,
                 paidBy,
                 splits,
             };
@@ -169,9 +181,11 @@ export function AddExpense() {
 
                 <div>
                     <Label htmlFor="expense-amount">{t.addExpense.amountLabel}</Label>
-                    <div className="relative"><span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-[#716969]">€</span><Input id="expense-amount" className="pl-7 text-lg font-semibold tabular-nums" inputMode="decimal" type="number" step="0.01" min="0" placeholder="0.00" value={amount} onChange={e => {
+                    <div className="relative"><span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-[#716969]">{currencyLabel}</span><Input id="expense-amount" className="pl-14 text-lg font-semibold tabular-nums" inputMode="decimal" type="number" step="0.01" min="0" placeholder="0.00" value={amount} onChange={e => {
                         setAmount(e.target.value);
-                        if (splitMode === 'custom') prefillCustomSplits(excludedParticipants, e.target.value);
+                        if (splitMode === 'custom' || Object.keys(customSplits).length > 0) {
+                            setCustomSplits(rebalanceCustomSplits(participantIds, e.target.value, excludedParticipants, manualSplits, customSplits));
+                        }
                     }} /></div>
                 </div>
 
@@ -211,7 +225,8 @@ export function AddExpense() {
                                 </Button>
                                 <Input className="text-right tabular-nums" inputMode="decimal" type="number" step="0.01" min="0" placeholder="0.00"
                                     value={customSplits[m.id] || ''}
-                                    onChange={e => setCustomSplits(prev => ({ ...prev, [m.id]: e.target.value }))}
+                                    aria-label={m.displayName}
+                                    onChange={e => editShare(m.id, e.target.value)}
                                     disabled={excludedParticipants.has(m.id)} />
                             </div>
                         ))}
@@ -220,7 +235,7 @@ export function AddExpense() {
 
                 {splitMode === 'equal' && amount && parseFloat(amount) > 0 && (
                     <Alert className="rounded-lg border-[#004502]/10 bg-[#004502]/5 text-[#004502]">
-                        {t.addExpense.splitEqually} €{(parseFloat(amount) / activeMembers.length).toFixed(2)} {t.addExpense.perPerson}
+                        {t.addExpense.splitEqually} {currencyLabel} {(parseFloat(amount) / activeMembers.length).toFixed(2)} {t.addExpense.perPerson}
                     </Alert>
                 )}
 

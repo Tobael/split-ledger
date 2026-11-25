@@ -83,6 +83,11 @@ export interface Translations {
         allSettled: string;
         expensesTitle: string;
         noExpenses: string;
+        expenseTotal: string;
+        expenseOrder: string;
+        newestFirst: string;
+        oldestFirst: string;
+        groupByPayer: string;
         paidBy: string;
         confirmSettleUp: string;
         markAsPaid: string;
@@ -288,6 +293,11 @@ const en: Translations = {
         allSettled: 'All settled up',
         expensesTitle: 'Expenses',
         noExpenses: 'No expenses yet. Add one to get started!',
+        expenseTotal: 'Total spent',
+        expenseOrder: 'View',
+        newestFirst: 'Newest first',
+        oldestFirst: 'Oldest first',
+        groupByPayer: 'Group by payer',
         paidBy: 'Paid by',
         confirmSettleUp: 'Are you sure you want to mark this as paid?',
         markAsPaid: 'Mark as Paid',
@@ -338,7 +348,7 @@ const en: Translations = {
         custom: 'Custom',
         eligible: 'Included',
         excluded: 'Excluded',
-        customSplitHelp: 'Click a participant to include or exclude them. Shares are redistributed equally and remain editable.',
+        customSplitHelp: 'Click a participant to include or exclude them. The remaining amount is split equally among shares you haven’t edited.',
         splitEqually: 'Split equally:',
         perPerson: 'per person',
         splitMismatch: (splitTotal: string, amount: string) =>

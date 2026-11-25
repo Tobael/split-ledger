@@ -24,6 +24,7 @@ We believe in transparency. Here is exactly how the security and synchronization
 -   [**User Flow: Adding Expenses**](docs/flows/03-adding-expense.md) - How the ledger ensures integrity and ordering.
 -   [**User Flow: Synchronization**](docs/flows/04-synchronization.md) - How devices stay in sync via an untrusted relay.
 -   [**Self-hosting a Relay**](docs/relay-self-hosting.md) - Reference Compose deployment, configuration, backups, retention, and upgrades.
+-   [**Recovering groups from an older identity export**](docs/identity-export-recovery.md) - Recover available group histories from a version 2 transfer file.
 -   [**Manual Web Release Test Plan**](docs/manual-web-test-plan.md) - Cross-device, invitation, relay-recovery, transfer, and iOS checks required before Tauri work.
 
 ## Quick Start (Development)

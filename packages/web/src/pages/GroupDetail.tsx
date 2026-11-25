@@ -93,9 +93,32 @@ function ProtocolV2GroupDetail({ state, onDelete }: { state: GroupStateV2; onDel
     const [editingParticipantId, setEditingParticipantId] = useState<string | null>(null);
     const [editedParticipantName, setEditedParticipantName] = useState('');
     const [participantError, setParticipantError] = useState('');
+    const [expenseOrder, setExpenseOrder] = useState('newest');
     const textSharing = useMemo(() => new BrowserTextSharing(), []);
     const participants = Object.values(state.participants).filter(({ status }) => status !== 'disabled');
-    const expenses = Object.values(state.expenses).filter((expense) => expense.status === 'effective');
+    const expenses = Object.values(state.expenses).filter((expense) => expense.status === 'effective')
+        .sort((a, b) => {
+            const newestFirst = (b.createdAt ?? 0) - (a.createdAt ?? 0);
+            return (expenseOrder === 'oldest' ? -newestFirst : newestFirst) || a.expenseId.localeCompare(b.expenseId);
+        });
+    const payerName = (id: string) => state.participants[id]?.displayName ?? id;
+    const expenseTotals = new Map<string, bigint>();
+    const expensesByPayer = new Map<string, typeof expenses>();
+    for (const { expense } of expenses) {
+        const currency = String(expense.currency);
+        expenseTotals.set(currency, (expenseTotals.get(currency) ?? 0n) + BigInt(Number(expense.amountMinorUnits)));
+    }
+    if (expenseOrder === 'payer') {
+        for (const entry of expenses) {
+            const payer = String(entry.expense.paidBy);
+            const group = expensesByPayer.get(payer) ?? [];
+            group.push(entry);
+            expensesByPayer.set(payer, group);
+        }
+    }
+    const expenseSections = expenseOrder === 'payer'
+        ? [...expensesByPayer.entries()].sort(([a], [b]) => payerName(a).localeCompare(payerName(b)) || a.localeCompare(b))
+        : [[null, expenses]] as const;
     const currencies = Object.keys(state.balances).sort();
     const creator = state.participants[state.creatorParticipantId];
     const isCreator = creator?.claimedRootPublicKey === identity?.rootKeyPair.publicKey;
@@ -313,22 +336,46 @@ function ProtocolV2GroupDetail({ state, onDelete }: { state: GroupStateV2; onDel
                 </Card>
             </div>
             <Card>
-                <CardHeader><CardTitle>{t.groupDetail.expensesTitle}</CardTitle></CardHeader>
-                <CardContent className="space-y-2">
-                {expenses.length === 0 ? <p className="text-sm text-[#716969]">{t.groupDetail.noExpenses}</p> : expenses.map((expense) => (
-                    <div key={expense.expenseId} className="flex flex-col gap-3 rounded-lg border border-[#004502]/10 p-3 sm:flex-row sm:items-center sm:justify-between">
-                        <div className="min-w-0">
-                            <strong className="block truncate">{String(expense.expense.description)}</strong>
-                            <div className="text-sm text-[#716969]">
-                                {String(expense.expense.currency)} {(Number(expense.expense.amountMinorUnits) / 100).toFixed(2)} · {t.groupDetail.paidBy} {state.participants[String(expense.expense.paidBy)]?.displayName}
+                <CardHeader>
+                    <CardTitle>{t.groupDetail.expensesTitle}</CardTitle>
+                    {expenses.length > 0 && (
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                            <div className="text-sm">
+                                <span className="text-[#716969]">{t.groupDetail.expenseTotal} </span>
+                                <strong className="tabular-nums">{[...expenseTotals.entries()].sort(([a], [b]) => a.localeCompare(b))
+                                    .map(([currency, total]) => `${currency} ${total / 100n}.${String(total % 100n).padStart(2, '0')}`).join(' · ')}</strong>
                             </div>
+                            <label className="flex items-center gap-2 text-sm">
+                                {t.groupDetail.expenseOrder}
+                                <select className="h-9 rounded-lg border border-[#004502]/15 bg-white px-2" value={expenseOrder} onChange={(event) => setExpenseOrder(event.target.value)}>
+                                    <option value="newest">{t.groupDetail.newestFirst}</option>
+                                    <option value="oldest">{t.groupDetail.oldestFirst}</option>
+                                    <option value="payer">{t.groupDetail.groupByPayer}</option>
+                                </select>
+                            </label>
                         </div>
-                        <div className="flex shrink-0 gap-1 self-end sm:self-auto">
-                            <Button asChild variant="ghost" size="icon"><Link title={t.groupDetail.editExpense} aria-label={t.groupDetail.editExpense} to={`/group/${state.groupId}/expense?edit=${expense.expenseId}`}><Pencil className="size-4" /></Link></Button>
-                            <ConfirmationAction description={t.groupDetail.confirmVoidExpense} onConfirm={() => voidExpense(expense.expenseId)} destructive>
-                                <Button variant="destructive" size="icon" title={t.groupDetail.voidExpense} aria-label={t.groupDetail.voidExpense}><Trash2 className="size-4" /></Button>
-                            </ConfirmationAction>
-                        </div>
+                    )}
+                </CardHeader>
+                <CardContent className="space-y-4">
+                {expenses.length === 0 ? <p className="text-sm text-[#716969]">{t.groupDetail.noExpenses}</p> : expenseSections.map(([payer, entries]) => (
+                    <div key={payer ?? 'all'} className="space-y-2">
+                        {payer !== null && <h3 className="text-sm font-semibold text-[#004502]">{payerName(payer)}</h3>}
+                        {entries.map((expense) => (
+                            <div key={expense.expenseId} className="flex flex-col gap-3 rounded-lg border border-[#004502]/10 p-3 sm:flex-row sm:items-center sm:justify-between">
+                                <div className="min-w-0">
+                                    <strong className="block truncate">{String(expense.expense.description)}</strong>
+                                    <div className="text-sm text-[#716969]">
+                                        {String(expense.expense.currency)} {(Number(expense.expense.amountMinorUnits) / 100).toFixed(2)} · {t.groupDetail.paidBy} {payerName(String(expense.expense.paidBy))}
+                                    </div>
+                                </div>
+                                <div className="flex shrink-0 gap-1 self-end sm:self-auto">
+                                    <Button asChild variant="ghost" size="icon"><Link title={t.groupDetail.editExpense} aria-label={t.groupDetail.editExpense} to={`/group/${state.groupId}/expense?edit=${expense.expenseId}`}><Pencil className="size-4" /></Link></Button>
+                                    <ConfirmationAction description={t.groupDetail.confirmVoidExpense} onConfirm={() => voidExpense(expense.expenseId)} destructive>
+                                        <Button variant="destructive" size="icon" title={t.groupDetail.voidExpense} aria-label={t.groupDetail.voidExpense}><Trash2 className="size-4" /></Button>
+                                    </ConfirmationAction>
+                                </div>
+                            </div>
+                        ))}
                     </div>
                 ))}
                 </CardContent>

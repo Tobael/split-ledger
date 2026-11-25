@@ -133,6 +133,10 @@ describe('protocol v2 command builders', () => {
             'Duplicate',
         );
 
+        const correctedState = deriveGroupStateV2([root, authorization, expense, correction]);
+        expect(correctedState.expenses['018cc251-f400-7000-8000-000000000010']).toMatchObject({
+            createdAt: expense.createdAt, effectiveOperationId: correction.operationId,
+        });
         const state = deriveGroupStateV2([root, authorization, expense, correction, voidOperation]);
         expect(state.expenses['018cc251-f400-7000-8000-000000000010']?.status).toBe('void');
         expect(state.balances).toEqual({});

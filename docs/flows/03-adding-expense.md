@@ -18,9 +18,11 @@ sequenceDiagram
 
 Participants may be claimed or unclaimed active slots. Expenses use stable participant IDs.
 
+For a custom split, the form divides the remaining amount evenly among included participants whose shares have not been edited. Manually entered shares stay fixed while other shares adjust. Excluded participants have zero shares. If the remaining fields cannot absorb the difference, the form requires the user to bring the split total back to the expense amount before saving.
+
 ## Editing
 
-An edit creates one immutable `ExpenseCorrected` operation with complete replacement data. It does not void and recreate the expense. A deletion creates `ExpenseVoided`. The activity view may show audit history, while balances and totals use the deterministic effective expense.
+An edit creates one immutable `ExpenseCorrected` operation with complete replacement data. A deletion creates `ExpenseVoided`. Balances and totals use the deterministic effective expense. The group view shows totals by currency and sorts expenses by their original creation time, newest first by default. It also offers oldest first and grouping by payer.
 
 ## Invariants
 

@@ -7,12 +7,16 @@
   "scripts": {
     "test": "npm run test --workspaces --if-present",
     "build": "npm run build --workspaces --if-present",
-    "lint": "npm run lint --workspaces --if-present"
+    "lint": "npm run lint --workspaces --if-present",
+    "recover:identity": "node --import tsx scripts/recover-identity.mts"
   },
   "engines": {
     "node": ">=20.0.0"
   },
   "allowScripts": {
     "better-sqlite3@12.11.1": true
+  },
+  "devDependencies": {
+    "tsx": "^4.23.1"
   }
 }
