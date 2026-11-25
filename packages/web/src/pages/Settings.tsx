@@ -18,7 +18,7 @@ import { ConfirmationAction } from '../components/ConfirmationAction';
 
 export function Settings() {
     const {
-        identity, updateIdentity, deleteIdentity, groups,
+        identity, updateIdentity, deleteIdentity, groups, currentDeviceRevoked,
         getAuthorizedDevicesV2, revokeDeviceV2,
         exportIdentityTransferV2, importIdentityFromJson, preferredRelayUrl, setPreferredRelayUrl,
     } = useApp();
@@ -233,11 +233,13 @@ export function Settings() {
                         </div>
                         <code className="text-xs text-[#716969]">{devicePubkeyShort}</code>
                     </div>
-                    <span className="rounded-full bg-green-100 px-2 py-1 text-xs font-medium text-green-800">{t.common.active}</span>
+                    <span className={`rounded-full px-2 py-1 text-xs font-medium ${currentDeviceRevoked ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}`}>
+                        {currentDeviceRevoked ? t.settings.deviceRevokedLabel : t.common.active}
+                    </span>
                 </div>
 
                 {/* Other Devices */}
-                {authorizedDevices.size > 1 && (
+                {[...authorizedDevices.keys()].some((key) => key !== identity.device.deviceKeyPair.publicKey) && (
                     <>
                         <h4 className="mt-5 mb-2 text-xs font-semibold uppercase tracking-wide text-[#716969]">{t.settings.authorizedDevices}</h4>
                         <div className="space-y-2">

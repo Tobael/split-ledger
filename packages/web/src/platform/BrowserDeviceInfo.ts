@@ -17,6 +17,6 @@ export class BrowserDeviceInfo implements DeviceInfo {
                     : /Windows/.test(this.userAgent)
                         ? 'Windows PC'
                         : 'Browser';
-        return `${displayName}'s ${platform}`;
+        return `${displayName}'s ${platform}`.slice(0, 100);
     }
 }

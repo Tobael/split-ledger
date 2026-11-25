@@ -46,11 +46,11 @@ export function Dashboard() {
                                     <h3 className="truncate text-lg font-semibold">
                                         {g.name}
                                     </h3>
-                                    <span className="mt-1 inline-flex rounded-full bg-[#004502]/10 px-2 py-0.5 text-xs font-medium">
+                                    {!g.waitingForHistory && <span className="mt-1 inline-flex rounded-full bg-[#004502]/10 px-2 py-0.5 text-xs font-medium">
                                         {g.memberCount} {g.memberCount === 1 ? t.common.member : t.common.members}
-                                    </span>
+                                    </span>}
                                 </div>
-                                <BalanceDisplay amount={g.myBalance} currency={g.currency} />
+                                {g.waitingForHistory ? <span className="text-xs text-[#716969]">{t.groupDetail.waitingForMemberTitle}</span> : <BalanceDisplay amount={g.myBalance} currency={g.currency} />}
                             </div>
                             <div className="mt-4 flex items-center gap-1 text-xs text-[#716969] group-hover:text-[#004502]">
                                 {t.dashboard.viewDetails}<ArrowRight className="size-3.5" />

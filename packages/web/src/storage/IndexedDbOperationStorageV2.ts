@@ -1,16 +1,25 @@
 import {
     signedOperationV2Schema,
+    storedRootIdentitySchema,
+    deviceIdentitySchema,
+    parseIdentityDirectoryRecord,
+    type IdentityDirectoryRecord,
+    deriveGroupStateV2,
     groupAccessV2Schema,
     type GroupAccessStorageV2,
     type GroupAccessV2,
     type OperationStorageV2,
     type SignedOperationV2,
 } from '@splitledger/core';
+import type { IdentityStore, StoredIdentity, StoredRootIdentity } from './IdentityStore';
 
 const DATABASE_NAME = 'fair-money-v2';
-const DATABASE_VERSION = 2;
+const DATABASE_VERSION = 3;
 const OPERATIONS = 'operations';
 const GROUP_ACCESS = 'groupAccess';
+const DIRECTORY_RECORDS = 'directoryRecords';
+const HIDDEN_GROUPS = 'hiddenGroups';
+const IDENTITY = 'identity';
 
 interface StoredOperationV2 {
     operationId: string;
@@ -34,7 +43,7 @@ function transactionDone(transaction: IDBTransaction): Promise<void> {
 }
 
 /** Clean v2-only browser operation store. It does not read or migrate the legacy ledger database. */
-export class IndexedDbOperationStorageV2 implements OperationStorageV2, GroupAccessStorageV2 {
+export class IndexedDbOperationStorageV2 implements OperationStorageV2, GroupAccessStorageV2, IdentityStore {
     private readonly database: Promise<IDBDatabase>;
 
     constructor(databaseName = DATABASE_NAME) {
@@ -54,6 +63,10 @@ export class IndexedDbOperationStorageV2 implements OperationStorageV2, GroupAcc
                 const operations = database.createObjectStore(OPERATIONS, { keyPath: 'operationId' });
                 operations.createIndex('groupId', 'groupId', { unique: false });
                 database.createObjectStore(GROUP_ACCESS, { keyPath: 'groupId' });
+                const directory = database.createObjectStore(DIRECTORY_RECORDS, { keyPath: 'recordId' });
+                directory.createIndex('directoryId', 'directoryId');
+                database.createObjectStore(HIDDEN_GROUPS);
+                database.createObjectStore(IDENTITY);
             };
             request.onsuccess = () => resolve(request.result);
             request.onerror = () => reject(request.error ?? new Error('Unable to open protocol-v2 IndexedDB'));
@@ -99,15 +112,48 @@ export class IndexedDbOperationStorageV2 implements OperationStorageV2, GroupAcc
     }
 
     async getGroupIds(): Promise<string[]> {
-        const transaction = (await this.database).transaction(OPERATIONS, 'readonly');
-        const records = await requestResult(
+        const transaction = (await this.database).transaction([OPERATIONS, GROUP_ACCESS], 'readonly');
+        const [records, accessKeys] = await Promise.all([requestResult(
             transaction.objectStore(OPERATIONS).getAll() as IDBRequest<StoredOperationV2[]>,
-        );
-        return [...new Set(records.map(({ groupId }) => groupId))].sort();
+        ), requestResult(transaction.objectStore(GROUP_ACCESS).getAllKeys())]);
+        return [...new Set([...records.map(({ groupId }) => groupId), ...accessKeys.map(String)])].sort();
+    }
+
+    async replaceGroups(groups: { access: GroupAccessV2; operations: SignedOperationV2[] }[], directoryRecords: IdentityDirectoryRecord[] = [], identity?: StoredIdentity | null): Promise<void> {
+        const validated = groups.map(({ access, operations }) => {
+            const parsedAccess = groupAccessV2Schema.parse(access);
+            const parsedOperations = operations.map((operation) => signedOperationV2Schema.parse(operation));
+            if (parsedOperations.some(({ groupId }) => groupId !== parsedAccess.groupId)) {
+                throw new Error('Transferred history belongs to another group');
+            }
+            deriveGroupStateV2(parsedOperations);
+            return { access: parsedAccess, operations: parsedOperations };
+        });
+        const parsedIdentity = identity ? this.validateIdentity(identity) : identity;
+        const parsedDirectoryRecords = directoryRecords.map((record) => parseIdentityDirectoryRecord(record, record.ownerRootPublicKey, record.directoryId));
+        const transaction = (await this.database).transaction([OPERATIONS, GROUP_ACCESS, DIRECTORY_RECORDS, HIDDEN_GROUPS, IDENTITY], 'readwrite');
+        const done = transactionDone(transaction);
+        const operationsStore = transaction.objectStore(OPERATIONS);
+        const accessStore = transaction.objectStore(GROUP_ACCESS);
+        operationsStore.clear();
+        accessStore.clear();
+        if (parsedIdentity === null) transaction.objectStore(IDENTITY).clear();
+        else if (parsedIdentity) transaction.objectStore(IDENTITY).put(parsedIdentity, 'current');
+        transaction.objectStore(DIRECTORY_RECORDS).clear();
+        transaction.objectStore(HIDDEN_GROUPS).clear();
+        for (const record of parsedDirectoryRecords) transaction.objectStore(DIRECTORY_RECORDS).put(record);
+        for (const { access, operations } of validated) {
+            accessStore.put(access);
+            for (const operation of operations) {
+                operationsStore.put({ operationId: operation.operationId, groupId: operation.groupId, operation } satisfies StoredOperationV2);
+            }
+        }
+        await done;
     }
 
     async deleteGroup(groupId: string): Promise<void> {
-        const transaction = (await this.database).transaction([OPERATIONS, GROUP_ACCESS], 'readwrite');
+        const transaction = (await this.database).transaction([OPERATIONS, GROUP_ACCESS, HIDDEN_GROUPS], 'readwrite');
+        transaction.objectStore(HIDDEN_GROUPS).put(true, groupId);
         const store = transaction.objectStore(OPERATIONS);
         const keys = await requestResult(store.index('groupId').getAllKeys(groupId));
         for (const key of keys) store.delete(key);
@@ -118,7 +164,13 @@ export class IndexedDbOperationStorageV2 implements OperationStorageV2, GroupAcc
     async storeGroupAccess(access: GroupAccessV2): Promise<void> {
         const parsed = groupAccessV2Schema.parse(access);
         const transaction = (await this.database).transaction(GROUP_ACCESS, 'readwrite');
-        transaction.objectStore(GROUP_ACCESS).put(parsed);
+        const store = transaction.objectStore(GROUP_ACCESS);
+        const existing = await requestResult(store.get(parsed.groupId)) as GroupAccessV2 | undefined;
+        if (existing && (existing.groupSecret !== parsed.groupSecret
+            || existing.relayGroupCapability !== parsed.relayGroupCapability || existing.relayUrl !== parsed.relayUrl)) {
+            throw new Error('Group access conflicts with retained access');
+        }
+        store.put(parsed);
         await transactionDone(transaction);
     }
 
@@ -134,6 +186,46 @@ export class IndexedDbOperationStorageV2 implements OperationStorageV2, GroupAcc
         const transaction = (await this.database).transaction(GROUP_ACCESS, 'readwrite');
         transaction.objectStore(GROUP_ACCESS).delete(groupId);
         await transactionDone(transaction);
+    }
+
+    private validateIdentity(identity: StoredIdentity): StoredIdentity {
+        const root = storedRootIdentitySchema.parse(identity.root) as StoredRootIdentity;
+        const device = deviceIdentitySchema.parse(identity.device) as StoredIdentity['device'];
+        if (device.rootPublicKey !== root.rootKeyPair.publicKey) throw new Error('Device does not belong to stored identity');
+        return { root, device };
+    }
+
+    async loadIdentity(): Promise<StoredIdentity | null> {
+        const transaction = (await this.database).transaction(IDENTITY, 'readonly');
+        const stored = await requestResult(transaction.objectStore(IDENTITY).get('current')) as StoredIdentity | undefined;
+        return stored ? this.validateIdentity(stored) : null;
+    }
+
+    async saveIdentity(identity: StoredIdentity): Promise<void> {
+        const parsed = this.validateIdentity(identity);
+        const transaction = (await this.database).transaction(IDENTITY, 'readwrite');
+        const done = transactionDone(transaction);
+        transaction.objectStore(IDENTITY).put(parsed, 'current');
+        await done;
+    }
+
+    async getDirectoryRecords(directoryId: string): Promise<IdentityDirectoryRecord[]> {
+        const transaction = (await this.database).transaction(DIRECTORY_RECORDS, 'readonly');
+        const records = await requestResult(transaction.objectStore(DIRECTORY_RECORDS).index('directoryId').getAll(directoryId)) as IdentityDirectoryRecord[];
+        return records.map((record) => parseIdentityDirectoryRecord(record, record.ownerRootPublicKey, directoryId));
+    }
+
+    async putDirectoryRecords(records: IdentityDirectoryRecord[]): Promise<void> {
+        const parsed = records.map((record) => parseIdentityDirectoryRecord(record, record.ownerRootPublicKey, record.directoryId));
+        const transaction = (await this.database).transaction(DIRECTORY_RECORDS, 'readwrite');
+        const done = transactionDone(transaction);
+        for (const record of parsed) transaction.objectStore(DIRECTORY_RECORDS).put(record);
+        await done;
+    }
+
+    async isGroupHidden(groupId: string): Promise<boolean> {
+        const transaction = (await this.database).transaction(HIDDEN_GROUPS, 'readonly');
+        return (await requestResult(transaction.objectStore(HIDDEN_GROUPS).get(groupId))) === true;
     }
 
     async close(): Promise<void> {

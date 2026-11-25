@@ -14,6 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { BrowserTextSharing } from '../platform/BrowserTextSharing';
 import { ConfirmationAction } from '../components/ConfirmationAction';
+import { Alert } from '@/components/ui/alert';
 
 export function GroupDetail() {
     const { id } = useParams<{ id: string }>();
@@ -67,7 +68,13 @@ export function GroupDetail() {
         );
     }
 
-    return <ProtocolV2GroupDetail state={state} onDelete={handleDeleteGroup} />;
+    return <>
+        {groupsWaitingForHistory.has(groupId) && <Alert role="status" className="mb-4">
+            <strong>{t.groupDetail.waitingForMemberTitle}</strong>
+            <p>{t.groupDetail.waitingForMemberText}</p>
+        </Alert>}
+        <ProtocolV2GroupDetail state={state} onDelete={handleDeleteGroup} />
+    </>;
 }
 
 function ProtocolV2GroupDetail({ state, onDelete }: { state: GroupStateV2; onDelete: () => Promise<void> }) {

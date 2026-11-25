@@ -7,6 +7,8 @@ import {
     GroupServiceV2,
     createParticipantSlotCommandV2,
     generateKeyPair,
+    createRootIdentity,
+    createDeviceIdentity,
 } from '@splitledger/core';
 import { IndexedDbOperationStorageV2 } from './IndexedDbOperationStorageV2';
 
@@ -53,6 +55,25 @@ describe('IndexedDbOperationStorageV2', () => {
         expect(await storage.getOperation(root.operationId)).toBeNull();
         expect(await storage.getGroupIds()).toEqual([]);
         expect(await storage.getGroupAccess(root.groupId)).toBeNull();
+    });
+
+    it('persists identity and device together and validates key ownership before writing', async () => {
+        const databaseName = `fair-money-v2-test-${crypto.randomUUID()}`;
+        databases.push(databaseName);
+        const storage = new IndexedDbOperationStorageV2(databaseName);
+        storages.push(storage);
+        const root = { ...createRootIdentity('Alice'), directoryAccess: createGroupAccessV2(crypto.randomUUID(), 'wss://relay.example/ws') };
+        const device = createDeviceIdentity(root.rootKeyPair, 'Phone');
+        await storage.saveIdentity({ root, device });
+        const reopened = new IndexedDbOperationStorageV2(databaseName);
+        storages.push(reopened);
+        expect(await reopened.loadIdentity()).toEqual({ root, device });
+        const unrelated = createRootIdentity('Mallory');
+        await expect(storage.saveIdentity({ root, device: createDeviceIdentity(unrelated.rootKeyPair, 'Other') })).rejects.toThrow('does not belong');
+        await expect(storage.saveIdentity({ root: { ...root, rootKeyPair: { ...root.rootKeyPair, publicKey: unrelated.rootKeyPair.publicKey } }, device })).rejects.toThrow('does not match');
+        expect(await reopened.loadIdentity()).toEqual({ root, device });
+        await storage.replaceGroups([], [], null);
+        expect(await reopened.loadIdentity()).toBeNull();
     });
 
     it('rejects malformed operations before writing', async () => {
