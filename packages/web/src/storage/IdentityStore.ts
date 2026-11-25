@@ -1,9 +1,9 @@
-import type { DeviceIdentity, RootIdentity } from '@splitledger/core';
+import type { DeviceIdentity, RootIdentity, GroupAccessV2 } from '@splitledger/core';
+
+export interface StoredRootIdentity extends RootIdentity { directoryAccess: GroupAccessV2 }
+export interface StoredIdentity { root: StoredRootIdentity; device: DeviceIdentity }
 
 export interface IdentityStore {
-    storeRootIdentity(identity: RootIdentity): Promise<void>;
-    getRootIdentity(): Promise<RootIdentity | null>;
-    storeDeviceIdentity(identity: DeviceIdentity): Promise<void>;
-    getDeviceIdentity(): Promise<DeviceIdentity | null>;
-    clearIdentity(): Promise<void>;
+    loadIdentity(): Promise<StoredIdentity | null>;
+    saveIdentity(identity: StoredIdentity): Promise<void>;
 }

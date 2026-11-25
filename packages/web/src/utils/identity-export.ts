@@ -20,7 +20,12 @@ interface EncryptedEnvelope {
 // ─── Helpers ───
 
 function toBase64(buf: ArrayBuffer): string {
-    return btoa(String.fromCharCode(...new Uint8Array(buf)));
+    const bytes = new Uint8Array(buf);
+    const chunks: string[] = [];
+    for (let offset = 0; offset < bytes.length; offset += 32768) {
+        chunks.push(String.fromCharCode(...bytes.subarray(offset, offset + 32768)));
+    }
+    return btoa(chunks.join(''));
 }
 
 function fromBase64(b64: string): ArrayBuffer {

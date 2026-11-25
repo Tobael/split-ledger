@@ -172,6 +172,7 @@ export interface Translations {
         revoke: string;
         confirmRevoke: string;
         deviceRevoked: string;
+        deviceRevokedLabel: string;
         revokeFailed: string;
         exportFailed: string;
         renameFailed: string;
@@ -358,9 +359,9 @@ const en: Translations = {
         rootKeyLabel: 'Root Public Key',
         deviceTitle: 'This Device',
         transferTitle: 'Account Transfer',
-        transferDescription: 'Move your identity to another browser or device',
-        exportButton: 'Export identity',
-        importButton: 'Import identity',
+        transferDescription: 'Copy your identity and all current groups to another browser or device. Both devices can edit and sync. New groups are shared automatically when the devices synchronize.',
+        exportButton: 'Export identity and groups',
+        importButton: 'Import identity and groups',
         passwordPrompt: 'Enter a password to protect the export:',
         passwordMinLength: 'Password must be at least 6 characters',
         exporting: 'Encrypting…',
@@ -375,8 +376,9 @@ const en: Translations = {
         unknownDevice: 'Unknown Device',
         thisDevice: 'This Device',
         revoke: 'Revoke',
-        confirmRevoke: 'Are you sure you want to revoke this device? It will be removed from all groups.',
-        deviceRevoked: 'Device revoked',
+        confirmRevoke: 'Revoke this device for this identity? After synchronization it can no longer make changes or automatically receive new groups. Copies of data already downloaded remain on the device.',
+        deviceRevoked: 'Revocation saved. Other devices apply it when they next synchronize.',
+        deviceRevokedLabel: 'Revoked',
         revokeFailed: 'Failed to revoke device',
         exportFailed: 'Failed to export identity',
         renameFailed: 'Failed to update name',

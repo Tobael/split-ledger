@@ -1,3 +1,4 @@
+import { z } from 'zod';
 // =============================================================================
 // SplitLedger — Relay Transport (WebSocket Client)
 // =============================================================================
@@ -52,6 +53,20 @@ interface ServerError {
 
 type ServerMessage = ServerNewEntry | ServerEntriesResponse | ServerOperationsConsumed | ServerPong | ServerError;
 
+const operationIdSchema = z.string().regex(/^[0-9a-f]{64}$/);
+const envelopeSchema = z.object({ operationId: operationIdSchema, encryptedOperation: z.string().min(1) });
+const groupIdSchema = z.string().uuid();
+const serverMessageSchema = z.discriminatedUnion('type', [
+    envelopeSchema.extend({ type: z.literal('OPERATION'), groupId: groupIdSchema }),
+    z.object({ type: z.literal('OPERATIONS_RESPONSE'), groupId: groupIdSchema,
+        operations: z.array(envelopeSchema.extend({ cursor: z.number().int().nonnegative().safe() })),
+        nextCursor: z.number().int().nonnegative().safe(), hasMore: z.boolean() }),
+    z.object({ type: z.literal('OPERATIONS_CONSUMED'), groupId: groupIdSchema, operations: z.array(envelopeSchema) }),
+    z.object({ type: z.literal('PONG') }),
+    z.object({ type: z.literal('ERROR'), code: z.string().max(100), message: z.string().max(1000),
+        groupId: groupIdSchema.optional(), admissionDifficulty: z.number().int().min(0).max(32).optional() }),
+]);
+
 // ─── Pending Request Tracker ───
 
 interface PendingRequest<T> {
@@ -91,6 +106,8 @@ export class RelayTransport implements Transport {
     private connectionStateHandlers: OnConnectionStateHandler[] = [];
     private connectedGroups = new Set<GroupId>();
     private _connected = false;
+    private connectionAttempt: Promise<void> | null = null;
+    private cancelConnection: (() => void) | null = null;
 
     private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
     private pingTimer: ReturnType<typeof setInterval> | null = null;
@@ -130,6 +147,7 @@ export class RelayTransport implements Transport {
     // ─── Connection Management ───
 
     async connect(groupId: GroupId): Promise<void> {
+        this.capability(groupId);
         this.connectedGroups.add(groupId);
 
         if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
@@ -186,6 +204,7 @@ export class RelayTransport implements Transport {
         do {
             const page = await this.requestPage(groupId, cursor);
             entries.push(...page.entries);
+            if (page.hasMore && page.nextCursor <= cursor) throw new Error('Relay pagination did not advance');
             cursor = page.nextCursor;
             if (!page.hasMore) break;
         } while (true);
@@ -234,47 +253,54 @@ export class RelayTransport implements Transport {
     // ─── Internal ───
 
     private async ensureConnection(_groupId: GroupId): Promise<void> {
-        return new Promise((resolve, reject) => {
-            const wsUrl = this.url;
-
-            try {
-                this.ws = new WebSocket(wsUrl);
-            } catch (err) {
-                reject(err);
-                return;
-            }
-
-            const onOpen = () => {
+        if (this.connectionAttempt) return this.connectionAttempt;
+        const attempt = new Promise<void>((resolve, reject) => {
+            let socket: WebSocket;
+            try { socket = new WebSocket(this.url); }
+            catch (error) { reject(error); return; }
+            this.ws = socket;
+            let settled = false;
+            const finish = (error?: Error) => {
+                if (settled) return;
+                settled = true;
+                clearTimeout(timeout);
+                this.cancelConnection = null;
+                if (error) reject(error);
+                else resolve();
+            };
+            const timeout = setTimeout(() => {
+                finish(new Error('Timeout connecting to relay'));
+                socket.close();
+            }, this.requestTimeoutMs);
+            this.cancelConnection = () => finish(new Error('Connection closed'));
+            socket.addEventListener('open', () => {
+                if (settled || this.ws !== socket) return;
                 this._connected = true;
                 this.emitConnectionState('connected');
                 this.startPingInterval();
                 this.subscribeToAllGroups();
-                resolve();
-            };
-
-            const onError = (_event: Event) => {
-                if (!this._connected) {
-                    reject(new Error('WebSocket connection failed'));
-                }
-            };
-
-            this.ws.addEventListener('open', onOpen, { once: true });
-            this.ws.addEventListener('error', onError, { once: true });
-
-            this.ws.addEventListener('message', (event) => {
-                this.handleMessage(event.data as string);
+                finish();
+            }, { once: true });
+            socket.addEventListener('error', () => {
+                if (this.ws === socket && !this._connected) finish(new Error('WebSocket connection failed'));
+            }, { once: true });
+            socket.addEventListener('message', (event) => {
+                if (this.ws === socket) this.handleMessage(event.data as string);
             });
-
-            this.ws.addEventListener('close', () => {
+            socket.addEventListener('close', () => {
+                if (this.ws !== socket) return;
+                finish(new Error('Connection closed'));
                 this._connected = false;
                 this.cleanup();
                 this.emitConnectionState('disconnected');
                 this.scheduleReconnect();
             });
         });
+        this.connectionAttempt = attempt.finally(() => { this.connectionAttempt = null; });
+        return this.connectionAttempt;
     }
 
-    private async subscribeToAllGroups(): Promise<void> {
+    private subscribeToAllGroups(): void {
         if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
 
         for (const groupId of this.connectedGroups) {
@@ -289,7 +315,7 @@ export class RelayTransport implements Transport {
     private handleMessage(raw: string): void {
         let msg: ServerMessage;
         try {
-            msg = JSON.parse(raw) as ServerMessage;
+            msg = serverMessageSchema.parse(JSON.parse(raw));
         } catch {
             console.warn('[RelayTransport] Rejected malformed server message');
             return;
@@ -344,7 +370,20 @@ export class RelayTransport implements Transport {
                     void this.handleAdmissionRequired(msg.groupId as GroupId, msg.admissionDifficulty);
                     break;
                 }
-                console.error(`[RelayTransport] Server error: ${msg.code}`);
+                if (msg.groupId) {
+                    const pending = this.pendingGetEntries.get(msg.groupId);
+                    if (pending) {
+                        clearTimeout(pending.timeout);
+                        this.pendingGetEntries.delete(msg.groupId);
+                        pending.reject(new Error(`Relay rejected request: ${msg.code}`));
+                    }
+                    const consume = this.pendingConsumeEntries.get(msg.groupId);
+                    if (consume) {
+                        clearTimeout(consume.timeout);
+                        this.pendingConsumeEntries.delete(msg.groupId);
+                        consume.reject(new Error(`Relay rejected request: ${msg.code}`));
+                    }
+                }
                 break;
         }
     }
@@ -368,6 +407,7 @@ export class RelayTransport implements Transport {
     }
 
     private send(msg: unknown): void {
+        if (!this.ws || this.ws.readyState !== WebSocket.OPEN) throw new Error('Relay is disconnected');
         if (this.ws && this.ws.readyState === WebSocket.OPEN) {
             if (typeof msg === 'object' && msg !== null && 'groupId' in msg && typeof msg.groupId === 'string') {
                 const groupId = msg.groupId;
@@ -413,6 +453,7 @@ export class RelayTransport implements Transport {
     }
 
     private cleanup(): void {
+        this.cancelConnection?.();
         this.stopPingInterval();
         if (this.reconnectTimer) {
             clearTimeout(this.reconnectTimer);

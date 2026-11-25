@@ -45,6 +45,7 @@ export {
 export type { GroupAccessStorageV2, GroupAccessV2, OperationStorageV2 } from './storage.js';
 
 export { GroupServiceV2 } from './group-service.js';
+export { parseIdentityTransfer, storedRootIdentitySchema, type IdentityTransfer } from './identity-transfer.js';
 
 export { createGroupAccessV2, groupAccessFromInviteV2 } from './group-access.js';
 
@@ -100,3 +101,10 @@ export type {
     SettlementStateV2,
     VoidedExpenseProjectionV2,
 } from './projector.js';
+
+export {
+    signIdentityDirectoryRecord, parseIdentityDirectoryRecord, projectIdentityDirectory,
+    type IdentityDirectoryRecord, type IdentityDirectoryPayload,
+} from './identity-directory.js';
+export { synchronizeGroupV2 } from './group-sync.js';
+export { IdentitySyncService, type IdentitySyncStorage, type SyncIdentity } from './identity-sync.js';

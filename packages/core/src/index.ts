@@ -18,7 +18,7 @@ export {
     verify,
 } from "./crypto.js";
 
-export { createDeviceIdentity, createRootIdentity } from './identity.js';
+export { createDeviceIdentity, createRootIdentity, identityKeyPairSchema, rootIdentitySchema, deviceIdentitySchema } from './identity.js';
 export { computeSettlements, type Settlement } from "./balance.js";
 export {
     deriveGroupKey,
@@ -34,3 +34,4 @@ export type {
     RelayTransportOptions,
 } from "./sync/index.js";
 export * from "./protocol-v2/index.js";
+export { exchangeEncryptedSet, createRelayForAccess } from './sync/encrypted-set.js';

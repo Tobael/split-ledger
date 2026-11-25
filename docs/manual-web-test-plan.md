@@ -52,10 +52,13 @@ Run this checklist on the deployed HTTPS web application before starting Tauri i
 ## Identity and device transfer
 
 1. Export the password-encrypted identity-transfer file from device A; confirm no full identity package is offered as a QR code.
-2. Import it into a clean device B profile.
-3. Confirm B generates a distinct device public key and regains every transferred group.
-4. From A, revoke B and confirm B can no longer publish valid operations.
-5. Confirm A remains usable and historical operations attributed to B remain visible.
+2. Disconnect the relay and import it into a clean device B profile. Confirm all transferred groups and expenses appear immediately, and B has a distinct device public key.
+3. Add and correct expenses on both A and B offline. Reconnect the relay, wait for synchronization, and confirm both sessions converge after reload.
+4. Disconnect the relay on A and revoke B. Confirm the revocation is saved without reporting a relay failure. Reconnect both devices and wait for synchronization.
+5. Confirm B displays its revoked status and can no longer edit expenses or administer the transferred groups. Confirm A remains usable and historical operations attributed to B remain visible.
+6. Create a new group on A after exporting and another group on B. Without another export, synchronize both sessions and confirm both groups appear and are editable on each device. Repeat with a group joined through an invitation.
+7. Delete a group locally on B, reload and synchronize. Confirm it stays removed on B while A retains it. Temporarily remove a group root from a test relay and verify the waiting-for-history message; bring a complete member online and verify recovery without another export.
+8. Import a malformed snapshot and confirm the existing identity, devices, directory, and group data are preserved. Use a fresh format-3 export; obsolete access-only files are unsupported.
 
 ## iOS messenger test
 

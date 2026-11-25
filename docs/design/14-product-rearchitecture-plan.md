@@ -2,7 +2,7 @@
 
 > Status: approved direction and implementation handoff
 >
-> Last updated: 2026-07-16
+> Last updated: 2026-11-25
 
 This document is the starting point for future implementation sessions. It supersedes the platform and recovery direction in the older design roadmap where the two conflict. Do not begin by rewriting the React UI or moving all code to Rust. First correct the protocol and introduce platform boundaries; then add Tauri as another host for the same application.
 
@@ -212,14 +212,14 @@ The active protocol-v2 runtime now provides:
 
 Current validation baseline:
 
-- 71 focused core tests pass after deleting the superseded linear-ledger test suites.
-- 11 protocol-v2 relay HTTP/WebSocket integration and configuration tests pass.
-- Web identity, operation-storage, platform-link, routing, and expense-split tests pass.
+- 79 core tests pass, including relay lifecycle and causal authorization coverage.
+- 24 relay tests pass, including real encrypted identity-discovery, admission, pagination, edit, and revocation integration.
+- 41 web tests pass, including offline transfer, atomic identity storage, automatic group discovery, pruning recovery, and device-wide revocation.
 - Full workspace lint passes.
 - Full production build passes.
 - `better-sqlite3` is upgraded to 12.11.1 for Node 26 compatibility.
 
-The production build still reports a large-chunk warning and mixed static/dynamic loading of `identity-export.ts`; these are non-blocking cleanup items.
+The current production build completes without the earlier large-chunk and mixed identity-export loading warnings.
 
 Remaining edit work:
 
@@ -353,7 +353,9 @@ Exit criterion: two independent implementations could produce identical hashes a
 - [x] Connect deterministic per-currency settlement suggestions and payer-signed settlement operations to the active v2 group UI.
 - [x] Connect creator-authorized participant rename, disable, and explicit lost-identity slot reassignment to the active v2 group UI.
 - [x] Connect v2 authorized-device aggregation and owner-signed device revocation to settings while retaining transfer/export support.
-- [x] Replace legacy identity exports with a v2-only transfer package containing the root identity and per-group access material; imports generate and authorize a fresh device key instead of copying the source device key.
+- [x] Replace access-only identity exports with transfer format 3 containing the root identity, per-group access, and complete retained protocol-v2 histories; imports validate the full snapshot before atomically replacing identity, directory, and group storage and authorize a fresh device key locally, so both sessions work offline. See [multi-device behavior and limitations](11-multi-device-sync.md).
+- [x] Implement encrypted identity-private group discovery and a monotonic device registry, so enrolled sessions automatically receive later groups without another export. Keep the directory out of the product group list and preserve explicit local deletion.
+- [x] Retain access-only groups in synchronization retries; use device signatures for normal administration and revocation, show revoked current-device status, and keep local edits/revocations successful when publication is unavailable.
 - [x] Delete the legacy invite-token and member-add fallback from the active join route; the web application now accepts only encrypted v2 invitations.
 - [x] Keep recovery operations out of v2; identity transfer and device sharing remain supported portability flows.
 
@@ -366,7 +368,8 @@ Exit criterion: complete local group lifecycle and property tests pass without n
 - [x] Add bounded cursor pagination and adversarial capability tests.
 - [x] Delete the unused libp2p/WebRTC, signaling, and composite-transport implementation.
 - [x] Document the self-hosted relay contract, deployment, configuration, backup, retention, and upgrades.
-- [x] Implement bidirectional reconnect anti-entropy: fetch remote operations and idempotently republish every locally retained group operation.
+- [x] Implement bidirectional reconnect anti-entropy: fetch remote operations and idempotently republish every locally retained group operation, even when remote history has missing parents. Perform a validating read after publication.
+- [x] Bound relay handshakes, reject disconnected publication and invalid wire responses, enforce advancing pagination, and sync independent group relays despite directory failure.
 - [x] Detect synchronization blocked by missing history and show that another group member with the required history needs to come online.
 - [x] Test recovery from an empty/replaced relay using only one member's durable local operation set.
 - [x] Verify two clients converge deterministically after offline concurrent writes arrive in opposite orders.
